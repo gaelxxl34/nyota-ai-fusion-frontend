@@ -1,70 +1,102 @@
-# Getting Started with Create React App
+# Nyota AI Fusion Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Overview
+
+Nyota AI Fusion is a lead management platform with AI-powered features to automate lead qualification, engage with leads via multiple channels including WhatsApp, and provide advanced analytics for business growth.
+
+## Prerequisites
+
+- Node.js 16+
+- npm or yarn
+- Backend API service running
+
+## Setup
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/your-username/nyota-ai-fusion.git
+cd nyota-ai-fusion/nyota-ai-fusion-frontend
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Set up environment variables:
+
+```bash
+cp .env.example .env
+# Edit .env with your actual values
+```
+
+4. Start the development server:
+
+```bash
+npm start
+# or
+yarn start
+```
+
+## Build for Production
+
+```bash
+npm run build
+# or
+yarn build
+```
+
+## Features
+
+- **User Authentication**: Secure login and role-based access control
+- **Lead Management Dashboard**: Centralized view of all leads with filtering and search capabilities
+- **Lead Qualification**: Automatic scoring and qualification of leads
+- **WhatsApp Integration**: Direct messaging with leads via WhatsApp
+- **Analytics**: Comprehensive analytics dashboard with visualizations
+- **Team Management**: Assign leads to team members and track performance
+- **Organization Management**: Multi-organization support for admin users
+
+## Project Structure
+
+```
+nyota-ai-fusion-frontend/
+├── public/             # Static files
+├── src/
+│   ├── components/     # Reusable UI components
+│   ├── contexts/       # React context providers
+│   ├── hooks/          # Custom React hooks
+│   ├── pages/          # Page components
+│   ├── services/       # API service layer
+│   ├── theme/          # Theme configuration
+│   ├── utils/          # Utility functions
+│   ├── App.js          # Main application component
+│   └── index.js        # Application entry point
+└── package.json        # Project dependencies and scripts
+```
 
 ## Available Scripts
 
-In the project directory, you can run:
+- `npm start`: Run the development server
+- `npm run build`: Build the app for production
+- `npm run test`: Run tests
+- `npm run eject`: Eject from Create React App
 
-### `npm start`
+## User Roles
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+1. **System Admin**: Access to all features and organizations
+2. **Organization Admin**: Manage their organization's settings, team, and leads
+3. **Lead Manager**: View and manage leads within their organization
+4. **Customer Support**: Handle conversations with leads
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Technologies Used
 
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- React.js
+- Material-UI
+- React Router
+- Axios
+- Chart.js
+- Firebase Authentication
