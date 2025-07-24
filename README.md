@@ -2,11 +2,15 @@
 
 ## Overview
 
-Nyota AI Fusion is a lead management platform with AI-powered features to automate lead qualification, engage with leads via multiple channels including WhatsApp, and provide advanced analytics for business growth.
+Nyota AI Fusion is an AI-powered lead management platform designed specifically for educational institutions. It automates lead capture, qualification, and conversion through intelligent automation, multi-channel engagement including WhatsApp integration, and provides comprehensive analytics for enrollment growth.
+
+## Live Website
+
+🌐 **[https://nyotafusionai.com](https://nyotafusionai.com)**
 
 ## Prerequisites
 
-- Node.js 16+
+- Node.js 20+
 - npm or yarn
 - Backend API service running
 
@@ -52,29 +56,50 @@ yarn build
 
 ## Features
 
+- **Modern UI/UX**: Built with Tailwind CSS for responsive, professional design
+- **SEO Optimized**: Comprehensive meta tags, Open Graph, and Twitter Card support
 - **User Authentication**: Secure login and role-based access control
-- **Lead Management Dashboard**: Centralized view of all leads with filtering and search capabilities
-- **Lead Qualification**: Automatic scoring and qualification of leads
-- **WhatsApp Integration**: Direct messaging with leads via WhatsApp
-- **Analytics**: Comprehensive analytics dashboard with visualizations
-- **Team Management**: Assign leads to team members and track performance
-- **Organization Management**: Multi-organization support for admin users
+- **AI Lead Management**: Intelligent lead capture, scoring, and qualification
+- **WhatsApp Integration**: Direct messaging with leads via WhatsApp Business API
+- **Multi-Channel Engagement**: Email, SMS, and social media integration
+- **Advanced Analytics**: Real-time dashboards with conversion tracking
+- **Team Collaboration**: Lead assignment and performance tracking
+- **Organization Management**: Multi-tenant architecture for educational institutions
+- **Social Media Ready**: Optimized sharing cards for all major platforms
+
+## Technical Stack
+
+- **Frontend Framework**: React.js 18+
+- **Styling**: Tailwind CSS 3.4+ (migrated from Material-UI)
+- **Routing**: React Router DOM
+- **SEO**: React Helmet for meta tag management
+- **Icons**: Font Awesome Pro
+- **HTTP Client**: Axios
+- **Charts**: Chart.js for analytics visualization
+- **Authentication**: Firebase Authentication
+- **Build Tool**: Create React App with Webpack
 
 ## Project Structure
 
-```
+```text
 nyota-ai-fusion-frontend/
-├── public/             # Static files
+├── public/             # Static assets including hero.jpg for SEO
 ├── src/
-│   ├── components/     # Reusable UI components
+│   ├── components/     # Reusable UI components (Tailwind CSS)
 │   ├── contexts/       # React context providers
 │   ├── hooks/          # Custom React hooks
-│   ├── pages/          # Page components
+│   ├── pages/          # Page components with SEO optimization
+│   │   ├── auth/       # Authentication pages (Login, ForgotPassword)
+│   │   ├── LandingPage.js    # Main public page with hero section
+│   │   ├── PrivacyPolicy.js  # Legal compliance page
+│   │   └── TermsOfService.js # Service agreement page
 │   ├── services/       # API service layer
-│   ├── theme/          # Theme configuration
+│   ├── theme/          # Tailwind theme configuration
 │   ├── utils/          # Utility functions
 │   ├── App.js          # Main application component
 │   └── index.js        # Application entry point
+├── tailwind.config.js  # Tailwind CSS configuration
+├── postcss.config.js   # PostCSS configuration
 └── package.json        # Project dependencies and scripts
 ```
 
@@ -94,9 +119,30 @@ nyota-ai-fusion-frontend/
 
 ## Technologies Used
 
-- React.js
-- Material-UI
-- React Router
-- Axios
-- Chart.js
-- Firebase Authentication
+- **React.js 18+** - Modern frontend framework
+- **Tailwind CSS 3.4+** - Utility-first CSS framework
+- **React Router DOM** - Client-side routing
+- **React Helmet** - SEO meta tag management
+- **Font Awesome** - Icon library
+- **Axios** - HTTP client for API calls
+- **Chart.js** - Data visualization
+- **Firebase Authentication** - Secure user authentication
+- **PostCSS** - CSS processing and optimization
+
+## SEO & Social Media Features
+
+- **Comprehensive Meta Tags**: Title, description, keywords for all pages
+- **Open Graph Protocol**: Rich previews for Facebook, LinkedIn, WhatsApp
+- **Twitter Cards**: Optimized sharing for Twitter
+- **Structured Data**: Schema.org markup for search engines
+- **Canonical URLs**: Proper SEO indexing with nyotafusionai.com domain
+- **Social Media Images**: Hero image (1440x1024) for all sharing cards
+- **Mobile Optimization**: Responsive design with proper viewport settings
+
+## Development Notes
+
+- **Migration Completed**: Successfully migrated from Material-UI to Tailwind CSS
+- **Legacy Support**: Uses `--legacy-peer-deps` for dependency resolution
+- **SEO Ready**: All external pages optimized for search engines and social sharing
+- **Performance**: Optimized images and CSS for fast loading
+- **Accessibility**: WCAG compliant design patterns

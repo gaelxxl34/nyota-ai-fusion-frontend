@@ -3,7 +3,6 @@ import {
   Routes,
   Route,
   Navigate,
-  useLocation,
 } from "react-router-dom";
 import Layout from "./components/Layout/Layout";
 import Dashboard from "./pages/Dashboard";
@@ -11,6 +10,9 @@ import ChatManagement from "./pages/ChatManagement";
 import Settings from "./pages/Settings";
 import Login from "./pages/auth/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
+import LandingPage from "./pages/LandingPage";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import Organizations from "./pages/Organizations";
 import Users from "./pages/Users";
 import AdminSettings from "./pages/AdminSettings";
@@ -32,7 +34,6 @@ const ProtectedRoute = ({
   children,
 }) => {
   const { user, loading, hasPermission } = useAuth();
-  const location = useLocation();
 
   // Show loading state
   if (loading) {
@@ -96,6 +97,9 @@ function App() {
         <AuthProvider>
           <Routes>
             {/* Public routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
 
@@ -236,7 +240,7 @@ function App() {
               }
             />
 
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AuthProvider>
       </Router>

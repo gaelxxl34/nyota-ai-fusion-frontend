@@ -1,15 +1,8 @@
 import React, { useState, useEffect } from "react";
-import {
-  Box,
-  Button,
-  TextField,
-  Typography,
-  Container,
-  Paper,
-  Link,
-} from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { Link as RouterLink } from "react-router-dom";
+import { Helmet } from "react-helmet";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -82,112 +75,165 @@ const Login = () => {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        backgroundColor: "background.default",
-        p: 0,
-        m: 0,
-        width: "100vw",
-        overflow: "hidden",
-      }}
-    >
-      <Container
-        maxWidth="xs"
-        sx={{
-          p: 0,
-          height: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-        }}
-      >
-        <Paper
-          elevation={3}
-          sx={{
-            p: { xs: 2, sm: 4 },
-            height: { xs: "100vh", sm: "auto" },
-            borderRadius: { xs: 0, sm: 2 },
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            m: { xs: 0, sm: 2 },
-          }}
-        >
-          <Box sx={{ mb: { xs: 3, sm: 4 } }}>
-            <Typography
-              component="h1"
-              variant="h5"
-              align="center"
-              sx={{
-                fontSize: { xs: "1.5rem", sm: "2rem" },
-                fontWeight: 500,
-                mb: 1,
-              }}
-            >
-              Login to Nyota AI Fusion
-            </Typography>
-          </Box>
-          <Box
-            component="form"
-            onSubmit={handleSubmit}
-            sx={{
-              width: "100%",
-              mt: { xs: 0, sm: 1 },
-            }}
-          >
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              autoFocus
-              value={formData.email}
-              onChange={handleChange}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={formData.password}
-              onChange={handleChange}
-            />
-            {(authError || localError) && (
-              <Typography color="error" align="center" sx={{ mt: 2 }}>
-                {authError || localError}
-              </Typography>
-            )}
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              disabled={loading}
-              sx={{ mt: 3, mb: 2 }}
-            >
-              {loading ? "Signing in..." : "Sign In"}
-            </Button>
-            <Box sx={{ textAlign: "center" }}>
-              <Link
-                component="button"
-                variant="body2"
-                onClick={() => navigate("/forgot-password")}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center px-4 sm:px-6 lg:px-8">
+      {/* SEO Meta Tags */}
+      <Helmet>
+        <title>
+          Login - Nyota Fusion AI | Access Your Lead Management Dashboard
+        </title>
+        <meta
+          name="description"
+          content="Login to your Nyota Fusion AI account to access powerful lead management tools, student enrollment tracking, and AI-powered admissions automation."
+        />
+        <meta
+          name="keywords"
+          content="login, Nyota Fusion AI, lead management dashboard, school admissions login, educational technology platform"
+        />
+        <meta name="robots" content="noindex, nofollow" />
+        <meta property="og:title" content="Login - Nyota Fusion AI" />
+        <meta
+          property="og:description"
+          content="Access your AI-powered lead management dashboard for educational institutions."
+        />
+        <meta property="og:type" content="website" />
+        <meta
+          property="og:image"
+          content="https://nyotafusionai.com/hero.jpg"
+        />
+        <meta property="og:image:width" content="1440" />
+        <meta property="og:image:height" content="1024" />
+        <meta property="og:image:type" content="image/jpeg" />
+        <meta property="og:site_name" content="Nyota Fusion AI" />
+
+        {/* Twitter Card Meta Tags */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Login - Nyota Fusion AI" />
+        <meta
+          name="twitter:description"
+          content="Access your AI-powered lead management dashboard for educational institutions."
+        />
+        <meta
+          name="twitter:image"
+          content="https://nyotafusionai.com/hero.jpg"
+        />
+      </Helmet>
+
+      {/* Background Pattern */}
+      <div className="absolute inset-0 bg-gradient-to-br from-red-50 to-blue-50 opacity-30"></div>
+
+      {/* Login Container */}
+      <div className="relative max-w-md w-full space-y-8">
+        {/* Header with Logo */}
+        <div className="text-center">
+          <RouterLink to="/" className="inline-block mb-6 no-underline">
+            <h1 className="text-3xl font-bold text-gray-900 hover:text-red-800 transition-colors">
+              Nyota Fusion AI
+            </h1>
+          </RouterLink>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
+            <p className="text-gray-600">Sign in to your account to continue</p>
+          </div>
+        </div>
+
+        {/* Login Form */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Email Input */}
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 mb-2"
               >
-                Forgot password?
-              </Link>
-            </Box>
-          </Box>
-        </Paper>
-      </Container>
-    </Box>
+                Email Address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors text-gray-900 placeholder-gray-500"
+                placeholder="Enter your email"
+                value={formData.email}
+                onChange={handleChange}
+              />
+            </div>
+
+            {/* Password Input */}
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors text-gray-900 placeholder-gray-500"
+                placeholder="Enter your password"
+                value={formData.password}
+                onChange={handleChange}
+              />
+            </div>
+
+            {/* Error Message */}
+            {(authError || localError) && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-red-600 text-sm text-center">
+                  {authError || localError}
+                </p>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full py-3 px-4 rounded-lg text-white font-semibold transition-all duration-200 ${
+                loading
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-red-800 hover:bg-red-900 focus:ring-4 focus:ring-red-200 transform hover:scale-105"
+              }`}
+            >
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Signing in...
+                </div>
+              ) : (
+                "Sign In"
+              )}
+            </button>
+
+            {/* Forgot Password Link */}
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => navigate("/forgot-password")}
+                className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
+              >
+                Forgot your password?
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center">
+          <p className="text-gray-500 text-sm">
+            © 2025 Nyota Fusion AI. All rights reserved.
+          </p>
+          <p className="text-gray-400 text-xs mt-1">
+            Powered by Nyota Innovations
+          </p>
+        </div>
+      </div>
+    </div>
   );
 };
 
