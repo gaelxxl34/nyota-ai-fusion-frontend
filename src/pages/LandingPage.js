@@ -309,8 +309,19 @@ const LandingPage = () => {
           <div className="flex justify-between items-center h-16 md:justify-between">
             {/* Logo - Centered on mobile, left-aligned on desktop */}
             <div className="flex items-center justify-center md:justify-start w-full md:w-auto">
-              <span className="text-2xl font-bold text-gray-900">
-                Nyota Fusion AI
+              <img
+                src="/red.png"
+                alt="Nyota Fusion AI"
+                className="h-16 w-auto"
+              />
+              <span
+                className="text-2xl font-bold text-gray-900 tracking-wider font-serif"
+                style={{
+                  fontFamily: "'Playfair Display', 'Times New Roman', serif",
+                  letterSpacing: "0.1em",
+                }}
+              >
+                NYOTA FUSION AI
               </span>
             </div>
             {/* Navigation buttons - Hidden on mobile, visible on desktop */}
