@@ -204,7 +204,7 @@ const LeadDetailsDialog = ({
     const statusMap = {
       INQUIRY: { color: "primary", progress: 10, label: "Inquiry" },
       CONTACTED: { color: "info", progress: 25, label: "Contacted" },
-      PRE_QUALIFIED: { color: "warning", progress: 40, label: "Pre-qualified" },
+      PRE_QUALIFIED: { color: "warning", progress: 40, label: "Interested" },
       APPLIED: { color: "info", progress: 60, label: "Applied" },
       QUALIFIED: { color: "success", progress: 75, label: "Qualified" },
       ADMITTED: { color: "secondary", progress: 85, label: "Admitted" },
@@ -534,7 +534,7 @@ const LeadDetailsDialog = ({
                       >
                         <MenuItem value="INQUIRY">Inquiry</MenuItem>
                         <MenuItem value="CONTACTED">Contacted</MenuItem>
-                        <MenuItem value="PRE_QUALIFIED">Pre-qualified</MenuItem>
+                        <MenuItem value="PRE_QUALIFIED">Interested</MenuItem>
                         <MenuItem value="APPLIED">Applied</MenuItem>
                         <MenuItem value="QUALIFIED">Qualified</MenuItem>
                         <MenuItem value="ADMITTED">Admitted</MenuItem>

@@ -16,10 +16,11 @@ class ConversationService {
       offset = 0,
       status = "active",
       includeClosed = false,
+      leadStatus = null, // New: filter by lead status
     } = options;
 
     console.log(
-      `🔄 Fetching conversations from backend (limit: ${limit}, offset: ${offset})...`
+      `🔄 Fetching conversations from backend (limit: ${limit}, offset: ${offset}, leadStatus: ${leadStatus})...`
     );
 
     try {
@@ -29,6 +30,11 @@ class ConversationService {
         status,
         includeClosed: includeClosed.toString(),
       });
+
+      // Add leadStatus if provided
+      if (leadStatus) {
+        params.append("leadStatus", leadStatus);
+      }
 
       const response = await axiosInstance.get(
         `/api/whatsapp/conversations?${params}`
@@ -40,7 +46,7 @@ class ConversationService {
         const pagination = response.data.pagination || {};
 
         console.log(
-          `📋 Found ${apiConversations.length} conversations from backend (hasMore: ${pagination.hasMore})`
+          `📋 Found ${apiConversations.length} conversations from backend (hasMore: ${pagination.hasMore}, nextOffset: ${pagination.nextOffset})`
         );
 
         const processedData = this.processConversationsData(apiConversations);
@@ -49,9 +55,12 @@ class ConversationService {
           ...processedData,
           pagination: {
             hasMore: pagination.hasMore || false,
-            limit,
-            offset,
-            total: pagination.total,
+            limit: pagination.limit || limit,
+            offset: pagination.offset || offset,
+            nextOffset: pagination.nextOffset || offset + limit,
+            totalCount: pagination.totalCount || 0,
+            totalFetched: pagination.totalFetched || apiConversations.length,
+            currentPage: pagination.currentPage || 1,
           },
         };
       }
@@ -64,7 +73,10 @@ class ConversationService {
           hasMore: false,
           limit,
           offset,
-          total: 0,
+          nextOffset: offset,
+          totalCount: 0,
+          totalFetched: 0,
+          currentPage: 1,
         },
       };
     } catch (error) {

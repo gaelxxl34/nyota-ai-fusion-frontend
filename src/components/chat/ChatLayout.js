@@ -38,6 +38,9 @@ const ChatLayout = ({
   messagesLoading = false,
   onRefresh,
   onStartConversation,
+  hasMoreConversations = false,
+  loadingMoreConversations = false,
+  onLoadMore,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -98,6 +101,9 @@ const ChatLayout = ({
           searchTerm={searchTerm}
           loading={conversationsLoading}
           onRefresh={onRefresh}
+          hasMoreConversations={hasMoreConversations}
+          loadingMoreConversations={loadingMoreConversations}
+          onLoadMore={onLoadMore}
         />
       </Box>
     </Box>

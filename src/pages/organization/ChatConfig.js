@@ -15,6 +15,7 @@ import {
   Refresh as RefreshIcon,
   Notifications as NotificationsIcon,
 } from "@mui/icons-material";
+import Swal from "sweetalert2";
 
 import ConversationTabs from "../../components/chat/ConversationTabs";
 import ChatLayout from "../../components/chat/ChatLayout";
@@ -47,7 +48,12 @@ const ChatConfig = () => {
   const [totalUnreadMessages, setTotalUnreadMessages] = useState(0);
   const [aiTyping, setAiTyping] = useState(new Map());
   const [userTyping, setUserTyping] = useState(false);
-  const [leadStatuses, setLeadStatuses] = useState(new Map());
+  // Note: leadStatuses now come directly from conversationMetadata.leadStatus
+
+  // Pagination state
+  const [hasMoreConversations, setHasMoreConversations] = useState(true);
+  const [loadingMoreConversations, setLoadingMoreConversations] =
+    useState(false);
 
   // Refs
   const activeConversationRef = useRef(activeConversation);
@@ -73,7 +79,7 @@ const ChatConfig = () => {
       tabId: "inquiries-tab",
     },
     {
-      label: "Pre-Qualified",
+      label: "Interested",
       statuses: ["PRE_QUALIFIED", "FOLLOW_UP"],
       color: "info.main",
       icon: "🎯",
@@ -108,75 +114,25 @@ const ChatConfig = () => {
     return phoneNumber.toString().replace(/\D/g, "").replace(/^0+/, "");
   }, []);
 
-  const fetchLeadStatuses = useCallback(async () => {
-    try {
-      const statusMap = new Map();
-      const conversationPhones = Array.from(conversationMetadata.keys());
-
-      for (const phoneNumber of conversationPhones) {
-        try {
-          const response = await axiosInstance.get(
-            `/api/leads/phone/${normalizePhoneNumber(phoneNumber)}`
-          );
-          if (response.data.success && response.data.data) {
-            const leadStatus = response.data.data.status || "INQUIRY";
-            statusMap.set(phoneNumber, leadStatus);
-          } else {
-            statusMap.set(phoneNumber, "NO_LEAD");
-          }
-        } catch (error) {
-          statusMap.set(phoneNumber, "NO_LEAD");
-        }
-      }
-
-      setLeadStatuses(statusMap);
-    } catch (error) {
-      console.error("❌ Error fetching lead statuses:", error);
-    }
-  }, [conversationMetadata, normalizePhoneNumber]);
-
-  // Get filtered conversations based on current tab
+  // Get filtered conversations based on current tab - now using API filtering
   const getFilteredConversations = useCallback(() => {
     try {
       if (tabValue === mainTabs.length - 1) {
         return []; // Knowledge Base tab doesn't show conversations
       }
 
-      const currentTab = mainTabs[tabValue];
+      // Convert conversations Map to array for display
+      // Filtering is now done at API level, so we just return all conversations
+      const conversationsArray = Array.from(conversations.entries());
 
-      // Handle "New Contacts" tab (non-leads)
-      if (currentTab.type === "non_leads") {
-        const filteredEntries = Array.from(conversations.entries()).filter(
-          ([phoneNumber, messages]) => {
-            const leadStatus = leadStatuses.get(phoneNumber);
-            const isNonLead = !leadStatus || leadStatus === "NO_LEAD";
-            return isNonLead;
-          }
-        );
-
-        return filteredEntries;
-      }
-
-      // Handle status-based tabs
-      const targetStatuses = currentTab.statuses;
-
-      const filteredEntries = Array.from(conversations.entries()).filter(
-        ([phoneNumber, messages]) => {
-          const leadStatus = leadStatuses.get(phoneNumber);
-          const hasLead = leadStatus && leadStatus !== "NO_LEAD";
-          const matches = hasLead && targetStatuses.includes(leadStatus);
-          return matches;
-        }
-      );
-
-      return filteredEntries;
+      return conversationsArray;
     } catch (error) {
       console.error("❌ Error filtering conversations:", error);
       return [];
     }
-  }, [tabValue, mainTabs, conversations, leadStatuses]);
+  }, [tabValue, mainTabs, conversations]);
 
-  // Get count of conversations for each tab
+  // Get count of conversations for each tab - now using conversation counts
   const getTabCount = useCallback(
     (tabIndex) => {
       try {
@@ -184,19 +140,18 @@ const ChatConfig = () => {
 
         const tab = mainTabs[tabIndex];
 
-        // Handle "New Contacts" tab (non-leads)
-        if (tab.type === "non_leads") {
-          const count = Array.from(leadStatuses.values()).filter(
-            (status) => !status || status === "NO_LEAD"
-          ).length;
-          return count;
-        }
+        // Count conversations by their leadStatus
+        let count = 0;
+        conversations.forEach((messages, phoneNumber) => {
+          const conversationData = conversationMetadata.get(phoneNumber);
+          const leadStatus = conversationData?.leadStatus || "NO_LEAD";
 
-        // Handle status-based tabs
-        const count = Array.from(leadStatuses.values()).filter(
-          (status) =>
-            status && status !== "NO_LEAD" && tab.statuses.includes(status)
-        ).length;
+          if (tab.type === "non_leads") {
+            if (leadStatus === "NO_LEAD") count++;
+          } else if (tab.statuses && tab.statuses.includes(leadStatus)) {
+            count++;
+          }
+        });
 
         return count;
       } catch (error) {
@@ -204,60 +159,90 @@ const ChatConfig = () => {
         return 0;
       }
     },
-    [mainTabs, leadStatuses]
+    [mainTabs, conversations, conversationMetadata]
   );
 
-  // All the original functions but simplified (fetchConversations, switchConversation, etc.)
-  // I'll include the essential ones here:
+  // Optimized conversation switching with lazy message loading
+  const switchConversation = useCallback(async (phoneNumber) => {
+    if (!phoneNumber) {
+      setActiveConversation(null);
+      setChatMessages([]);
+      return;
+    }
 
-  const switchConversation = useCallback(
-    (phoneNumber) => {
-      if (!phoneNumber) {
-        setActiveConversation(null);
+    setMessagesLoading(true);
+    setActiveConversation(phoneNumber);
+
+    try {
+      // Fetch messages only when conversation is selected (lazy loading)
+      const response = await axiosInstance.get(
+        `/api/whatsapp/conversations/${encodeURIComponent(
+          phoneNumber
+        )}/messages?limit=50&offset=0`
+      );
+
+      if (response.data.success) {
+        setChatMessages(response.data.messages || []);
+      } else {
+        console.error("Failed to fetch messages:", response.data.error);
         setChatMessages([]);
-        return;
       }
+    } catch (error) {
+      console.error("❌ Error fetching messages:", error);
+      setChatMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
 
-      setMessagesLoading(true);
-      setActiveConversation(phoneNumber);
+    // Mark messages as read
+    setUnreadCounts((prev) => {
+      const newCounts = new Map(prev);
+      newCounts.set(phoneNumber, 0);
+      return newCounts;
+    });
+  }, []);
 
-      // Simulate brief loading for messages (since they're loaded instantly from memory)
-      setTimeout(() => {
-        const messages = conversations.get(phoneNumber) || [];
-        setChatMessages([...messages]);
-        setMessagesLoading(false);
-      }, 200);
-
-      // Mark messages as read
-      setUnreadCounts((prev) => {
-        const newCounts = new Map(prev);
-        newCounts.set(phoneNumber, 0);
-        return newCounts;
-      });
-    },
-    [conversations]
-  );
-
+  // Optimized conversation fetching with pagination and filtering
   const fetchConversations = useCallback(
-    async (loadMore = false) => {
+    async (loadMore = false, specificLeadStatus = null) => {
       try {
         if (!loadMore) {
           setConversationsLoading(true);
+          // Reset pagination state for fresh load
+          setHasMoreConversations(true);
+          setLoadingMoreConversations(false);
+        } else {
+          setLoadingMoreConversations(true);
         }
 
         const currentOffset = loadMore ? conversations.size : 0;
         const limit = 25;
 
-        const params = new URLSearchParams({
-          limit: limit.toString(),
-          offset: currentOffset.toString(),
-          status: "active",
-          includeClosed: "false",
-        });
+        // Determine which lead status to filter by based on current tab
+        let leadStatusFilter = specificLeadStatus;
+        if (!leadStatusFilter && tabValue < mainTabs.length - 1) {
+          const currentTab = mainTabs[tabValue];
+          if (currentTab.type === "non_leads") {
+            leadStatusFilter = "NO_LEAD";
+          } else if (currentTab.statuses && currentTab.statuses.length > 0) {
+            // For status-based tabs, we'll make separate calls for each status
+            // For now, let's use the first status as primary filter
+            leadStatusFilter = currentTab.statuses[0];
+          }
+        }
 
-        const response = await axiosInstance.get(
-          `/api/whatsapp/conversations?${params}`
-        );
+        let apiUrl = `/api/whatsapp/conversations?limit=${limit}&offset=${currentOffset}&status=active&includeClosed=false`;
+
+        // Add lead status filter if specified
+        if (leadStatusFilter && leadStatusFilter !== "NO_LEAD") {
+          apiUrl += `&leadStatus=${leadStatusFilter}`;
+        } else if (leadStatusFilter === "NO_LEAD") {
+          apiUrl += `&leadStatus=NO_LEAD`;
+        }
+
+        console.log(`🔄 Fetching conversations: ${apiUrl}`);
+
+        const response = await axiosInstance.get(apiUrl);
 
         if (response.data.success) {
           const apiConversations = response.data.conversations || [];
@@ -277,130 +262,46 @@ const ChatConfig = () => {
             const phoneNumber = normalizePhoneNumber(conversation.phoneNumber);
             if (!phoneNumber) continue;
 
+            // Store conversation metadata (including leadStatus from API)
             newConversationMetadataMap.set(phoneNumber, {
               id: conversation.id,
               contactName: conversation.contactName,
               contactId: conversation.contactId,
               status: conversation.status,
+              leadStatus: conversation.leadStatus || "NO_LEAD", // From API
+              leadId: conversation.leadId,
+              aiEnabled: conversation.aiEnabled !== false,
               createdAt: conversation.createdAt,
               updatedAt: conversation.updatedAt,
-              aiEnabled: conversation.aiEnabled !== false,
+              lastMessage: conversation.lastMessage,
+              lastMessageTime: conversation.lastMessageTime,
+              messageCount: conversation.messageCount || 0,
             });
 
-            try {
-              const messagesResponse = await axiosInstance.get(
-                `/api/whatsapp/conversations/${conversation.phoneNumber}/messages`
-              );
-              if (messagesResponse.data.success) {
-                const messages = messagesResponse.data.messages.map((msg) => {
-                  let timestamp = msg.timestamp;
-                  if (typeof timestamp === "string") {
-                    timestamp = new Date(timestamp);
-                  } else if (timestamp && timestamp._seconds) {
-                    timestamp = new Date(
-                      timestamp._seconds * 1000 +
-                        (timestamp._nanoseconds || 0) / 1000000
-                    );
-                  }
-
-                  // Properly determine sender type based on message data
-                  let sender = "admin";
-                  let senderName = "Admin";
-                  let isAI = false;
-                  let isAdmin = false;
-
-                  if (msg.direction === "incoming") {
-                    sender = "customer";
-                    senderName =
-                      msg.senderName ||
-                      msg.profileName ||
-                      `Contact ${phoneNumber.slice(-4)}`;
-                  } else if (msg.direction === "outgoing") {
-                    // For outgoing messages, use the following priority:
-                    // 1. Explicit isAI field (most reliable)
-                    // 2. senderName === "Miryam"
-                    // 3. automated === true with AI content markers
-                    // 4. Content-based detection (fallback)
-                    if (
-                      msg.isAI === true ||
-                      msg.senderName === "Miryam" ||
-                      (msg.automated === true &&
-                        msg.content &&
-                        (msg.content.includes("I'm Miryam") ||
-                          msg.content.includes("AI assistant") ||
-                          msg.content.includes(
-                            "Welcome to International University"
-                          ) ||
-                          msg.content.includes("university family"))) ||
-                      (msg.automated !== false &&
-                        msg.content &&
-                        (msg.content.includes("I'm Miryam") ||
-                          msg.content.includes("AI assistant") ||
-                          msg.content.includes(
-                            "Welcome to International University"
-                          ) ||
-                          msg.content.includes("university family")))
-                    ) {
-                      sender = "ai";
-                      senderName = "Miryam";
-                      isAI = true;
-                    } else {
-                      // Manual admin message (automated === false or no AI content)
-                      sender = "admin";
-                      senderName = msg.senderName || "Admin";
-                      isAdmin = true;
-                    }
-                  } else {
-                    // Fallback for messages without proper direction
-                    // Use isAI field as primary indicator
-                    if (msg.isAI === true || msg.senderName === "Miryam") {
-                      sender = "ai";
-                      senderName = "Miryam";
-                      isAI = true;
-                    } else {
-                      sender = "admin";
-                      senderName = msg.senderName || "Admin";
-                      isAdmin = true;
-                    }
-                  }
-
-                  return {
-                    ...msg,
-                    sender: sender,
-                    senderName: senderName,
-                    timestamp: timestamp || new Date(),
-                    id:
-                      msg.messageId ||
-                      msg.id ||
-                      `msg-${Date.now()}-${Math.random()}`,
-                    profileName: senderName,
-                    isAI: isAI,
-                    isAdmin: isAdmin,
-                  };
-                });
-
-                newConversationsMap.set(phoneNumber, messages);
-
-                // Calculate unread count
-                const unreadCount = messages.filter(
-                  (msg) => msg.direction === "incoming" && !msg.read
-                ).length;
-                newUnreadCountsMap.set(phoneNumber, unreadCount);
-              }
-            } catch (msgError) {
-              console.error(
-                `❌ Error fetching messages for ${phoneNumber}:`,
-                msgError
-              );
+            // Store empty messages array - messages will be loaded on demand
+            if (!newConversationsMap.has(phoneNumber)) {
               newConversationsMap.set(phoneNumber, []);
-              newUnreadCountsMap.set(phoneNumber, 0);
             }
+
+            // Set unread count from API
+            newUnreadCountsMap.set(phoneNumber, conversation.unreadCount || 0);
           }
 
           // Update state with new data
           setConversations(newConversationsMap);
           setUnreadCounts(newUnreadCountsMap);
           setConversationMetadata(newConversationMetadataMap);
+
+          // Update pagination state based on response
+          const hasMore =
+            pagination.hasMore !== undefined
+              ? pagination.hasMore
+              : apiConversations.length === limit;
+          setHasMoreConversations(hasMore);
+
+          console.log(
+            `✅ Loaded ${apiConversations.length} conversations, hasMore: ${hasMore}`
+          );
 
           // Return first phone number for auto-selection
           if (!loadMore && apiConversations.length > 0) {
@@ -424,29 +325,91 @@ const ChatConfig = () => {
           setConversationMetadata(new Map());
         }
       } finally {
-        setConversationsLoading(false);
+        if (loadMore) {
+          setLoadingMoreConversations(false);
+        } else {
+          setConversationsLoading(false);
+        }
       }
     },
-    [conversations, unreadCounts, conversationMetadata, normalizePhoneNumber]
+    [
+      conversations,
+      unreadCounts,
+      conversationMetadata,
+      normalizePhoneNumber,
+      tabValue,
+      mainTabs,
+    ]
   );
+
+  // Fetch conversations for specific lead status (used when tab changes)
+  const fetchConversationsForTab = useCallback(
+    async (tabIndex) => {
+      if (tabIndex >= mainTabs.length - 1) return; // Skip Knowledge Base tab
+
+      const tab = mainTabs[tabIndex];
+      let leadStatusFilter = null;
+
+      if (tab.type === "non_leads") {
+        leadStatusFilter = "NO_LEAD";
+      } else if (tab.statuses && tab.statuses.length > 0) {
+        // For tabs with multiple statuses, we'll need to make separate calls
+        // For now, let's fetch all and filter client-side, or you can modify API to accept array
+        leadStatusFilter = tab.statuses[0]; // Use first status for now
+      }
+
+      await fetchConversations(false, leadStatusFilter);
+    },
+    [mainTabs, fetchConversations]
+  );
+
+  // Load more conversations for current tab
+  const loadMoreConversations = useCallback(async () => {
+    if (!hasMoreConversations || loadingMoreConversations) return;
+
+    setLoadingMoreConversations(true);
+
+    // Determine current lead status filter based on active tab
+    let leadStatusFilter = null;
+    if (tabValue < mainTabs.length - 1) {
+      const currentTab = mainTabs[tabValue];
+      if (currentTab.type === "non_leads") {
+        leadStatusFilter = "NO_LEAD";
+      } else if (currentTab.statuses && currentTab.statuses.length > 0) {
+        leadStatusFilter = currentTab.statuses[0];
+      }
+    }
+
+    await fetchConversations(true, leadStatusFilter);
+  }, [
+    hasMoreConversations,
+    loadingMoreConversations,
+    tabValue,
+    mainTabs,
+    fetchConversations,
+  ]);
+
+  // Remove old fetchLeadStatuses since lead status now comes from API
+  // const fetchLeadStatuses = useCallback(async () => { ... }, []);
 
   const getConversationsList = () => {
     try {
       const filteredConversations = getFilteredConversations();
       return filteredConversations
         .filter(([phoneNumber, messages]) => phoneNumber && phoneNumber.trim())
-        .map(([phoneNumber, messages]) => ({
-          phoneNumber,
-          messages,
-          lastMessage:
-            messages.length > 0 ? messages[messages.length - 1].content : "",
-          lastMessageTime:
-            messages.length > 0
-              ? messages[messages.length - 1].timestamp
-              : new Date(),
-          unreadCount: unreadCounts.get(phoneNumber) || 0,
-          leadStatus: leadStatuses.get(phoneNumber) || "INQUIRY",
-        }));
+        .map(([phoneNumber, messages]) => {
+          const metadata = conversationMetadata.get(phoneNumber);
+          return {
+            phoneNumber,
+            messages,
+            lastMessage: metadata?.lastMessage || "",
+            lastMessageTime: metadata?.lastMessageTime || new Date(),
+            unreadCount: unreadCounts.get(phoneNumber) || 0,
+            leadStatus: metadata?.leadStatus || "NO_LEAD",
+            contactName:
+              metadata?.contactName || `Contact ${phoneNumber.slice(-4)}`,
+          };
+        });
     } catch (error) {
       console.error("❌ Error in getConversationsList:", error);
       return [];
@@ -462,20 +425,6 @@ const ChatConfig = () => {
         metadata.contactName !== `Contact ${phoneNumber.slice(-4)}`
       ) {
         return metadata.contactName;
-      }
-      const messages = conversations.get(phoneNumber) || [];
-      if (messages.length > 0) {
-        const incomingMessagesWithProfile = messages
-          .filter(
-            (msg) =>
-              msg.sender === "customer" &&
-              msg.profileName &&
-              msg.profileName !== "Unknown"
-          )
-          .reverse();
-        if (incomingMessagesWithProfile.length > 0) {
-          return incomingMessagesWithProfile[0].profileName;
-        }
       }
       return `Contact ${phoneNumber.slice(-4)}`;
     } catch (error) {
@@ -567,7 +516,8 @@ const ChatConfig = () => {
     }
   };
 
-  const clearConversation = async (phoneNumber) => {
+  // Internal function without confirmation dialog
+  const clearConversationInternal = async (phoneNumber) => {
     try {
       setLoading(true);
       await ConversationService.clearConversationMessages(phoneNumber);
@@ -577,7 +527,9 @@ const ChatConfig = () => {
       }
       setSnackbar({
         open: true,
-        message: `Chat history cleared for ${phoneNumber}`,
+        message: `Chat history cleared for ${
+          conversationMetadata.get(phoneNumber)?.contactName || phoneNumber
+        }`,
         severity: "success",
       });
     } catch (error) {
@@ -587,12 +539,14 @@ const ChatConfig = () => {
         message: "Failed to clear chat history",
         severity: "error",
       });
+      throw error; // Re-throw so calling function can handle it
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteConversation = async (identifier) => {
+  // Internal function without confirmation dialog
+  const deleteConversationInternal = async (identifier) => {
     try {
       setLoading(true);
       let phoneNumber = identifier;
@@ -618,7 +572,7 @@ const ChatConfig = () => {
       }
       setSnackbar({
         open: true,
-        message: `Conversation with ${phoneNumber} deleted successfully`,
+        message: `Conversation deleted successfully`,
         severity: "success",
       });
     } catch (error) {
@@ -628,9 +582,142 @@ const ChatConfig = () => {
         message: "Failed to delete conversation",
         severity: "error",
       });
+      throw error; // Re-throw so calling function can handle it
     } finally {
       setLoading(false);
     }
+  };
+
+  const clearConversation = (phoneNumber) => {
+    // Get contact name for better UX
+    const contactName =
+      conversationMetadata.get(phoneNumber)?.contactName || phoneNumber;
+
+    Swal.fire({
+      title: "Clear Conversation?",
+      html: `Are you sure you want to clear all messages with <strong>${contactName}</strong>?<br><small>This action cannot be undone.</small>`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, clear it!",
+      cancelButtonText: "Cancel",
+      background: "#fff",
+      customClass: {
+        popup: "swal2-popup",
+        title: "swal2-title",
+        content: "swal2-content",
+      },
+    }).then(async (result) => {
+      if (!result.isConfirmed) {
+        return; // User cancelled
+      }
+
+      try {
+        setLoading(true);
+        await ConversationService.clearConversationMessages(phoneNumber);
+        await fetchConversations();
+        if (activeConversation === phoneNumber) {
+          setChatMessages([]);
+        }
+        setSnackbar({
+          open: true,
+          message: `Chat history cleared for ${contactName}`,
+          severity: "success",
+        });
+      } catch (error) {
+        console.error("❌ Error clearing conversation:", error);
+        setSnackbar({
+          open: true,
+          message: "Failed to clear chat history",
+          severity: "error",
+        });
+      } finally {
+        setLoading(false);
+      }
+    });
+  };
+
+  const deleteConversation = (identifier) => {
+    // Get contact name for better UX
+    let contactName = identifier;
+    if (
+      typeof identifier === "string" &&
+      identifier.length > 15 &&
+      !identifier.startsWith("+")
+    ) {
+      // This is a conversation ID, find the phone number
+      for (const [phone, metadata] of conversationMetadata.entries()) {
+        if (metadata?.id === identifier) {
+          contactName = metadata?.contactName || phone;
+          break;
+        }
+      }
+    } else {
+      // This is a phone number
+      contactName =
+        conversationMetadata.get(identifier)?.contactName || identifier;
+    }
+
+    Swal.fire({
+      title: "Delete Conversation?",
+      html: `Are you sure you want to permanently delete the conversation with <strong>${contactName}</strong>?<br><small>This action cannot be undone.</small>`,
+      icon: "error",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it!",
+      cancelButtonText: "Cancel",
+      background: "#fff",
+      customClass: {
+        popup: "swal2-popup",
+        title: "swal2-title",
+        content: "swal2-content",
+      },
+    }).then(async (result) => {
+      if (!result.isConfirmed) {
+        return; // User cancelled
+      }
+
+      try {
+        setLoading(true);
+        let phoneNumber = identifier;
+        if (
+          typeof identifier === "string" &&
+          identifier.length > 15 &&
+          !identifier.startsWith("+")
+        ) {
+          await ConversationService.deleteConversation(identifier);
+          for (const [phone, metadata] of conversationMetadata.entries()) {
+            if (metadata?.id === identifier) {
+              phoneNumber = phone;
+              break;
+            }
+          }
+        } else {
+          await ConversationService.deleteConversationByPhone(identifier);
+          phoneNumber = identifier;
+        }
+        await fetchConversations();
+        if (activeConversation === phoneNumber) {
+          switchConversation(null);
+        }
+        setSnackbar({
+          open: true,
+          message: `Conversation with ${contactName} deleted successfully`,
+          severity: "success",
+        });
+      } catch (error) {
+        console.error("❌ Error deleting conversation:", error);
+        setSnackbar({
+          open: true,
+          message: "Failed to delete conversation",
+          severity: "error",
+        });
+      } finally {
+        setLoading(false);
+      }
+    });
   };
 
   const toggleAutoReply = async (phoneNumber) => {
@@ -701,6 +788,9 @@ const ChatConfig = () => {
       if (searchTerm) {
         setSearchTerm("");
       }
+
+      // Fetch conversations for the new tab
+      fetchConversationsForTab(newValue);
     } catch (error) {
       console.error("❌ Error in handleTabChange:", error);
     }
@@ -764,12 +854,7 @@ const ChatConfig = () => {
     setTotalUnreadMessages(total);
   }, [unreadCounts]);
 
-  // Fetch lead statuses when conversations change
-  useEffect(() => {
-    if (conversationMetadata.size > 0) {
-      fetchLeadStatuses();
-    }
-  }, [conversationMetadata, fetchLeadStatuses]);
+  // Note: Lead statuses now come directly from API, no separate fetching needed
 
   // SSE setup
   useEffect(() => {
@@ -812,7 +897,8 @@ const ChatConfig = () => {
                 ChatMessageHandler.handleAITyping(data.data, setAiTyping);
                 break;
               case "lead_status_update":
-                fetchLeadStatuses();
+                // Refresh conversations to get updated lead status
+                fetchConversationsForTab(tabValue);
                 break;
               default:
                 break;
@@ -842,16 +928,16 @@ const ChatConfig = () => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Periodic refresh of lead statuses (backup mechanism)
+  // Periodic refresh of conversations (backup mechanism)
   useEffect(() => {
     const interval = setInterval(() => {
       if (conversationMetadata.size > 0) {
-        fetchLeadStatuses();
+        fetchConversationsForTab(tabValue);
       }
     }, 60000); // Refresh every minute
 
     return () => clearInterval(interval);
-  }, [conversationMetadata, fetchLeadStatuses]);
+  }, [conversationMetadata, fetchConversationsForTab, tabValue]);
 
   return (
     <Box
@@ -935,6 +1021,9 @@ const ChatConfig = () => {
                     messagesLoading={messagesLoading}
                     onRefresh={refreshConversations}
                     onStartConversation={handleStartConversation}
+                    hasMoreConversations={hasMoreConversations}
+                    loadingMoreConversations={loadingMoreConversations}
+                    onLoadMore={loadMoreConversations}
                   />
                 </ErrorBoundary>
               )}

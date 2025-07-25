@@ -83,7 +83,7 @@ const DataCenter = () => {
       color: "info",
     },
     {
-      label: "Pre-Qualified",
+      label: "Interested",
       statuses: ["PRE_QUALIFIED"],
       icon: AssessmentIcon,
       color: "warning",
@@ -422,14 +422,14 @@ const DataCenter = () => {
             </Card>
           </Grid>
 
-          {/* Pre-Qualified */}
+          {/* Interested */}
           <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent>
                 <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                   <ContactMailIcon color="warning" sx={{ mr: 1 }} />
                   <Typography variant="h6" color="warning.main">
-                    Pre-Qualified
+                    Interested
                   </Typography>
                 </Box>
                 <Typography
@@ -646,10 +646,10 @@ const DataCenter = () => {
                   →
                 </Typography>
 
-                {/* Pre-Qualified */}
+                {/* Interested */}
                 <Box sx={{ textAlign: "center", minWidth: 100 }}>
                   <Chip
-                    label={`Pre-Qualified: ${
+                    label={`Interested: ${
                       leadStats.byStatus.PRE_QUALIFIED || 0
                     }`}
                     color="warning"
@@ -964,8 +964,8 @@ const DataCenter = () => {
                   >
                     {tab.label === "All Leads" &&
                       "Overview of all leads in the system across all stages"}
-                    {tab.label === "Pre-Qualified" &&
-                      "Leads that have been pre-qualified and are ready for further engagement"}
+                    {tab.label === "Interested" &&
+                      "Leads that have shown interest and are ready for further engagement"}
                     {tab.label === "Applied" &&
                       "Leads who have submitted formal applications"}
                     {tab.label === "Qualified" &&

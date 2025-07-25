@@ -11,6 +11,8 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Button,
+  CircularProgress,
 } from "@mui/material";
 import {
   Person as PersonIcon,
@@ -18,6 +20,8 @@ import {
   Delete as DeleteIcon,
   Clear as ClearIcon,
 } from "@mui/icons-material";
+import Swal from "sweetalert2";
+import ConversationService from "../../services/conversationService";
 import ConversationListSkeleton from "./ConversationListSkeleton";
 import EmptyState from "./EmptyState";
 
@@ -34,6 +38,9 @@ const ConversationList = ({
   searchTerm,
   loading = false,
   onRefresh,
+  hasMoreConversations = false,
+  loadingMoreConversations = false,
+  onLoadMore,
 }) => {
   const filteredConversations = conversations.filter((conv) => {
     if (!searchTerm) return true;
@@ -76,6 +83,116 @@ const ConversationList = ({
     return message.length > maxLength
       ? `${message.substring(0, maxLength)}...`
       : message;
+  };
+
+  // Confirmation dialog for clearing conversation
+  const handleClearConversation = (phoneNumber, contactName) => {
+    Swal.fire({
+      title: "Clear Conversation?",
+      html: `Are you sure you want to clear all messages from <strong>${contactName}</strong>?<br><br><small>This will remove all messages but keep the conversation.</small>`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#f44336",
+      cancelButtonColor: "#6c757d",
+      confirmButtonText: "Yes, clear it!",
+      cancelButtonText: "Cancel",
+      focusCancel: true,
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          // Show loading state
+          Swal.fire({
+            title: "Clearing...",
+            text: "Please wait while we clear the conversation.",
+            icon: "info",
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            didOpen: () => {
+              Swal.showLoading();
+            },
+          });
+
+          // Call the backend operation directly
+          await ConversationService.clearConversationMessages(phoneNumber);
+
+          // Refresh the conversations list
+          if (onRefresh) {
+            await onRefresh();
+          }
+
+          // Show success message
+          Swal.fire({
+            title: "Cleared!",
+            text: `All messages have been cleared from ${contactName}.`,
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+          });
+        } catch (error) {
+          console.error("❌ Error clearing conversation:", error);
+          Swal.fire({
+            title: "Error!",
+            text: "Failed to clear the conversation. Please try again.",
+            icon: "error",
+          });
+        }
+      }
+    });
+  };
+
+  // Confirmation dialog for deleting conversation
+  const handleDeleteConversation = (phoneNumber, contactName) => {
+    Swal.fire({
+      title: "Delete Conversation?",
+      html: `Are you sure you want to permanently delete the conversation with <strong>${contactName}</strong>?<br><br><small class="text-danger">This action cannot be undone!</small>`,
+      icon: "error",
+      showCancelButton: true,
+      confirmButtonColor: "#dc3545",
+      cancelButtonColor: "#6c757d",
+      confirmButtonText: "Yes, delete it!",
+      cancelButtonText: "Cancel",
+      focusCancel: true,
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          // Show loading state
+          Swal.fire({
+            title: "Deleting...",
+            text: "Please wait while we delete the conversation.",
+            icon: "info",
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            didOpen: () => {
+              Swal.showLoading();
+            },
+          });
+
+          // Call the backend operation directly
+          await ConversationService.deleteConversationByPhone(phoneNumber);
+
+          // Refresh the conversations list
+          if (onRefresh) {
+            await onRefresh();
+          }
+
+          // Show success message
+          Swal.fire({
+            title: "Deleted!",
+            text: `The conversation with ${contactName} has been deleted.`,
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+          });
+        } catch (error) {
+          console.error("❌ Error deleting conversation:", error);
+          Swal.fire({
+            title: "Error!",
+            text: "Failed to delete the conversation. Please try again.",
+            icon: "error",
+          });
+        }
+      }
+    });
   };
 
   // Show skeleton loading while conversations are loading
@@ -232,7 +349,10 @@ const ConversationList = ({
                   size="small"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onConversationClear(conversation.phoneNumber);
+                    handleClearConversation(
+                      conversation.phoneNumber,
+                      profileName
+                    );
                   }}
                   sx={{ color: "warning.main" }}
                 >
@@ -245,7 +365,10 @@ const ConversationList = ({
                   size="small"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onConversationDelete(conversation.phoneNumber);
+                    handleDeleteConversation(
+                      conversation.phoneNumber,
+                      profileName
+                    );
                   }}
                   sx={{ color: "error.main" }}
                 >
@@ -256,6 +379,27 @@ const ConversationList = ({
           </ListItem>
         );
       })}
+
+      {/* Load More Button */}
+      {hasMoreConversations && (
+        <ListItem sx={{ justifyContent: "center", py: 2 }}>
+          <Button
+            variant="outlined"
+            onClick={onLoadMore}
+            disabled={loadingMoreConversations}
+            sx={{
+              borderRadius: 2,
+              textTransform: "none",
+              minWidth: 120,
+            }}
+            startIcon={
+              loadingMoreConversations ? <CircularProgress size={16} /> : null
+            }
+          >
+            {loadingMoreConversations ? "Loading..." : "Load More"}
+          </Button>
+        </ListItem>
+      )}
     </List>
   );
 };
