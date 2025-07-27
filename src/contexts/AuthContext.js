@@ -62,7 +62,16 @@ export const AuthProvider = ({ children }) => {
               }
             } catch (err) {
               console.error("Error verifying token:", err);
-              logout();
+              // Clear invalid token and redirect to login
+              localStorage.removeItem("token");
+              localStorage.removeItem("user");
+              setUser(null);
+              if (
+                window.location.pathname !== "/login" &&
+                window.location.pathname !== "/"
+              ) {
+                navigate("/login", { replace: true });
+              }
             }
           }
         } else {
@@ -79,7 +88,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     initializeAuth();
-  }, [logout]);
+  }, [navigate]);
 
   // Setup token refresh mechanism
   useEffect(() => {
@@ -112,7 +121,7 @@ export const AuthProvider = ({ children }) => {
   const hasPermission = useCallback(
     (requiredPermission) => {
       if (!user) return false;
-      if (user.role === "systemAdmin") return true;
+      if (user.role === "superAdmin") return true;
       if (user.permissions?.includes(requiredPermission)) return true;
       return false;
     },
@@ -121,14 +130,16 @@ export const AuthProvider = ({ children }) => {
 
   const getDefaultRoute = useCallback((userRole, permissions = []) => {
     switch (userRole) {
-      case "systemAdmin":
-        return "/admin/dashboard";
-      case "organizationAdmin":
-        return "/organization/dashboard";
-      case "leadManager":
-        return "/organization/leads";
-      case "customerSupport":
-        return "/organization/chat-config";
+      case "superAdmin":
+        return "/super-admin/dashboard";
+      case "admin":
+        return "/admin/leads";
+      case "marketingManager":
+        return "/admin/chat-config";
+      case "admissionsOfficer":
+        return "/admin/chat-config";
+      case "teamMember":
+        return "/admin/leads";
       default:
         return "/login";
     }
@@ -137,14 +148,16 @@ export const AuthProvider = ({ children }) => {
   const getRedirectPath = useCallback(() => {
     const role = getUserRole();
     switch (role) {
-      case "systemAdmin":
-        return "/admin/dashboard";
-      case "organizationAdmin":
-        return "/organization/dashboard";
-      case "leadManager":
-        return "/organization/leads";
-      case "customerSupport":
-        return "/organization/chat-config";
+      case "superAdmin":
+        return "/super-admin/dashboard";
+      case "admin":
+        return "/admin/leads";
+      case "marketingManager":
+        return "/admin/chat-config";
+      case "admissionsOfficer":
+        return "/admin/chat-config";
+      case "teamMember":
+        return "/admin/leads";
       default:
         return "/login";
     }
@@ -179,8 +192,8 @@ export const AuthProvider = ({ children }) => {
       error,
       login,
       logout,
-      isSystemAdmin: () => getUserRole() === "systemAdmin",
-      isOrganizationAdmin: () => getUserRole() === "organizationAdmin",
+      isSuperAdmin: () => getUserRole() === "superAdmin",
+      isAdmin: () => getUserRole() === "admin",
       hasPermission,
       getUserRole,
       getRedirectPath,

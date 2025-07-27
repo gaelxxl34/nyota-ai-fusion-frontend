@@ -5,28 +5,32 @@ import {
   Navigate,
 } from "react-router-dom";
 import Layout from "./components/Layout/Layout";
-import Dashboard from "./pages/Dashboard";
-import ChatManagement from "./pages/ChatManagement";
-import Settings from "./pages/Settings";
+// Super Admin Pages
+import SuperAdminDashboard from "./pages/super-admin/Dashboard";
+import ChatManagement from "./pages/super-admin/ChatManagement";
+import Settings from "./pages/super-admin/Settings";
+import Organizations from "./pages/super-admin/Organizations";
+import UserManagement from "./pages/super-admin/UserManagement";
+import SuperAdminSettings from "./pages/super-admin/AdminSettings";
+// Admin Pages (formerly organization)
+import TeamManagement from "./pages/admin/TeamManagement";
+import LeadsOverview from "./pages/admin/LeadsOverview";
+import ChatConfig from "./pages/admin/ChatConfig";
+import Analytics from "./pages/admin/Analytics";
+import DataCenter from "./pages/admin/DataCenter";
+// Auth Pages
 import Login from "./pages/auth/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
+// Public Pages
 import LandingPage from "./pages/LandingPage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
-import Organizations from "./pages/Organizations";
-import Users from "./pages/Users";
-import AdminSettings from "./pages/AdminSettings";
-import OrganizationDashboard from "./pages/organization/Dashboard";
-import TeamManagement from "./pages/organization/TeamManagement";
-import LeadsOverview from "./pages/organization/LeadsOverview";
-import ChatConfig from "./pages/organization/ChatConfig";
-import Analytics from "./pages/organization/Analytics";
-import DataCenter from "./pages/organization/DataCenter";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useState } from "react";
 import { ThemeProvider } from "@mui/material/styles";
 import { createAppTheme } from "./theme/theme";
 import { Box, CircularProgress } from "@mui/material";
+import { HelmetProvider } from "react-helmet-async";
 
 const ProtectedRoute = ({
   allowedRoles = [],
@@ -61,12 +65,13 @@ const ProtectedRoute = ({
 
     // Redirect to appropriate dashboard based on role
     let redirectPath = "/login";
-    if (userRole === "systemAdmin") redirectPath = "/admin/dashboard";
-    else if (userRole === "organizationAdmin")
-      redirectPath = "/organization/dashboard";
-    else if (userRole === "leadManager") redirectPath = "/organization/leads";
-    else if (userRole === "customerSupport")
-      redirectPath = "/organization/chat-config";
+    if (userRole === "superAdmin") redirectPath = "/super-admin/dashboard";
+    else if (userRole === "admin") redirectPath = "/admin/leads";
+    else if (userRole === "marketingManager")
+      redirectPath = "/admin/chat-config";
+    else if (userRole === "admissionsOfficer")
+      redirectPath = "/admin/chat-config";
+    else if (userRole === "teamMember") redirectPath = "/admin/leads";
 
     return <Navigate to={redirectPath} replace />;
   }
@@ -92,159 +97,184 @@ function App() {
   };
 
   return (
-    <ThemeProvider theme={currentTheme}>
-      <Router>
-        <AuthProvider>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms-of-service" element={<TermsOfService />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
+    <HelmetProvider>
+      <ThemeProvider theme={currentTheme}>
+        <Router
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
+          <AuthProvider>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-of-service" element={<TermsOfService />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
 
-            {/* System Admin Routes */}
-            <Route
-              path="/admin/*"
-              element={
-                <ProtectedRoute allowedRoles={["systemAdmin"]}>
-                  <Layout>
-                    <Routes>
-                      <Route path="dashboard" element={<Dashboard />} />
-                      <Route path="organizations" element={<Organizations />} />
-                      <Route path="users" element={<Users />} />
-                      <Route path="chat" element={<ChatManagement />} />
-                      <Route
-                        path="settings"
-                        element={<Settings onThemeChange={handleThemeChange} />}
-                      />
-                      <Route
-                        path="admin-settings"
-                        element={<AdminSettings />}
-                      />
-                    </Routes>
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
+              {/* Super Admin Routes */}
+              <Route
+                path="/super-admin/*"
+                element={
+                  <ProtectedRoute allowedRoles={["superAdmin"]}>
+                    <Layout>
+                      <Routes>
+                        <Route
+                          path="dashboard"
+                          element={<SuperAdminDashboard />}
+                        />
+                        <Route
+                          path="organizations"
+                          element={<Organizations />}
+                        />
+                        <Route path="users" element={<UserManagement />} />
+                        <Route path="chat" element={<ChatManagement />} />
+                        <Route
+                          path="settings"
+                          element={
+                            <Settings onThemeChange={handleThemeChange} />
+                          }
+                        />
+                        <Route
+                          path="admin-settings"
+                          element={<SuperAdminSettings />}
+                        />
+                      </Routes>
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Organization Admin Routes */}
-            <Route
-              path="/organization/*"
-              element={
-                <Routes>
-                  <Route
-                    path="leads"
-                    element={
-                      <ProtectedRoute
-                        allowedRoles={["organizationAdmin", "leadManager"]}
-                      >
-                        <Layout>
-                          <LeadsOverview />
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
+              {/* Admin Routes (IUEA Admins) */}
+              <Route
+                path="/admin/*"
+                element={
+                  <Routes>
+                    <Route
+                      path="leads"
+                      element={
+                        <ProtectedRoute
+                          allowedRoles={[
+                            "admin",
+                            "marketingManager",
+                            "admissionsOfficer",
+                            "teamMember",
+                          ]}
+                        >
+                          <Layout>
+                            <LeadsOverview />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
 
-                  {/* Ensure root organization path redirects to dashboard */}
-                  <Route
-                    path=""
-                    element={<Navigate to="dashboard" replace />}
-                  />
+                    {/* Ensure root admin path redirects appropriately */}
+                    <Route
+                      path=""
+                      element={
+                        <ProtectedRoute
+                          allowedRoles={[
+                            "admin",
+                            "marketingManager",
+                            "admissionsOfficer",
+                            "teamMember",
+                          ]}
+                        >
+                          <Navigate to="leads" replace />
+                        </ProtectedRoute>
+                      }
+                    />
 
-                  <Route
-                    path="dashboard"
-                    element={
-                      <ProtectedRoute
-                        allowedRoles={[
-                          "organizationAdmin",
-                          "leadManager",
-                          "customerSupport",
-                          "salesManager",
-                          "marketingManager",
-                        ]}
-                      >
-                        <Layout>
-                          <OrganizationDashboard />
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="team"
-                    element={
-                      <ProtectedRoute allowedRoles={["organizationAdmin"]}>
-                        <Layout>
-                          <TeamManagement />
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="chat-config"
-                    element={
-                      <ProtectedRoute allowedRoles={["organizationAdmin"]}>
-                        <Layout>
-                          <ChatConfig />
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="analytics"
-                    element={
-                      <ProtectedRoute allowedRoles={["organizationAdmin"]}>
-                        <Layout>
-                          <Analytics />
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="data-center"
-                    element={
-                      <ProtectedRoute allowedRoles={["organizationAdmin"]}>
-                        <Layout>
-                          <DataCenter />
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="settings"
-                    element={
-                      <ProtectedRoute allowedRoles={["organizationAdmin"]}>
-                        <Layout>
-                          <Settings onThemeChange={handleThemeChange} />
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="*"
-                    element={<Navigate to="dashboard" replace />}
-                  />
-                </Routes>
-              }
-            />
+                    <Route
+                      path="team"
+                      element={
+                        <ProtectedRoute allowedRoles={["admin"]}>
+                          <Layout>
+                            <TeamManagement />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="chat-config"
+                      element={
+                        <ProtectedRoute
+                          allowedRoles={[
+                            "admin",
+                            "marketingManager",
+                            "admissionsOfficer",
+                          ]}
+                        >
+                          <Layout>
+                            <ChatConfig />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="analytics"
+                      element={
+                        <ProtectedRoute
+                          allowedRoles={[
+                            "admin",
+                            "marketingManager",
+                            "admissionsOfficer",
+                          ]}
+                        >
+                          <Layout>
+                            <Analytics />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="data-center"
+                      element={
+                        <ProtectedRoute
+                          allowedRoles={[
+                            "admin",
+                            "marketingManager",
+                            "admissionsOfficer",
+                          ]}
+                        >
+                          <Layout>
+                            <DataCenter />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="settings"
+                      element={
+                        <ProtectedRoute
+                          allowedRoles={[
+                            "admin",
+                            "marketingManager",
+                            "admissionsOfficer",
+                          ]}
+                        >
+                          <Layout>
+                            <Settings onThemeChange={handleThemeChange} />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route path="*" element={<Navigate to="leads" replace />} />
+                  </Routes>
+                }
+              />
 
-            {/* Regular User Routes */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute allowedRoles={["user"]}>
-                  <Layout>
-                    <Dashboard />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
+              {/* Redirect dashboard to appropriate role-based dashboard */}
+              <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AuthProvider>
-      </Router>
-    </ThemeProvider>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AuthProvider>
+        </Router>
+      </ThemeProvider>
+    </HelmetProvider>
   );
 }
 

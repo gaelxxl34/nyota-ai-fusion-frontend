@@ -25,8 +25,16 @@ import ErrorBoundary from "../../components/chat/ErrorBoundary";
 import { axiosInstance } from "../../services/axiosConfig";
 import ChatMessageHandler from "../../services/chatMessageHandler";
 import ConversationService from "../../services/conversationService";
+import { useRolePermissions } from "../../hooks/useRolePermissions";
+import { useAuth } from "../../contexts/AuthContext";
+import { PERMISSIONS, LEAD_STAGES } from "../../config/roles.config";
 
 const ChatConfig = () => {
+  const { checkPermission, filterLeadsByRole, checkLeadStageAccess } =
+    useRolePermissions();
+  const { getUserRole } = useAuth();
+  const userRole = getUserRole();
+
   // All the same state variables from the original file
   const [conversations, setConversations] = useState(new Map());
   const [conversationMetadata, setConversationMetadata] = useState(new Map());
@@ -63,7 +71,7 @@ const ChatConfig = () => {
   }, [activeConversation]);
 
   // Define main tabs for each lead status plus Knowledge Base
-  const mainTabs = [
+  const allTabs = [
     {
       label: "New Contacts",
       type: "non_leads", // Special type for non-lead conversations
@@ -107,6 +115,33 @@ const ChatConfig = () => {
       tabId: "knowledge-tab",
     },
   ];
+
+  // Filter tabs based on user role permissions - only hide UI tabs, don't filter data
+  const getFilteredTabs = () => {
+    console.log("🔑 ChatConfig permission check for user:", userRole);
+
+    return allTabs.filter((tab) => {
+      // Always show New Contacts and Knowledge Base tabs
+      if (tab.type === "non_leads" || tab.label === "Knowledge Base") {
+        console.log(`  - Tab ${tab.label}: Always visible`);
+        return true;
+      }
+
+      // For other tabs, check if user has access to at least one status
+      if (tab.statuses && tab.statuses.length > 0) {
+        const hasAccess = tab.statuses.some((status) => {
+          const access = checkLeadStageAccess(status);
+          console.log(`  - Tab ${tab.label}, Status ${status}: ${access}`);
+          return access;
+        });
+        return hasAccess;
+      }
+
+      return true;
+    });
+  };
+
+  const mainTabs = getFilteredTabs();
 
   // Utility functions (keep all the original utility functions but simplified)
   const normalizePhoneNumber = useCallback((phoneNumber) => {

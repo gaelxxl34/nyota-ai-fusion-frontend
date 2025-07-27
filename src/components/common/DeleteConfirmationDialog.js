@@ -6,6 +6,7 @@ import {
   DialogActions,
   Button,
   Typography,
+  CircularProgress,
 } from "@mui/material";
 
 const DeleteConfirmationDialog = ({
@@ -14,6 +15,7 @@ const DeleteConfirmationDialog = ({
   onConfirm,
   title,
   content,
+  loading = false,
 }) => {
   return (
     <Dialog open={open} onClose={onClose}>
@@ -25,9 +27,17 @@ const DeleteConfirmationDialog = ({
         </Typography>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={onConfirm} color="error" variant="contained">
-          Delete
+        <Button onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button
+          onClick={onConfirm}
+          color="error"
+          variant="contained"
+          disabled={loading}
+          startIcon={loading ? <CircularProgress size={20} /> : null}
+        >
+          {loading ? "Deleting..." : "Delete"}
         </Button>
       </DialogActions>
     </Dialog>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { Link as RouterLink } from "react-router-dom";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -14,41 +14,20 @@ const Login = () => {
   const [localError, setLocalError] = useState("");
 
   useEffect(() => {
-    // Check if already logged in
-    const token = localStorage.getItem("token");
-    const savedUser = JSON.parse(localStorage.getItem("user") || "null");
-
-    if (token && savedUser) {
-      console.log("User already logged in, redirecting to dashboard");
-
-      // Determine redirect path based on role
-      let redirectPath = "/login";
-      if (savedUser.role === "systemAdmin") redirectPath = "/admin/dashboard";
-      else if (savedUser.role === "organizationAdmin")
-        redirectPath = "/organization/dashboard";
-      else if (savedUser.jobRole === "leadManager")
-        redirectPath = "/organization/leads";
-      else if (savedUser.jobRole === "customerSupport")
-        redirectPath = "/organization/chat-config";
-
-      navigate(redirectPath, { replace: true });
-    }
-  }, [navigate]);
-
-  // Redirect after successful login
-  useEffect(() => {
+    // Only redirect if user is actually authenticated in context
+    // This prevents redirect loops with invalid localStorage data
     if (user) {
-      console.log("Login successful, redirecting to dashboard");
+      console.log("User already authenticated, redirecting to dashboard");
 
       // Determine redirect path based on role
       let redirectPath = "/login";
-      if (user.role === "systemAdmin") redirectPath = "/admin/dashboard";
-      else if (user.role === "organizationAdmin")
-        redirectPath = "/organization/dashboard";
-      else if (user.jobRole === "leadManager")
-        redirectPath = "/organization/leads";
-      else if (user.jobRole === "customerSupport")
-        redirectPath = "/organization/chat-config";
+      if (user.role === "superAdmin") redirectPath = "/super-admin/dashboard";
+      else if (user.role === "admin") redirectPath = "/admin/leads";
+      else if (user.role === "marketingManager")
+        redirectPath = "/admin/chat-config";
+      else if (user.role === "admissionsOfficer")
+        redirectPath = "/admin/chat-config";
+      else if (user.role === "teamMember") redirectPath = "/admin/leads";
 
       navigate(redirectPath, { replace: true });
     }

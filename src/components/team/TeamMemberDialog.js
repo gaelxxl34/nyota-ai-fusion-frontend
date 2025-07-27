@@ -17,57 +17,38 @@ import {
   Box,
   CircularProgress,
   Alert,
+  Tooltip,
+  Chip,
 } from "@mui/material";
-
-const availablePages = [
-  { id: "dashboard", name: "Dashboard", category: "General" },
-  { id: "leads", name: "Leads Overview", category: "Leads" },
-  { id: "chat-config", name: "Chat Configuration", category: "Chat" },
-  { id: "analytics", name: "Analytics", category: "Reports" },
-];
-
-const jobRoles = [
-  {
-    value: "leadManager",
-    label: "Lead Manager",
-    defaultPermissions: ["leads"],
-  },
-  {
-    value: "customerSupport",
-    label: "Customer Support",
-    defaultPermissions: ["chat-config"],
-  },
-  {
-    value: "salesManager",
-    label: "Sales Manager",
-    defaultPermissions: ["leads", "analytics"],
-  },
-  {
-    value: "marketingManager",
-    label: "Marketing Manager",
-    defaultPermissions: ["analytics", "leads"],
-  },
-];
+import { Info as InfoIcon } from "@mui/icons-material";
+import {
+  getRoleOptions,
+  PERMISSIONS,
+  hasPermission,
+} from "../../config/roles.config";
 
 const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
+  const roleOptions = getRoleOptions();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    jobRole: "",
-    permissions: [],
+    role: "", // Changed from jobRole to role
     status: "active",
   });
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
     if (member) {
-      setFormData(member);
+      setFormData({
+        ...member,
+        role: member.role || member.jobRole || "", // Handle both old and new field names
+      });
     } else {
       setFormData({
         name: "",
         email: "",
-        jobRole: "",
-        permissions: [],
+        role: "",
         status: "active",
       });
     }
@@ -80,33 +61,13 @@ const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
     });
   };
 
-  const handleJobRoleChange = (e) => {
-    const selectedRole = jobRoles.find((role) => role.value === e.target.value);
-    setFormData({
-      ...formData,
-      jobRole: e.target.value,
-      permissions: selectedRole ? selectedRole.defaultPermissions : [],
-    });
-  };
-
-  const handlePermissionToggle = (pageId) => {
-    const newPermissions = formData.permissions.includes(pageId)
-      ? formData.permissions.filter((p) => p !== pageId)
-      : [...formData.permissions, pageId];
-
-    setFormData({
-      ...formData,
-      permissions: newPermissions,
-    });
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
     setFormError("");
 
     // Validate required fields
-    if (!formData.name || !formData.email || !formData.jobRole) {
-      setFormError("Name, email, and job role are required");
+    if (!formData.name || !formData.email || !formData.role) {
+      setFormError("Name, email, and role are required");
       return;
     }
 
@@ -155,14 +116,14 @@ const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
           </Grid>
           <Grid item xs={12} md={6}>
             <FormControl fullWidth>
-              <InputLabel>Job Role</InputLabel>
+              <InputLabel>Role</InputLabel>
               <Select
-                name="jobRole"
-                value={formData.jobRole}
-                onChange={handleJobRoleChange}
-                label="Job Role"
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                label="Role"
               >
-                {jobRoles.map((role) => (
+                {roleOptions.map((role) => (
                   <MenuItem key={role.value} value={role.value}>
                     {role.label}
                   </MenuItem>
@@ -186,52 +147,75 @@ const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
             </FormControl>
           </Grid>
           <Grid item xs={12}>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle1" color="primary" gutterBottom>
-                Role Description
-              </Typography>
-              <Typography variant="body2">
-                {
-                  jobRoles.find((role) => role.value === formData.jobRole)
-                    ?.label
-                }
-                {" - "}
-                {getRoleDescription(formData.jobRole)}
-              </Typography>
-            </Box>
-            <Typography variant="h6" gutterBottom>
-              Access Permissions
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {Object.entries(
-                availablePages.reduce((acc, page) => {
-                  if (!acc[page.category]) acc[page.category] = [];
-                  acc[page.category].push(page);
-                  return acc;
-                }, {})
-              ).map(([category, pages]) => (
-                <Box key={category}>
-                  <Typography variant="subtitle1" color="primary">
-                    {category}
+            {formData.role && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" color="primary" gutterBottom>
+                  Role Description
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <InfoIcon color="action" fontSize="small" />
+                  <Typography variant="body2">
+                    {
+                      roleOptions.find((r) => r.value === formData.role)
+                        ?.description
+                    }
                   </Typography>
-                  <Grid container>
-                    {pages.map((page) => (
-                      <Grid item xs={12} sm={6} md={4} key={page.id}>
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={formData.permissions.includes(page.id)}
-                              onChange={() => handlePermissionToggle(page.id)}
-                            />
-                          }
-                          label={page.name}
-                        />
-                      </Grid>
-                    ))}
-                  </Grid>
                 </Box>
-              ))}
-            </Box>
+              </Box>
+            )}
+
+            {formData.role && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Permissions for this Role
+                </Typography>
+                <Box sx={{ mt: 2 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    gutterBottom
+                  >
+                    The following permissions are automatically granted based on
+                    the selected role:
+                  </Typography>
+                  <Box
+                    sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 1 }}
+                  >
+                    {formData.role === "admin" && (
+                      <Chip label="Full Access" color="primary" size="small" />
+                    )}
+                    {formData.role === "marketingManager" && (
+                      <>
+                        <Chip
+                          label="Chat Config (New Contact → Applied)"
+                          size="small"
+                        />
+                        <Chip
+                          label="Data Center (New Contact → Applied)"
+                          size="small"
+                        />
+                        <Chip label="Analytics" size="small" />
+                        <Chip label="Settings (View Only)" size="small" />
+                      </>
+                    )}
+                    {formData.role === "admissionsOfficer" && (
+                      <>
+                        <Chip
+                          label="Chat Config (Applied → Enrolled)"
+                          size="small"
+                        />
+                        <Chip
+                          label="Data Center (Applied → Enrolled)"
+                          size="small"
+                        />
+                        <Chip label="Analytics" size="small" />
+                        <Chip label="Settings (View Only)" size="small" />
+                      </>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+            )}
           </Grid>
         </Grid>
       </DialogContent>
@@ -250,21 +234,6 @@ const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
       </DialogActions>
     </Dialog>
   );
-};
-
-const getRoleDescription = (roleValue) => {
-  switch (roleValue) {
-    case "leadManager":
-      return "Handles lead qualification, distribution, and follow-up processes";
-    case "customerSupport":
-      return "Manages customer inquiries and handles chat support";
-    case "salesManager":
-      return "Oversees lead conversion, sales processes, and team performance";
-    case "marketingManager":
-      return "Manages marketing campaigns, analytics, and strategy";
-    default:
-      return "Please select a job role";
-  }
 };
 
 export default TeamMemberDialog;

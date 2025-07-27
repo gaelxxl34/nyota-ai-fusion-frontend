@@ -3,7 +3,7 @@ import { axiosInstance } from "./axiosConfig";
 export const teamService = {
   async getTeamMembers() {
     try {
-      const response = await axiosInstance.get("/organization/team");
+      const response = await axiosInstance.get("/api/team/members");
       return {
         success: true,
         members: response.data?.members || [], // Ensure we always return an array
@@ -23,7 +23,7 @@ export const teamService = {
   async addTeamMember(memberData) {
     try {
       const response = await axiosInstance.post(
-        "/organization/team",
+        "/api/team/members",
         memberData
       );
       return response.data;
@@ -37,7 +37,7 @@ export const teamService = {
   async updateTeamMember(memberId, memberData) {
     try {
       const response = await axiosInstance.put(
-        `/organization/team/${memberId}`,
+        `/api/team/members/${memberId}`,
         memberData
       );
       return {
@@ -54,7 +54,7 @@ export const teamService = {
   async deleteTeamMember(memberId) {
     try {
       const response = await axiosInstance.delete(
-        `/organization/team/${memberId}`
+        `/api/team/members/${memberId}`
       );
       return {
         success: true,

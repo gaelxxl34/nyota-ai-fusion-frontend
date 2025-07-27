@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 
 const LandingPage = () => {
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
@@ -68,7 +68,7 @@ const LandingPage = () => {
         <div className="mb-6 sm:mb-8 transform animate-bounce">
           <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-4 sm:mb-6 relative">
             {/* Outer rotating ring */}
-            <div className="absolute inset-0 border-3 sm:border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+            <div className="absolute inset-0 border-2 sm:border-4 border-white border-t-transparent rounded-full animate-spin"></div>
             {/* Inner pulsing circle */}
             <div className="absolute inset-3 sm:inset-4 bg-white rounded-full animate-pulse flex items-center justify-center">
               <i className="fas fa-brain text-red-800 text-2xl sm:text-4xl"></i>

@@ -40,7 +40,17 @@ axiosInstance.interceptors.response.use(
   (error) => {
     console.error("Response error:", error.response?.status, error.message);
     if (error.response?.status === 401) {
+      // Token expired or invalid
       localStorage.removeItem("token");
+      localStorage.removeItem("user");
+
+      // Only redirect if not already on login page
+      if (
+        window.location.pathname !== "/login" &&
+        window.location.pathname !== "/"
+      ) {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

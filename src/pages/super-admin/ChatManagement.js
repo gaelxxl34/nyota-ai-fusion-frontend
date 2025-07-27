@@ -44,7 +44,7 @@ import {
   MoreVert as MoreVertIcon,
   DeleteSweep as DeleteSweepIcon,
 } from "@mui/icons-material";
-import ConversationService from "../services/conversationService";
+import ConversationService from "../../services/conversationService";
 
 const ChatManagement = () => {
   const [activeTab, setActiveTab] = useState(0);

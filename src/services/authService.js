@@ -168,14 +168,16 @@ class AuthService {
     if (!user) return "/login";
 
     switch (user.role) {
-      case "systemAdmin":
-        return "/admin/dashboard";
-      case "organizationAdmin":
-        return "/organization/dashboard";
-      case "leadManager":
-        return "/organization/leads";
-      case "customerSupport":
-        return "/organization/chat-config";
+      case "superAdmin":
+        return "/super-admin/dashboard";
+      case "admin":
+        return "/admin/leads";
+      case "marketingManager":
+        return "/admin/chat-config";
+      case "admissionsOfficer":
+        return "/admin/chat-config";
+      case "teamMember":
+        return "/admin/leads";
       default:
         return "/login";
     }

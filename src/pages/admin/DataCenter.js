@@ -37,11 +37,18 @@ import {
   Assignment as AssignmentIcon,
 } from "@mui/icons-material";
 import { leadService } from "../../services/leadService";
-// import { useAuth } from "../../contexts/AuthContext"; // Keep for future use
+import { useAuth } from "../../contexts/AuthContext";
+import { useRolePermissions } from "../../hooks/useRolePermissions";
+import { PERMISSIONS, LEAD_STAGES } from "../../config/roles.config";
 import InquiryContactDialog from "../../components/InquiryContactDialog";
 import ApplicationFormDialog from "../../components/applications/ApplicationFormDialog";
 
 const DataCenter = () => {
+  const { checkPermission, filterLeadsByRole, checkLeadStageAccess } =
+    useRolePermissions();
+  const { getUserRole } = useAuth();
+  const userRole = getUserRole();
+
   const [currentTab, setCurrentTab] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [leads, setLeads] = useState([]);
@@ -113,6 +120,56 @@ const DataCenter = () => {
       color: "success",
     },
   ];
+
+  // Filter tabs based on user role - only show tabs for stages they have access to
+  const getFilteredTabs = () => {
+    console.log("🔑 Permission check for user:", userRole);
+
+    return leadStatusTabs
+      .filter((tab) => {
+        // All Leads tab - filter statuses based on access
+        if (tab.label === "All Leads") {
+          const accessibleStatuses = tab.statuses.filter((status) => {
+            const hasAccess = checkLeadStageAccess(status);
+            console.log(`  - Checking ${status}: ${hasAccess}`);
+            return hasAccess;
+          });
+          return accessibleStatuses.length > 0;
+        }
+
+        // Other tabs - check if user has access to any of the statuses
+        const hasAccess = tab.statuses.some((status) => {
+          const access = checkLeadStageAccess(status);
+          console.log(`  - Tab ${tab.label}, Status ${status}: ${access}`);
+          return access;
+        });
+        return hasAccess;
+      })
+      .map((tab) => {
+        // For All Leads tab, filter the statuses
+        if (tab.label === "All Leads") {
+          return {
+            ...tab,
+            statuses: tab.statuses.filter((status) =>
+              checkLeadStageAccess(status)
+            ),
+          };
+        }
+        return tab;
+      });
+  };
+
+  const filteredTabs = getFilteredTabs();
+
+  // Debug logging
+  console.log("🔍 DataCenter Debug:", {
+    userRole,
+    allTabsCount: leadStatusTabs.length,
+    filteredTabsCount: filteredTabs.length,
+    filteredTabs: filteredTabs.map((t) => t.label),
+    leadsCount: leads.length,
+    leadStatuses: [...new Set(leads.map((l) => l.status))],
+  });
 
   // Fetch data from backend with pagination
   const fetchData = useCallback(
@@ -199,12 +256,156 @@ const DataCenter = () => {
 
   // Get leads for current tab
   const getCurrentTabLeads = () => {
-    const currentTabConfig = leadStatusTabs[currentTab];
+    const currentTabConfig = filteredTabs[currentTab];
     if (!currentTabConfig) return [];
 
-    return leads.filter((lead) =>
-      currentTabConfig.statuses.includes(lead.status)
-    );
+    // Filter leads by tab statuses
+    return leads.filter((lead) => {
+      // Check if lead matches the tab's statuses
+      return currentTabConfig.statuses.includes(lead.status);
+    });
+  };
+
+  // Get stats cards based on user role
+  const getVisibleStatsCards = () => {
+    const allCards = [
+      {
+        key: "total",
+        status: null,
+        label: "Total Leads",
+        icon: PersonAddIcon,
+        color: "primary",
+      },
+      {
+        key: "interested",
+        status: "PRE_QUALIFIED",
+        label: "Interested",
+        icon: ContactMailIcon,
+        color: "warning",
+      },
+      {
+        key: "qualified",
+        status: "QUALIFIED",
+        label: "Qualified",
+        icon: AssessmentIcon,
+        color: "success",
+      },
+      {
+        key: "applied",
+        status: "APPLIED",
+        label: "Applied",
+        icon: SchoolIcon,
+        color: "info",
+      },
+      {
+        key: "contacted",
+        status: "CONTACTED",
+        label: "Contacted",
+        icon: WhatsAppIcon,
+        color: "info",
+      },
+      {
+        key: "admitted",
+        status: "ADMITTED",
+        label: "Admitted",
+        icon: SchoolIcon,
+        color: "success",
+      },
+      {
+        key: "enrolled",
+        status: "ENROLLED",
+        label: "Enrolled",
+        icon: SchoolIcon,
+        color: "primary",
+      },
+    ];
+
+    switch (userRole) {
+      case "marketingAgent":
+        // Marketing agents don't see admitted/enrolled stats
+        return allCards.filter(
+          (card) => !["admitted", "enrolled"].includes(card.key)
+        );
+      case "admissionsAgent":
+        // Admissions agents don't see interested/contacted stats
+        return allCards.filter(
+          (card) => !["interested", "contacted"].includes(card.key)
+        );
+      case "organizationAdmin":
+      default:
+        return allCards;
+    }
+  };
+
+  // Get funnel stages based on user role
+  const getVisibleFunnelStages = () => {
+    const allStages = [
+      {
+        key: "inquiry",
+        status: "INQUIRY",
+        label: "Inquiry",
+        color: "default",
+        subtitle: "Initial Interest",
+      },
+      {
+        key: "contacted",
+        status: "CONTACTED",
+        label: "Contacted",
+        color: "info",
+        subtitle: "First Contact",
+      },
+      {
+        key: "interested",
+        status: "PRE_QUALIFIED",
+        label: "Interested",
+        color: "warning",
+        subtitle: "Shows Interest",
+      },
+      {
+        key: "applied",
+        status: "APPLIED",
+        label: "Applied",
+        color: "info",
+        subtitle: "Submitted App",
+      },
+      {
+        key: "qualified",
+        status: "QUALIFIED",
+        label: "Qualified",
+        color: "success",
+        subtitle: "Meets Requirements",
+      },
+      {
+        key: "admitted",
+        status: "ADMITTED",
+        label: "Admitted",
+        color: "secondary",
+        subtitle: "Officially Admitted",
+      },
+      {
+        key: "enrolled",
+        status: "ENROLLED",
+        label: "Enrolled",
+        color: "primary",
+        subtitle: "Final Goal",
+      },
+    ];
+
+    switch (userRole) {
+      case "marketingAgent":
+        // Marketing agents see up to qualified
+        return allStages.filter(
+          (stage) => !["admitted", "enrolled"].includes(stage.key)
+        );
+      case "admissionsAgent":
+        // Admissions agents see from applied onwards
+        return allStages.filter(
+          (stage) => !["inquiry", "contacted", "interested"].includes(stage.key)
+        );
+      case "organizationAdmin":
+      default:
+        return allStages;
+    }
   };
 
   // Filter data based on search term
@@ -398,197 +599,43 @@ const DataCenter = () => {
       {/* Lead Status Statistics Cards */}
       {!loading && (
         <Grid container spacing={3} sx={{ mb: 3 }}>
-          {/* Total Leads */}
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                  <PersonAddIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6" color="primary">
-                    Total Leads
+          {getVisibleStatsCards().map((card) => (
+            <Grid item xs={12} sm={6} md={3} key={card.key}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                    <card.icon color={card.color} sx={{ mr: 1 }} />
+                    <Typography
+                      variant="h6"
+                      color={`${card.color}${
+                        card.color === "primary" ? "" : ".main"
+                      }`}
+                    >
+                      {card.label}
+                    </Typography>
+                  </Box>
+                  <Typography
+                    variant="h3"
+                    component="div"
+                    sx={{ fontWeight: "bold" }}
+                  >
+                    {card.status
+                      ? leadStats.byStatus[card.status] || 0
+                      : leadStats.total}
                   </Typography>
-                </Box>
-                <Typography
-                  variant="h3"
-                  component="div"
-                  sx={{ fontWeight: "bold" }}
-                >
-                  {leadStats.total}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  All prospects in system
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Interested */}
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                  <ContactMailIcon color="warning" sx={{ mr: 1 }} />
-                  <Typography variant="h6" color="warning.main">
-                    Interested
+                  <Typography variant="body2" color="text.secondary">
+                    {card.key === "total" && "All prospects in system"}
+                    {card.key === "interested" && "Showing interest"}
+                    {card.key === "qualified" && "Ready for admission"}
+                    {card.key === "applied" && "Submitted applications"}
+                    {card.key === "contacted" && "Initial contact made"}
+                    {card.key === "admitted" && "Accepted for admission"}
+                    {card.key === "enrolled" && "Successfully enrolled"}
                   </Typography>
-                </Box>
-                <Typography
-                  variant="h3"
-                  component="div"
-                  sx={{ fontWeight: "bold" }}
-                >
-                  {leadStats.byStatus.PRE_QUALIFIED || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Showing interest
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Qualified */}
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                  <AssessmentIcon color="success" sx={{ mr: 1 }} />
-                  <Typography variant="h6" color="success.main">
-                    Qualified
-                  </Typography>
-                </Box>
-                <Typography
-                  variant="h3"
-                  component="div"
-                  sx={{ fontWeight: "bold" }}
-                >
-                  {leadStats.byStatus.QUALIFIED || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Ready for admission
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Applied */}
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                  <SchoolIcon color="info" sx={{ mr: 1 }} />
-                  <Typography variant="h6" color="info.main">
-                    Applied
-                  </Typography>
-                </Box>
-                <Typography
-                  variant="h3"
-                  component="div"
-                  sx={{ fontWeight: "bold" }}
-                >
-                  {leadStats.byStatus.APPLIED || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Submitted applications
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Additional Important Statuses */}
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                  <WhatsAppIcon color="info" sx={{ mr: 1 }} />
-                  <Typography variant="h6" color="info.main">
-                    Contacted
-                  </Typography>
-                </Box>
-                <Typography
-                  variant="h3"
-                  component="div"
-                  sx={{ fontWeight: "bold" }}
-                >
-                  {leadStats.byStatus.CONTACTED || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Initial contact made
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Admitted */}
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                  <SchoolIcon color="success" sx={{ mr: 1 }} />
-                  <Typography variant="h6" color="success.main">
-                    Admitted
-                  </Typography>
-                </Box>
-                <Typography
-                  variant="h3"
-                  component="div"
-                  sx={{ fontWeight: "bold" }}
-                >
-                  {leadStats.byStatus.ADMITTED || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Accepted for admission
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Enrolled */}
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                  <SchoolIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6" color="primary">
-                    Enrolled
-                  </Typography>
-                </Box>
-                <Typography
-                  variant="h3"
-                  component="div"
-                  sx={{ fontWeight: "bold" }}
-                >
-                  {leadStats.byStatus.ENROLLED || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Successfully enrolled
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Follow-up Required */}
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                  <ContactMailIcon color="warning" sx={{ mr: 1 }} />
-                  <Typography variant="h6" color="warning.main">
-                    Follow-up
-                  </Typography>
-                </Box>
-                <Typography
-                  variant="h3"
-                  component="div"
-                  sx={{ fontWeight: "bold" }}
-                >
-                  {leadStats.byStatus.FOLLOW_UP || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Requires follow-up
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
         </Grid>
       )}
 
@@ -612,121 +659,30 @@ const DataCenter = () => {
                   gap: 2,
                 }}
               >
-                {/* Inquiry */}
-                <Box sx={{ textAlign: "center", minWidth: 100 }}>
-                  <Chip
-                    label={`Inquiry: ${leadStats.byStatus.INQUIRY || 0}`}
-                    color="default"
-                    variant="outlined"
-                    sx={{ mb: 1, width: "100%" }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Initial Interest
-                  </Typography>
-                </Box>
-
-                <Typography variant="h6" color="text.secondary">
-                  →
-                </Typography>
-
-                {/* Contacted */}
-                <Box sx={{ textAlign: "center", minWidth: 100 }}>
-                  <Chip
-                    label={`Contacted: ${leadStats.byStatus.CONTACTED || 0}`}
-                    color="info"
-                    variant="outlined"
-                    sx={{ mb: 1, width: "100%" }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    First Contact
-                  </Typography>
-                </Box>
-
-                <Typography variant="h6" color="text.secondary">
-                  →
-                </Typography>
-
-                {/* Interested */}
-                <Box sx={{ textAlign: "center", minWidth: 100 }}>
-                  <Chip
-                    label={`Interested: ${
-                      leadStats.byStatus.PRE_QUALIFIED || 0
-                    }`}
-                    color="warning"
-                    variant="outlined"
-                    sx={{ mb: 1, width: "100%" }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Shows Interest
-                  </Typography>
-                </Box>
-
-                <Typography variant="h6" color="text.secondary">
-                  →
-                </Typography>
-
-                {/* Applied */}
-                <Box sx={{ textAlign: "center", minWidth: 100 }}>
-                  <Chip
-                    label={`Applied: ${leadStats.byStatus.APPLIED || 0}`}
-                    color="info"
-                    variant="outlined"
-                    sx={{ mb: 1, width: "100%" }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Submitted App
-                  </Typography>
-                </Box>
-
-                <Typography variant="h6" color="text.secondary">
-                  →
-                </Typography>
-
-                {/* Qualified */}
-                <Box sx={{ textAlign: "center", minWidth: 100 }}>
-                  <Chip
-                    label={`Qualified: ${leadStats.byStatus.QUALIFIED || 0}`}
-                    color="success"
-                    variant="outlined"
-                    sx={{ mb: 1, width: "100%" }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Meets Requirements
-                  </Typography>
-                </Box>
-
-                <Typography variant="h6" color="text.secondary">
-                  →
-                </Typography>
-
-                {/* Admitted */}
-                <Box sx={{ textAlign: "center", minWidth: 100 }}>
-                  <Chip
-                    label={`Admitted: ${leadStats.byStatus.ADMITTED || 0}`}
-                    color="secondary"
-                    variant="outlined"
-                    sx={{ mb: 1, width: "100%" }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Officially Admitted
-                  </Typography>
-                </Box>
-
-                <Typography variant="h6" color="text.secondary">
-                  →
-                </Typography>
-
-                {/* Enrolled */}
-                <Box sx={{ textAlign: "center", minWidth: 100 }}>
-                  <Chip
-                    label={`Enrolled: ${leadStats.byStatus.ENROLLED || 0}`}
-                    color="primary"
-                    sx={{ mb: 1, width: "100%" }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Final Goal
-                  </Typography>
-                </Box>
+                {getVisibleFunnelStages().map((stage, index) => (
+                  <React.Fragment key={stage.key}>
+                    <Box sx={{ textAlign: "center", minWidth: 100 }}>
+                      <Chip
+                        label={`${stage.label}: ${
+                          leadStats.byStatus[stage.status] || 0
+                        }`}
+                        color={stage.color}
+                        variant={
+                          stage.key === "enrolled" ? "filled" : "outlined"
+                        }
+                        sx={{ mb: 1, width: "100%" }}
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        {stage.subtitle}
+                      </Typography>
+                    </Box>
+                    {index < getVisibleFunnelStages().length - 1 && (
+                      <Typography variant="h6" color="text.secondary">
+                        →
+                      </Typography>
+                    )}
+                  </React.Fragment>
+                ))}
               </Box>
             </Grid>
 
@@ -920,7 +876,7 @@ const DataCenter = () => {
                 variant="scrollable"
                 scrollButtons="auto"
               >
-                {leadStatusTabs.map((tab, index) => {
+                {filteredTabs.map((tab, index) => {
                   const TabIcon = tab.icon;
                   const count = getTabCount(tab.statuses);
 
@@ -946,7 +902,7 @@ const DataCenter = () => {
             </Box>
 
             {/* Tab Content */}
-            {leadStatusTabs.map((tab, index) => (
+            {filteredTabs.map((tab, index) => (
               <TabPanel key={index} value={currentTab} index={index}>
                 <Box sx={{ mb: 2 }}>
                   <Typography
@@ -1021,9 +977,11 @@ const DataCenter = () => {
                       <IconButton onClick={fetchData} title="Refresh Data">
                         <RefreshIcon />
                       </IconButton>
-                      <Button variant="outlined" startIcon={<DownloadIcon />}>
-                        Export
-                      </Button>
+                      {checkPermission(PERMISSIONS.EXPORT_DATA) && (
+                        <Button variant="outlined" startIcon={<DownloadIcon />}>
+                          Export
+                        </Button>
+                      )}
                     </Box>
                   </Box>
 

@@ -15,10 +15,6 @@ import {
   Alert,
   CircularProgress,
   Box,
-  Chip,
-  FormControlLabel,
-  RadioGroup,
-  Radio,
 } from "@mui/material";
 import {
   School as SchoolIcon,
@@ -187,7 +183,7 @@ const ApplicationFormDialog = ({ open, onClose, onSuccess }) => {
     }
 
     // Phone number validation
-    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+    const phoneRegex = /^\+?[\d\s\-()]{10,}$/;
     if (!phoneRegex.test(formData.phoneNumber)) {
       setError("Please enter a valid phone number");
       return false;

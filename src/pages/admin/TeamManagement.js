@@ -12,33 +12,43 @@ import {
   TableRow,
   IconButton,
   Chip,
-  CircularProgress,
   Alert,
   Snackbar,
   Skeleton,
+  TextField,
+  MenuItem,
+  InputAdornment,
 } from "@mui/material";
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Shield as ShieldIcon,
+  Person as PersonIcon,
+  Search as SearchIcon,
 } from "@mui/icons-material";
 import TeamMemberDialog from "../../components/team/TeamMemberDialog";
 import DeleteConfirmationDialog from "../../components/common/DeleteConfirmationDialog";
 import { teamService } from "../../services/teamService";
-
-const jobRoles = [
-  { value: "developer", label: "Developer" },
-  { value: "designer", label: "Designer" },
-  { value: "manager", label: "Manager" },
-];
+import { ROLES, PERMISSIONS } from "../../config/roles.config";
+import { useRolePermissions } from "../../hooks/useRolePermissions";
+import { useAuth } from "../../contexts/AuthContext";
 
 const TeamManagement = () => {
+  const { checkPermission } = useRolePermissions();
+  const { user } = useAuth();
+  const canManageTeam = checkPermission(PERMISSIONS.MANAGE_TEAM);
+
   const [teamMembers, setTeamMembers] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [savingMember, setSavingMember] = useState(false);
+  const [deletingMember, setDeletingMember] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [notification, setNotification] = useState({
     open: false,
     message: "",
@@ -60,7 +70,9 @@ const TeamManagement = () => {
   const fetchTeamMembers = useCallback(async () => {
     try {
       setLoading(true);
+      console.log("Fetching team members...");
       const response = await teamService.getTeamMembers();
+      console.log("Team members response:", response);
 
       // Initialize teamMembers as an empty array if response or members is undefined
       setTeamMembers(response?.members || []);
@@ -104,7 +116,7 @@ const TeamManagement = () => {
 
   const handleSaveMember = async (memberData) => {
     try {
-      setLoading(true);
+      setSavingMember(true);
       let response;
 
       if (selectedMember) {
@@ -117,27 +129,49 @@ const TeamManagement = () => {
       }
 
       if (response.success) {
-        showNotification(
-          `Team member ${selectedMember ? "updated" : "added"} successfully`
-        );
-        fetchTeamMembers();
+        // For new members, show the password in the message
+        if (
+          !selectedMember &&
+          response.message &&
+          response.message.includes("password:")
+        ) {
+          showNotification(response.message, "success");
+        } else {
+          showNotification(
+            `Team member ${selectedMember ? "updated" : "added"} successfully`
+          );
+        }
+        await fetchTeamMembers(); // Wait for refresh
         setOpenDialog(false);
       } else {
-        showNotification(response.message, "error");
+        showNotification(
+          response.message || "Failed to save team member",
+          "error"
+        );
       }
     } catch (error) {
-      showNotification(error.message, "error");
+      showNotification(error.message || "An error occurred", "error");
     } finally {
-      setLoading(false);
+      setSavingMember(false);
     }
   };
 
   const handleConfirmDelete = async () => {
     try {
-      setLoading(true);
+      setDeletingMember(true);
       const response = await teamService.deleteTeamMember(memberToDelete.id);
       if (response.success) {
-        showNotification("Team member deleted successfully");
+        // Check if there's a warning about authentication
+        if (response.warning) {
+          showNotification(
+            `Team member removed from organization. ${response.warning}`,
+            "warning"
+          );
+        } else {
+          showNotification(
+            response.message || "Team member deleted successfully"
+          );
+        }
         fetchTeamMembers();
       } else {
         showNotification(
@@ -148,16 +182,37 @@ const TeamManagement = () => {
     } catch (error) {
       showNotification(error.message, "error");
     } finally {
-      setLoading(false);
+      setDeletingMember(false);
       setDeleteDialogOpen(false);
       setMemberToDelete(null);
     }
   };
 
   const getRoleLabel = (roleValue) => {
-    const role = jobRoles.find((r) => r.value === roleValue);
-    return role?.label || roleValue;
+    const role = ROLES[roleValue];
+    return role?.name || roleValue;
   };
+
+  const getRoleIcon = (roleValue) => {
+    if (roleValue === "admin") {
+      return <ShieldIcon fontSize="small" color="primary" />;
+    }
+    return <PersonIcon fontSize="small" />;
+  };
+
+  // Filter team members based on search and role
+  const filteredMembers = teamMembers.filter((member) => {
+    // Filter by search term
+    const matchesSearch = searchTerm
+      ? member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.email.toLowerCase().includes(searchTerm.toLowerCase())
+      : true;
+
+    // Filter by role
+    const matchesRole = roleFilter === "all" || member.role === roleFilter;
+
+    return matchesSearch && matchesRole;
+  });
 
   // Skeleton loading component for table rows
   const SkeletonTableRows = () => (
@@ -247,7 +302,7 @@ const TeamManagement = () => {
   );
 
   // Ensure teamMembers is always an array
-  const displayMembers = Array.isArray(teamMembers) ? teamMembers : [];
+  const displayMembers = Array.isArray(filteredMembers) ? filteredMembers : [];
 
   return (
     <Box>
@@ -266,15 +321,52 @@ const TeamManagement = () => {
         ) : (
           <>
             <Typography variant="h4">Team Management</Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleAddMember}
-            >
-              Add Team Member
-            </Button>
+            {canManageTeam && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleAddMember}
+              >
+                Add Team Member
+              </Button>
+            )}
           </>
         )}
+      </Box>
+
+      {/* Search and Filter */}
+      <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
+        <TextField
+          placeholder="Search by name or email..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          size="small"
+          sx={{ flex: 1, maxWidth: 400 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <TextField
+          select
+          label="Filter by Role"
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          size="small"
+          sx={{ minWidth: 200 }}
+        >
+          <MenuItem value="all">All Roles</MenuItem>
+          {Object.entries(ROLES)
+            .filter(([key]) => key !== "superAdmin")
+            .map(([key, role]) => (
+              <MenuItem key={key} value={key}>
+                {role.name}
+              </MenuItem>
+            ))}
+        </TextField>
       </Box>
 
       <TableContainer component={Paper}>
@@ -283,8 +375,8 @@ const TeamManagement = () => {
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>Email</TableCell>
-              <TableCell>Job Role</TableCell>
-              <TableCell>Responsibilities</TableCell>
+              <TableCell>Role</TableCell>
+              <TableCell>Access Level</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -301,16 +393,20 @@ const TeamManagement = () => {
                       color="text.secondary"
                       gutterBottom
                     >
-                      No team members found
+                      {searchTerm || roleFilter !== "all"
+                        ? "No team members match your filters"
+                        : "No team members found"}
                     </Typography>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={handleAddMember}
-                      sx={{ mt: 1 }}
-                    >
-                      Add Your First Team Member
-                    </Button>
+                    {!searchTerm && roleFilter === "all" && canManageTeam && (
+                      <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={handleAddMember}
+                        sx={{ mt: 1 }}
+                      >
+                        Add Your First Team Member
+                      </Button>
+                    )}
                   </Box>
                 </TableCell>
               </TableRow>
@@ -320,19 +416,32 @@ const TeamManagement = () => {
                   <TableCell>{member.name}</TableCell>
                   <TableCell>{member.email}</TableCell>
                   <TableCell>
-                    <Typography variant="subtitle2">
-                      {getRoleLabel(member.jobRole)}
-                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      {getRoleIcon(member.role || member.jobRole)}
+                      <Typography variant="subtitle2">
+                        {getRoleLabel(member.role || member.jobRole)}
+                      </Typography>
+                    </Box>
                   </TableCell>
                   <TableCell>
-                    {member.permissions.map((permission) => (
+                    {(member.role || member.jobRole) === "organizationAdmin" ? (
+                      <Chip label="Full Access" color="primary" size="small" />
+                    ) : (member.role || member.jobRole) === "marketingAgent" ? (
                       <Chip
-                        key={permission}
-                        label={permission}
+                        label="Marketing Access"
+                        color="info"
                         size="small"
-                        sx={{ mr: 0.5, mb: 0.5 }}
                       />
-                    ))}
+                    ) : (member.role || member.jobRole) ===
+                      "admissionsAgent" ? (
+                      <Chip
+                        label="Admissions Access"
+                        color="secondary"
+                        size="small"
+                      />
+                    ) : (
+                      <Chip label="Custom Access" size="small" />
+                    )}
                   </TableCell>
                   <TableCell>
                     <Chip
@@ -342,19 +451,28 @@ const TeamManagement = () => {
                     />
                   </TableCell>
                   <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      onClick={() => handleEditMember(member)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleDeleteMember(member)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
+                    {canManageTeam ? (
+                      <>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditMember(member)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleDeleteMember(member)}
+                          disabled={member.id === user?.uid} // Prevent self-deletion
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        No actions
+                      </Typography>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -368,6 +486,7 @@ const TeamManagement = () => {
         onClose={() => setOpenDialog(false)}
         onSave={handleSaveMember}
         member={selectedMember}
+        loading={savingMember}
       />
 
       <DeleteConfirmationDialog
@@ -375,7 +494,12 @@ const TeamManagement = () => {
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
         title="Delete Team Member"
-        content="Are you sure you want to delete this team member? This action cannot be undone."
+        content={
+          memberToDelete?.role === "organizationAdmin"
+            ? "Warning: You are about to delete an Organization Admin. This will remove them from both the organization and their login access. Make sure there is at least one other admin. This action cannot be undone."
+            : "Are you sure you want to delete this team member? They will be removed from the organization and will no longer be able to log in. This action cannot be undone."
+        }
+        loading={deletingMember}
       />
 
       <Snackbar

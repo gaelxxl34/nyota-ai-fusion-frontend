@@ -28,6 +28,10 @@ import {
   Storage as DataCenterIcon,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
+import {
+  PERMISSIONS,
+  hasPermission as checkPermission,
+} from "../../config/roles.config";
 
 const drawerWidth = 280;
 
@@ -53,131 +57,90 @@ const Layout = ({ children }) => {
     const role = getUserRole();
     const items = [];
 
-    switch (role) {
-      case "systemAdmin":
-        items.push(
-          {
-            text: "Dashboard",
-            icon: <DashboardIcon />,
-            path: "/admin/dashboard",
-          },
-          {
-            text: "Organizations",
-            icon: <BusinessIcon />,
-            path: "/admin/organizations",
-          },
-          { text: "Users", icon: <PeopleIcon />, path: "/admin/users" },
-          { text: "Chat Management", icon: <ChatIcon />, path: "/admin/chat" },
-          {
-            text: "Admin Settings",
-            icon: <AdminIcon />,
-            path: "/admin/admin-settings",
-          },
-          { text: "Settings", icon: <SettingsIcon />, path: "/admin/settings" }
-        );
-        break;
-
-      case "organizationAdmin":
-        items.push(
-          {
-            text: "Dashboard",
-            icon: <DashboardIcon />,
-            path: "/organization/dashboard",
-          },
-          { text: "Team", icon: <PeopleIcon />, path: "/organization/team" },
-          {
-            text: "Leads Overview",
-            icon: <InsightsIcon />,
-            path: "/organization/leads",
-          },
-          {
-            text: "Chat Configuration",
-            icon: <ChatIcon />,
-            path: "/organization/chat-config",
-          },
-          {
-            text: "Data Center",
-            icon: <DataCenterIcon />,
-            path: "/organization/data-center",
-          },
-          {
-            text: "Analytics",
-            icon: <InsightsIcon />,
-            path: "/organization/analytics",
-          },
-          {
-            text: "Settings",
-            icon: <SettingsIcon />,
-            path: "/organization/settings",
-          }
-        );
-        break;
-
-      case "leadManager":
-        items.push({
+    // Super Admin menu
+    if (role === "superAdmin") {
+      return [
+        {
           text: "Dashboard",
           icon: <DashboardIcon />,
-          path: "/organization/dashboard",
-        });
-        if (hasPermission("leads")) {
-          items.push({
-            text: "Leads Overview",
-            icon: <InsightsIcon />,
-            path: "/organization/leads",
-          });
-        }
-        break;
-
-      case "customerSupport":
-      case "salesManager":
-      case "marketingManager":
-        items.push({
-          text: "Dashboard",
-          icon: <DashboardIcon />,
-          path: "/organization/dashboard",
-        });
-        if (hasPermission("chat-config")) {
-          items.push({
-            text: "Chat Configuration",
-            icon: <ChatIcon />,
-            path: "/organization/chat-config",
-          });
-        }
-        if (hasPermission("leads")) {
-          items.push({
-            text: "Leads Overview",
-            icon: <InsightsIcon />,
-            path: "/organization/leads",
-          });
-        }
-        if (hasPermission("lead-management")) {
-          items.push({
-            text: "Lead Management",
-            icon: <AssessmentIcon />,
-            path: "/organization/lead-management",
-          });
-        }
-        break;
-
-      default:
-        if (hasPermission("dashboard")) {
-          items.push({
-            text: "Dashboard",
-            icon: <DashboardIcon />,
-            path: "/organization/dashboard",
-          });
-        }
+          path: "/super-admin/dashboard",
+        },
+        {
+          text: "User Management",
+          icon: <PeopleIcon />,
+          path: "/super-admin/users",
+        },
+        {
+          text: "Chat Management",
+          icon: <ChatIcon />,
+          path: "/super-admin/chat",
+        },
+        {
+          text: "Admin Settings",
+          icon: <AdminIcon />,
+          path: "/super-admin/admin-settings",
+        },
+        {
+          text: "Settings",
+          icon: <SettingsIcon />,
+          path: "/super-admin/settings",
+        },
+      ];
     }
 
-    if (hasPermission("analytics")) {
-      items.push({
-        text: "Analytics",
+    // Admin level menu based on permissions (for IUEA admins and staff)
+    const adminMenuItems = [];
+
+    // Check permissions for each menu item
+    if (checkPermission(role, PERMISSIONS.LEADS_OVERVIEW)) {
+      adminMenuItems.push({
+        text: "Leads Overview",
         icon: <InsightsIcon />,
-        path: "/organization/analytics",
+        path: "/admin/leads",
       });
     }
 
-    return items;
+    if (checkPermission(role, PERMISSIONS.CHAT_CONFIG)) {
+      adminMenuItems.push({
+        text: "Chat Configuration",
+        icon: <ChatIcon />,
+        path: "/admin/chat-config",
+      });
+    }
+
+    if (checkPermission(role, PERMISSIONS.DATA_CENTER)) {
+      adminMenuItems.push({
+        text: "Data Center",
+        icon: <DataCenterIcon />,
+        path: "/admin/data-center",
+      });
+    }
+
+    if (checkPermission(role, PERMISSIONS.ANALYTICS)) {
+      adminMenuItems.push({
+        text: "Analytics",
+        icon: <InsightsIcon />,
+        path: "/admin/analytics",
+      });
+    }
+
+    if (checkPermission(role, PERMISSIONS.TEAM) && role === "admin") {
+      adminMenuItems.push({
+        text: "Team",
+        icon: <PeopleIcon />,
+        path: "/admin/team",
+      });
+    }
+
+    if (checkPermission(role, PERMISSIONS.SETTINGS)) {
+      adminMenuItems.push({
+        text: "Settings",
+        icon: <SettingsIcon />,
+        path: "/admin/settings",
+      });
+    }
+
+    return adminMenuItems;
   };
 
   const isCurrentPath = (path) => location.pathname === path;
@@ -214,14 +177,14 @@ const Layout = ({ children }) => {
         <Typography variant="body2" color="primary.contrastText" align="center">
           {getUserRole()}
         </Typography>
-        {getUserRole() === "organizationAdmin" && (
+        {getUserRole() === "admin" && (
           <Typography
             variant="caption"
             color="primary.contrastText"
             align="center"
             display="block"
           >
-            {user?.organization?.name}
+            IUEA
           </Typography>
         )}
       </Box>

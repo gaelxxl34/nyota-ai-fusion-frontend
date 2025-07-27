@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Link as RouterLink } from "react-router-dom";
 import { authService } from "../../services/authService";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 
 const ForgotPassword = () => {
   const navigate = useNavigate();

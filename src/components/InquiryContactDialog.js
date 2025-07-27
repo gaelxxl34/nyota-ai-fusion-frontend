@@ -99,7 +99,7 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
     }
 
     // Basic phone validation
-    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+    const phoneRegex = /^\+?[\d\s\-()]{10,}$/;
     if (!phoneRegex.test(formData.phone)) {
       setError("Please enter a valid phone number");
       return false;
