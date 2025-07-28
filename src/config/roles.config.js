@@ -54,7 +54,6 @@ export const ROLES = {
     description:
       "Access to marketing-related features (new contact to applied)",
     permissions: [
-      PERMISSIONS.LEADS_OVERVIEW,
       PERMISSIONS.CHAT_CONFIG,
       PERMISSIONS.DATA_CENTER,
       PERMISSIONS.ANALYTICS,
@@ -71,7 +70,6 @@ export const ROLES = {
     name: "Admissions Officer",
     description: "Access to admissions-related features (applied to enrolled)",
     permissions: [
-      PERMISSIONS.LEADS_OVERVIEW,
       PERMISSIONS.CHAT_CONFIG,
       PERMISSIONS.DATA_CENTER,
       PERMISSIONS.ANALYTICS,

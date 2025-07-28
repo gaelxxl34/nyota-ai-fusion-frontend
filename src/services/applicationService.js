@@ -13,13 +13,27 @@ class ApplicationService {
   /**
    * Submit an application form
    * @param {Object} applicationData - Application form data
+   * @param {Object} userInfo - User info of the person submitting
    * @returns {Promise} API response
    */
-  async submitApplication(applicationData) {
+  async submitApplication(applicationData, userInfo = null) {
     try {
+      // Include user info if provided
+      const requestData = { ...applicationData };
+
+      if (userInfo) {
+        requestData.submittedBy = {
+          uid: userInfo.uid,
+          email: userInfo.email,
+          name: userInfo.displayName || userInfo.email,
+          role: userInfo.role,
+          submittedAt: new Date().toISOString(),
+        };
+      }
+
       const response = await axiosInstance.post(
         `${this.apiUrl}/submit`,
-        applicationData
+        requestData
       );
       return {
         success: true,

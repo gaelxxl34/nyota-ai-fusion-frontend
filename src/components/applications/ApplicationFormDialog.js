@@ -22,8 +22,10 @@ import {
   Person as PersonIcon,
 } from "@mui/icons-material";
 import { applicationService } from "../../services/applicationService";
+import { useAuth } from "../../contexts/AuthContext";
 
 const ApplicationFormDialog = ({ open, onClose, onSuccess }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     countryOfBirth: "",
@@ -201,7 +203,7 @@ const ApplicationFormDialog = ({ open, onClose, onSuccess }) => {
 
     try {
       // Submit application
-      const result = await applicationService.submitApplication(formData);
+      const result = await applicationService.submitApplication(formData, user);
 
       if (result.success) {
         setSuccess(

@@ -23,8 +23,10 @@ import {
   Send as SendIcon,
 } from "@mui/icons-material";
 import { leadService } from "../services/leadService";
+import { useAuth } from "../contexts/AuthContext";
 
 const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -136,7 +138,8 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
         // Contact via WhatsApp (creates lead and sends message)
         const result = await leadService.contactLeadViaWhatsApp(
           contactInfo,
-          message
+          message,
+          user
         );
 
         if (result.success) {
@@ -157,7 +160,7 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
         }
       } else {
         // Create lead without sending message
-        const result = await leadService.createLead(contactInfo);
+        const result = await leadService.createLead(contactInfo, user);
 
         if (result.success) {
           setSuccess(

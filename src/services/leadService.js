@@ -66,17 +66,30 @@ export const leadService = {
   },
 
   // Create a new lead
-  async createLead(leadData) {
+  async createLead(leadData, userInfo = null) {
     try {
       // Extract contactInfo and separate additional data
       const { name, phone, email, ...additionalData } = leadData;
 
       const contactInfo = { name, phone, email };
 
-      const response = await axiosInstance.post("/api/leads", {
+      // Include user info if provided
+      const requestData = {
         contactInfo,
         ...additionalData,
-      });
+      };
+
+      if (userInfo) {
+        requestData.submittedBy = {
+          uid: userInfo.uid,
+          email: userInfo.email,
+          name: userInfo.displayName || userInfo.email,
+          role: userInfo.role,
+          submittedAt: new Date().toISOString(),
+        };
+      }
+
+      const response = await axiosInstance.post("/api/leads", requestData);
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || "Failed to create lead");
@@ -194,7 +207,7 @@ export const leadService = {
   },
 
   // Contact lead via WhatsApp (finds existing or creates new)
-  async contactLeadViaWhatsApp(contactInfo, message) {
+  async contactLeadViaWhatsApp(contactInfo, message, userInfo = null) {
     try {
       // First try to find existing lead by email (primary identifier)
       let lead = null;
@@ -215,11 +228,14 @@ export const leadService = {
 
       // If no lead exists, create one
       if (!lead) {
-        const newLead = await this.createLead({
-          ...contactInfo,
-          source: "MANUAL",
-          notes: "Lead created from inquiry form",
-        });
+        const newLead = await this.createLead(
+          {
+            ...contactInfo,
+            source: "MANUAL",
+            notes: "Lead created from inquiry form",
+          },
+          userInfo
+        );
         lead = newLead.data;
       }
 

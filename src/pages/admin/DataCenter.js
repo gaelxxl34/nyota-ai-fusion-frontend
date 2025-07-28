@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -136,7 +136,7 @@ const DataCenter = () => {
   ];
 
   // Filter tabs based on user role - only show tabs for stages they have access to
-  const getFilteredTabs = () => {
+  const filteredTabs = useMemo(() => {
     console.log("🔑 Permission check for user:", userRole);
 
     return leadStatusTabs
@@ -171,9 +171,7 @@ const DataCenter = () => {
         }
         return tab;
       });
-  };
-
-  const filteredTabs = getFilteredTabs();
+  }, [userRole, checkLeadStageAccess]);
 
   // Debug logging
   console.log("🔍 DataCenter Debug:", {
@@ -424,14 +422,20 @@ const DataCenter = () => {
   };
 
   // Filter data based on search term
-  const filteredLeads = getCurrentTabLeads().filter(
-    (lead) =>
-      lead.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.program?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.source?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredLeads = useMemo(() => {
+    const tabLeads = getCurrentTabLeads();
+    if (!searchTerm) return tabLeads;
+
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return tabLeads.filter(
+      (lead) =>
+        lead.name?.toLowerCase().includes(lowerSearchTerm) ||
+        lead.email?.toLowerCase().includes(lowerSearchTerm) ||
+        lead.phone?.toLowerCase().includes(lowerSearchTerm) ||
+        lead.program?.toLowerCase().includes(lowerSearchTerm) ||
+        lead.source?.toLowerCase().includes(lowerSearchTerm)
+    );
+  }, [leads, currentTab, searchTerm, filteredTabs]);
 
   // Keep applications filtering for future use
   // const filteredApplications = applications.filter(
@@ -595,7 +599,7 @@ const DataCenter = () => {
     fetchData();
   };
 
-  const TabPanel = ({ children, value, index, ...other }) => {
+  const TabPanel = React.memo(({ children, value, index, ...other }) => {
     return (
       <div
         role="tabpanel"
@@ -607,7 +611,7 @@ const DataCenter = () => {
         {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
       </div>
     );
-  };
+  });
 
   return (
     <Box sx={{ p: 3 }}>
@@ -977,9 +981,15 @@ const DataCenter = () => {
                     }}
                   >
                     <TextField
+                      id="lead-search-field"
                       placeholder="Search by name, email, phone, program..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                        }
+                      }}
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
@@ -988,6 +998,12 @@ const DataCenter = () => {
                         ),
                       }}
                       sx={{ minWidth: 350 }}
+                      variant="outlined"
+                      size="small"
+                      autoComplete="off"
+                      inputProps={{
+                        "aria-label": "search leads",
+                      }}
                     />
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                       <Button
@@ -1004,9 +1020,15 @@ const DataCenter = () => {
                         onClick={() => setApplicationDialogOpen(true)}
                         color="primary"
                       >
-                        Application Form
+                        Add Applicant
                       </Button>
-                      <IconButton onClick={fetchData} title="Refresh Data">
+                      <IconButton
+                        onClick={() => {
+                          console.log("Manual refresh triggered");
+                          fetchData();
+                        }}
+                        title="Refresh Data"
+                      >
                         <RefreshIcon />
                       </IconButton>
                       {checkPermission(PERMISSIONS.EXPORT_DATA) && (
@@ -1045,7 +1067,7 @@ const DataCenter = () => {
                         ) : filteredLeads.length === 0 ? (
                           <TableRow>
                             <TableCell
-                              colSpan={7}
+                              colSpan={6}
                               align="center"
                               sx={{ py: 4 }}
                             >
@@ -1212,7 +1234,7 @@ const DataCenter = () => {
         onSuccess={handleContactCreated}
       />
 
-      {/* Application Form Dialog */}
+      {/* Add Applicant Dialog */}
       <ApplicationFormDialog
         open={applicationDialogOpen}
         onClose={() => setApplicationDialogOpen(false)}
