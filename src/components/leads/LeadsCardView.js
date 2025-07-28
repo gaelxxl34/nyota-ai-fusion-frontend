@@ -15,7 +15,6 @@ import {
   Phone as PhoneIcon,
   CalendarToday as CalendarIcon,
   Visibility as ViewIcon,
-  WhatsApp as WhatsAppIcon,
 } from "@mui/icons-material";
 import SourceIcon from "../common/SourceIcon";
 
@@ -84,19 +83,6 @@ const LeadsCardView = ({ leads, getStatusColor, formatDate, onViewLead }) => {
                   onClick={() => onViewLead(lead.id)}
                 >
                   View
-                </Button>
-                <Button
-                  size="small"
-                  startIcon={<WhatsAppIcon />}
-                  color="success"
-                  disabled={!lead.phone}
-                  onClick={() =>
-                    window.open(
-                      `https://wa.me/${lead.phone?.replace(/[^\d]/g, "")}`
-                    )
-                  }
-                >
-                  Contact
                 </Button>
               </Box>
             </CardContent>

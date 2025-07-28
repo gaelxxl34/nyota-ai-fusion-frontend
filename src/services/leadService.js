@@ -100,13 +100,15 @@ export const leadService = {
     leadId,
     status,
     notes = "",
-    updatedBy = "frontend_user"
+    updatedBy = "frontend_user",
+    forceUpdate = false
   ) {
     try {
       const response = await axiosInstance.put(`/api/leads/${leadId}/status`, {
         status,
         notes,
         updatedBy,
+        forceUpdate,
       });
       return response.data;
     } catch (error) {

@@ -97,10 +97,29 @@ const LeadDetailsDialog = ({
 
         // Fetch communication history
         if (response.data.phone) {
-          const commResponse = await whatsappService.getConversationHistory(
-            response.data.phone
-          );
-          setCommunications(commResponse?.data || []);
+          try {
+            // Get conversations for this phone number
+            const conversations = await whatsappService.getConversations();
+
+            // Find conversation matching the phone number
+            const phoneNumber = response.data.phone.replace(/\D/g, "");
+            const conversation = conversations?.conversations?.find((conv) =>
+              conv.customerPhone?.includes(phoneNumber)
+            );
+
+            if (conversation) {
+              // Get messages for this conversation
+              const messagesResponse = await whatsappService.getMessages(
+                conversation.id
+              );
+              setCommunications(messagesResponse?.messages || []);
+            } else {
+              setCommunications([]);
+            }
+          } catch (err) {
+            console.error("Error fetching conversation history:", err);
+            setCommunications([]);
+          }
         }
       }
     } catch (err) {
@@ -361,7 +380,6 @@ const LeadDetailsDialog = ({
           <Tab label="Overview" icon={<PersonIcon />} />
           <Tab label="Communication" icon={<MessageIcon />} />
           <Tab label="Activities" icon={<HistoryIcon />} />
-          <Tab label="Documents" icon={<AttachmentIcon />} />
         </Tabs>
 
         {/* Overview Tab */}
@@ -836,24 +854,6 @@ const LeadDetailsDialog = ({
               </Button>
             </Paper>
           </Box>
-        </TabPanel>
-
-        {/* Documents Tab */}
-        <TabPanel value={activeTab} index={3}>
-          <Paper sx={{ p: 3, height: 400, textAlign: "center" }}>
-            <AttachmentIcon
-              sx={{ fontSize: 64, color: "text.secondary", mb: 2 }}
-            />
-            <Typography variant="h6" color="text.secondary">
-              Document Management
-            </Typography>
-            <Typography color="text.secondary" sx={{ mb: 3 }}>
-              Upload and manage lead-related documents
-            </Typography>
-            <Button variant="outlined" startIcon={<AttachmentIcon />}>
-              Upload Documents
-            </Button>
-          </Paper>
         </TabPanel>
       </DialogContent>
 

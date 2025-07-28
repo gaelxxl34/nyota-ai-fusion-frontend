@@ -153,15 +153,24 @@ export const useLeadManagement = ({
     };
   }, [autoRefresh, refreshInterval, fetchLeads]);
 
-  // Refetch when filters or sorting changes
+  // Refetch when filters (except search) or sorting changes
   useEffect(() => {
-    if (leads.length > 0 || !loading) {
+    // Don't refetch for search filter changes as it's handled client-side
+    const shouldRefetch = leads.length > 0 || !loading;
+    if (shouldRefetch) {
       setLeads([]);
       setHasMore(true);
       fetchLeads({ forceRefresh: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, sortBy, sortOrder]);
+  }, [
+    filters.status,
+    filters.source,
+    filters.program,
+    filters.dateRange,
+    sortBy,
+    sortOrder,
+  ]);
 
   // Memoized filtered and processed data
   const processedData = useMemo(() => {

@@ -1,9 +1,16 @@
 import React from "react";
-import { Menu, MenuItem, ListItemIcon } from "@mui/material";
+import {
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  Divider,
+  Typography,
+} from "@mui/material";
 import {
   Edit as EditIcon,
   Assignment as AssignmentIcon,
   Delete as DeleteIcon,
+  Update as UpdateIcon,
 } from "@mui/icons-material";
 
 const LeadActionMenu = ({
@@ -12,11 +19,17 @@ const LeadActionMenu = ({
   selectedLead,
   onClose,
   onEdit,
+  onUpdateStatus,
   onConvert,
   onDelete,
 }) => {
   const handleEdit = () => {
     onEdit(selectedLead);
+    onClose();
+  };
+
+  const handleUpdateStatus = () => {
+    onUpdateStatus(selectedLead);
     onClose();
   };
 
@@ -31,24 +44,60 @@ const LeadActionMenu = ({
   };
 
   return (
-    <Menu anchorEl={anchorEl} open={open} onClose={onClose}>
+    <Menu
+      anchorEl={anchorEl}
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          minWidth: 200,
+          "& .MuiMenuItem-root": {
+            px: 2,
+            py: 1,
+          },
+        },
+      }}
+    >
       <MenuItem onClick={handleEdit}>
         <ListItemIcon>
-          <EditIcon fontSize="small" />
+          <EditIcon fontSize="small" color="primary" />
         </ListItemIcon>
-        Edit Lead
+        <Typography variant="body2">Edit Lead</Typography>
       </MenuItem>
+
+      <MenuItem onClick={handleUpdateStatus}>
+        <ListItemIcon>
+          <UpdateIcon fontSize="small" color="secondary" />
+        </ListItemIcon>
+        <Typography variant="body2">Update Status</Typography>
+      </MenuItem>
+
       <MenuItem onClick={handleConvert}>
         <ListItemIcon>
-          <AssignmentIcon fontSize="small" />
+          <AssignmentIcon fontSize="small" color="success" />
         </ListItemIcon>
-        Convert to Application
+        <Typography variant="body2">Convert to Application</Typography>
       </MenuItem>
-      <MenuItem onClick={handleDelete}>
+
+      <Divider sx={{ my: 0.5 }} />
+
+      <MenuItem
+        onClick={handleDelete}
+        sx={{
+          "&:hover": {
+            bgcolor: "error.light",
+            "& .MuiTypography-root": {
+              color: "error.contrastText",
+            },
+          },
+        }}
+      >
         <ListItemIcon>
-          <DeleteIcon fontSize="small" />
+          <DeleteIcon fontSize="small" color="error" />
         </ListItemIcon>
-        Delete Lead
+        <Typography variant="body2" color="error">
+          Delete Lead
+        </Typography>
       </MenuItem>
     </Menu>
   );

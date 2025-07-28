@@ -16,12 +16,7 @@ import {
   Button,
   CircularProgress,
 } from "@mui/material";
-import {
-  Sort as SortIcon,
-  Visibility as ViewIcon,
-  WhatsApp as WhatsAppIcon,
-  MoreVert as MoreVertIcon,
-} from "@mui/icons-material";
+import { Sort as SortIcon, Visibility as ViewIcon } from "@mui/icons-material";
 import SourceIcon from "../common/SourceIcon";
 
 const LeadsTable = ({
@@ -34,7 +29,6 @@ const LeadsTable = ({
   formatDate,
   onSort,
   onViewLead,
-  onMoreActions,
   onLoadMore,
 }) => {
   const tableColumns = [
@@ -127,12 +121,14 @@ const LeadsTable = ({
                 </TableCell>
 
                 <TableCell>
-                  <Chip
-                    label={lead.status?.replace(/_/g, " ") || "Unknown"}
-                    color={getStatusColor(lead.status)}
-                    size="small"
-                    variant="filled"
-                  />
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Chip
+                      label={lead.status?.replace(/_/g, " ") || "Unknown"}
+                      color={getStatusColor(lead.status)}
+                      size="small"
+                      variant="filled"
+                    />
+                  </Box>
                 </TableCell>
 
                 <TableCell>
@@ -149,30 +145,6 @@ const LeadsTable = ({
                         onClick={() => onViewLead(lead.id)}
                       >
                         <ViewIcon />
-                      </IconButton>
-                    </Tooltip>
-
-                    <Tooltip title="Contact via WhatsApp">
-                      <IconButton
-                        size="small"
-                        color="success"
-                        disabled={!lead.phone}
-                        onClick={() =>
-                          window.open(
-                            `https://wa.me/${lead.phone?.replace(/[^\d]/g, "")}`
-                          )
-                        }
-                      >
-                        <WhatsAppIcon />
-                      </IconButton>
-                    </Tooltip>
-
-                    <Tooltip title="More Actions">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => onMoreActions(e.currentTarget, lead)}
-                      >
-                        <MoreVertIcon />
                       </IconButton>
                     </Tooltip>
                   </Box>

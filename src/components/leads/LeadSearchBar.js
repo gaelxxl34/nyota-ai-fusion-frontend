@@ -29,6 +29,11 @@ const LeadSearchBar = ({
           placeholder="Search leads by name, email, phone, or program..."
           value={filters.search}
           onChange={(e) => onFilterChange("search", e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+            }
+          }}
           sx={{
             "& .MuiOutlinedInput-root": {
               bgcolor: "background.default",
@@ -49,7 +54,11 @@ const LeadSearchBar = ({
             ),
             endAdornment: filters.search && (
               <IconButton
-                onClick={() => onFilterChange("search", "")}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onFilterChange("search", "");
+                }}
                 size="small"
               >
                 <ClearIcon />
@@ -63,7 +72,10 @@ const LeadSearchBar = ({
           <Select
             value={sortBy}
             label="Sort By"
-            onChange={(e) => onSortChange(e.target.value, sortOrder)}
+            onChange={(e) => {
+              e.stopPropagation();
+              onSortChange(e.target.value, sortOrder);
+            }}
             sx={{
               bgcolor: "background.default",
               "& .MuiOutlinedInput-notchedOutline": {
@@ -87,7 +99,12 @@ const LeadSearchBar = ({
         <ToggleButtonGroup
           value={sortOrder}
           exclusive
-          onChange={(e, newOrder) => newOrder && onSortChange(sortBy, newOrder)}
+          onChange={(e, newOrder) => {
+            e.stopPropagation();
+            if (newOrder) {
+              onSortChange(sortBy, newOrder);
+            }
+          }}
           size="small"
           sx={{
             "& .MuiToggleButton-root": {

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box } from "@mui/material";
+import { Box, Snackbar, Alert } from "@mui/material";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -29,7 +29,6 @@ import LeadsTable from "../../components/leads/LeadsTable";
 import LeadsCardView from "../../components/leads/LeadsCardView";
 import LeadFilterDrawer from "../../components/leads/LeadFilterDrawer";
 import LeadSpeedDial from "../../components/leads/LeadSpeedDial";
-import LeadActionMenu from "../../components/leads/LeadActionMenu";
 
 // Register ChartJS components
 ChartJS.register(
@@ -76,12 +75,15 @@ const LeadsOverview = () => {
   // UI states
   const [viewMode, setViewMode] = useState("table");
   const [selectedLeadId, setSelectedLeadId] = useState(null);
-  const [selectedLead, setSelectedLead] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [speedDialOpen, setSpeedDialOpen] = useState(false);
-  const [anchorEl, setAnchorEl] = useState(null);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [leadDetailsOpen, setLeadDetailsOpen] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   // Get user (used for permission checks in dialogs)
   const { user } = useAuth();
@@ -102,24 +104,8 @@ const LeadsOverview = () => {
     refresh();
   };
 
-  const handleMoreActions = (anchorElement, lead) => {
-    setAnchorEl(anchorElement);
-    setSelectedLead(lead);
-  };
-
-  const handleEditLead = (lead) => {
-    // Open edit dialog or navigate to edit page
-    console.log("Edit lead:", lead.id);
-  };
-
-  const handleConvertLead = (lead) => {
-    // Convert lead to application
-    console.log("Convert lead:", lead.id);
-  };
-
-  const handleDeleteLead = (lead) => {
-    // Delete lead with confirmation
-    console.log("Delete lead:", lead.id);
+  const handleSnackbarClose = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
   const handleExportLeads = (format) => {
@@ -181,7 +167,6 @@ const LeadsOverview = () => {
           formatDate={formatDate}
           onSort={updateSort}
           onViewLead={handleViewLead}
-          onMoreActions={handleMoreActions}
           onLoadMore={loadMore}
         />
       ) : (
@@ -212,17 +197,6 @@ const LeadsOverview = () => {
         onClearFilters={clearFilters}
       />
 
-      {/* Action Menu */}
-      <LeadActionMenu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        selectedLead={selectedLead}
-        onClose={() => setAnchorEl(null)}
-        onEdit={handleEditLead}
-        onConvert={handleConvertLead}
-        onDelete={handleDeleteLead}
-      />
-
       {/* Dialogs */}
       <InquiryContactDialog
         open={dialogOpen}
@@ -244,6 +218,21 @@ const LeadsOverview = () => {
         onLeadDelete={handleLeadDelete}
         user={user}
       />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

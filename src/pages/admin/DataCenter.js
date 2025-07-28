@@ -23,11 +23,11 @@ import {
   Alert,
   Skeleton,
   CircularProgress,
+  Tooltip,
 } from "@mui/material";
 import {
   Search as SearchIcon,
   Download as DownloadIcon,
-  Visibility as ViewIcon,
   PersonAdd as PersonAddIcon,
   School as SchoolIcon,
   ContactMail as ContactMailIcon,
@@ -35,17 +35,24 @@ import {
   Refresh as RefreshIcon,
   WhatsApp as WhatsAppIcon,
   Assignment as AssignmentIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Update as UpdateIcon,
 } from "@mui/icons-material";
 import { leadService } from "../../services/leadService";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRolePermissions } from "../../hooks/useRolePermissions";
-import { PERMISSIONS, LEAD_STAGES } from "../../config/roles.config";
+import { PERMISSIONS } from "../../config/roles.config";
 import InquiryContactDialog from "../../components/InquiryContactDialog";
 import ApplicationFormDialog from "../../components/applications/ApplicationFormDialog";
+import LeadActionMenu from "../../components/leads/LeadActionMenu";
+import LeadEditDialog from "../../components/leads/LeadEditDialog";
+import LeadDeleteDialog from "../../components/leads/LeadDeleteDialog";
+import LeadStatusUpdateDialog from "../../components/leads/LeadStatusUpdateDialog";
+import StartConversationDialog from "../../components/leads/StartConversationDialog";
 
 const DataCenter = () => {
-  const { checkPermission, filterLeadsByRole, checkLeadStageAccess } =
-    useRolePermissions();
+  const { checkPermission, checkLeadStageAccess } = useRolePermissions();
   const { getUserRole } = useAuth();
   const userRole = getUserRole();
 
@@ -63,6 +70,13 @@ const DataCenter = () => {
     bySource: {},
   });
   const [hasMoreLeads, setHasMoreLeads] = useState(true);
+  // State for action menu and dialogs
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [statusUpdateDialogOpen, setStatusUpdateDialogOpen] = useState(false);
+  const [conversationDialogOpen, setConversationDialogOpen] = useState(false);
   // const { } = useAuth(); // Keep for future use
 
   // Define lead status categories for tabs
@@ -252,6 +266,7 @@ const DataCenter = () => {
     }, 60000); // Increased to 60 seconds
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Remove fetchData dependency to prevent excessive refreshes
 
   // Get leads for current tab
@@ -455,42 +470,59 @@ const DataCenter = () => {
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
+  const formatDate = (dateValue) => {
+    if (!dateValue) return "N/A";
 
-    let date;
-
-    // Handle Firestore timestamp objects
-    if (dateString && typeof dateString === "object" && dateString._seconds) {
-      // Firestore timestamp with _seconds and _nanoseconds
-      date = new Date(
-        dateString._seconds * 1000 + (dateString._nanoseconds || 0) / 1000000
-      );
-    } else if (
-      dateString &&
-      typeof dateString === "object" &&
-      dateString.toDate
-    ) {
-      // Firestore timestamp with toDate() method
-      date = dateString.toDate();
-    } else {
-      // Regular string or Date object
-      date = new Date(dateString);
+    if (dateValue instanceof Date) {
+      return dateValue.toLocaleDateString();
     }
 
-    // Check if date is valid
-    if (isNaN(date.getTime())) {
-      return "Invalid Date";
+    if (typeof dateValue === "object" && dateValue.seconds) {
+      return new Date(dateValue.seconds * 1000).toLocaleDateString();
     }
 
-    // Format as time dd/mm/yy as requested
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = String(date.getFullYear()).slice(-2);
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
+    if (typeof dateValue === "string") {
+      return new Date(dateValue).toLocaleDateString();
+    }
 
-    return `${hours}:${minutes} ${day}/${month}/${year}`;
+    return "N/A";
+  };
+
+  // Action handlers
+  const handleEditLead = (lead) => {
+    setSelectedLead(lead);
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateStatus = (lead) => {
+    setSelectedLead(lead);
+    setStatusUpdateDialogOpen(true);
+  };
+
+  const handleConvertLead = (lead) => {
+    // Convert lead to application
+    console.log("Convert lead:", lead.id);
+    // TODO: Implement conversion to application
+  };
+
+  const handleDeleteLead = (lead) => {
+    setSelectedLead(lead);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleLeadUpdated = (updatedLead) => {
+    console.log("Lead updated:", updatedLead.id);
+    fetchData(); // Refresh the data
+  };
+
+  const handleLeadDeleted = (leadId) => {
+    console.log("Lead deleted:", leadId);
+    fetchData(); // Refresh the data
+  };
+
+  const handleStartConversation = (lead) => {
+    setSelectedLead(lead);
+    setConversationDialogOpen(true);
   };
 
   // Handler for when a new inquiry contact is created
@@ -1072,24 +1104,54 @@ const DataCenter = () => {
                                 />
                               </TableCell>
                               <TableCell>
-                                <Box sx={{ display: "flex", gap: 0.5 }}>
-                                  <IconButton size="small" title="View Details">
-                                    <ViewIcon />
-                                  </IconButton>
-                                  {[
-                                    "INQUIRY",
-                                    "CONTACTED",
-                                    "PRE_QUALIFIED",
-                                  ].includes(lead.status) && (
-                                    <Button
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    gap: 0.5,
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  <Tooltip title="Edit Lead">
+                                    <IconButton
                                       size="small"
-                                      variant="contained"
-                                      startIcon={<WhatsAppIcon />}
-                                      color="success"
+                                      color="primary"
+                                      onClick={() => handleEditLead(lead)}
                                     >
-                                      Contact
-                                    </Button>
-                                  )}
+                                      <EditIcon />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Update Status">
+                                    <IconButton
+                                      size="small"
+                                      color="secondary"
+                                      onClick={() => handleUpdateStatus(lead)}
+                                    >
+                                      <UpdateIcon />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Start WhatsApp Conversation">
+                                    <IconButton
+                                      size="small"
+                                      color="success"
+                                      onClick={() =>
+                                        handleStartConversation(lead)
+                                      }
+                                      disabled={
+                                        !lead.phone && !lead.phoneNumber
+                                      }
+                                    >
+                                      <WhatsAppIcon />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Delete Lead">
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => handleDeleteLead(lead)}
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </Tooltip>
                                 </Box>
                               </TableCell>
                             </TableRow>
@@ -1155,6 +1217,61 @@ const DataCenter = () => {
         open={applicationDialogOpen}
         onClose={() => setApplicationDialogOpen(false)}
         onSuccess={handleApplicationSubmitted}
+      />
+
+      {/* Lead Action Menu */}
+      <LeadActionMenu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        selectedLead={selectedLead}
+        onClose={() => setAnchorEl(null)}
+        onEdit={handleEditLead}
+        onUpdateStatus={handleUpdateStatus}
+        onConvert={handleConvertLead}
+        onDelete={handleDeleteLead}
+      />
+
+      {/* Lead Edit Dialog */}
+      <LeadEditDialog
+        open={editDialogOpen}
+        onClose={() => {
+          setEditDialogOpen(false);
+          setSelectedLead(null);
+        }}
+        lead={selectedLead}
+        onUpdate={handleLeadUpdated}
+      />
+
+      {/* Lead Delete Dialog */}
+      <LeadDeleteDialog
+        open={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setSelectedLead(null);
+        }}
+        lead={selectedLead}
+        onDelete={handleLeadDeleted}
+      />
+
+      {/* Lead Status Update Dialog */}
+      <LeadStatusUpdateDialog
+        open={statusUpdateDialogOpen}
+        onClose={() => {
+          setStatusUpdateDialogOpen(false);
+          setSelectedLead(null);
+        }}
+        lead={selectedLead}
+        onUpdate={handleLeadUpdated}
+      />
+
+      {/* Start Conversation Dialog */}
+      <StartConversationDialog
+        open={conversationDialogOpen}
+        onClose={() => {
+          setConversationDialogOpen(false);
+          setSelectedLead(null);
+        }}
+        lead={selectedLead}
       />
     </Box>
   );
