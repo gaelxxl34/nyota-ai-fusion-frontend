@@ -37,7 +37,6 @@ import {
   Assignment as AssignmentIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Update as UpdateIcon,
 } from "@mui/icons-material";
 import { leadService } from "../../services/leadService";
 import { useAuth } from "../../contexts/AuthContext";
@@ -48,7 +47,6 @@ import ApplicationFormDialog from "../../components/applications/ApplicationForm
 import LeadActionMenu from "../../components/leads/LeadActionMenu";
 import LeadEditDialog from "../../components/leads/LeadEditDialog";
 import LeadDeleteDialog from "../../components/leads/LeadDeleteDialog";
-import LeadStatusUpdateDialog from "../../components/leads/LeadStatusUpdateDialog";
 import StartConversationDialog from "../../components/leads/StartConversationDialog";
 
 const DataCenter = () => {
@@ -75,7 +73,6 @@ const DataCenter = () => {
   const [selectedLead, setSelectedLead] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [statusUpdateDialogOpen, setStatusUpdateDialogOpen] = useState(false);
   const [conversationDialogOpen, setConversationDialogOpen] = useState(false);
   // const { } = useAuth(); // Keep for future use
 
@@ -496,11 +493,6 @@ const DataCenter = () => {
   const handleEditLead = (lead) => {
     setSelectedLead(lead);
     setEditDialogOpen(true);
-  };
-
-  const handleUpdateStatus = (lead) => {
-    setSelectedLead(lead);
-    setStatusUpdateDialogOpen(true);
   };
 
   const handleConvertLead = (lead) => {
@@ -1142,15 +1134,6 @@ const DataCenter = () => {
                                       <EditIcon />
                                     </IconButton>
                                   </Tooltip>
-                                  <Tooltip title="Update Status">
-                                    <IconButton
-                                      size="small"
-                                      color="secondary"
-                                      onClick={() => handleUpdateStatus(lead)}
-                                    >
-                                      <UpdateIcon />
-                                    </IconButton>
-                                  </Tooltip>
                                   <Tooltip title="Start WhatsApp Conversation">
                                     <IconButton
                                       size="small"
@@ -1248,7 +1231,6 @@ const DataCenter = () => {
         selectedLead={selectedLead}
         onClose={() => setAnchorEl(null)}
         onEdit={handleEditLead}
-        onUpdateStatus={handleUpdateStatus}
         onConvert={handleConvertLead}
         onDelete={handleDeleteLead}
       />
@@ -1273,17 +1255,6 @@ const DataCenter = () => {
         }}
         lead={selectedLead}
         onDelete={handleLeadDeleted}
-      />
-
-      {/* Lead Status Update Dialog */}
-      <LeadStatusUpdateDialog
-        open={statusUpdateDialogOpen}
-        onClose={() => {
-          setStatusUpdateDialogOpen(false);
-          setSelectedLead(null);
-        }}
-        lead={selectedLead}
-        onUpdate={handleLeadUpdated}
       />
 
       {/* Start Conversation Dialog */}

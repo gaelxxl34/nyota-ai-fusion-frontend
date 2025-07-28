@@ -24,6 +24,7 @@ import {
 } from "@mui/icons-material";
 import { leadService } from "../services/leadService";
 import { useAuth } from "../contexts/AuthContext";
+import { LEAD_SOURCES, SOURCE_CONFIG } from "../config/lead.constants";
 
 const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
   const { user } = useAuth();
@@ -53,20 +54,14 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
     "Certificate Programs",
   ];
 
-  const sourceOptions = [
-    { value: "WEBSITE", label: "Website" },
-    { value: "META_ADS", label: "Meta Ads" },
-    { value: "GOOGLE_ADS", label: "Google Ads" },
-    { value: "WHATSAPP", label: "WhatsApp" },
-    { value: "LINKEDIN", label: "LinkedIn" },
-    { value: "REFERRAL", label: "Referral" },
-    { value: "WALK_IN", label: "Walk-in" },
-    { value: "PHONE", label: "Phone Call" },
-    { value: "EMAIL", label: "Email" },
-    { value: "EDUCATION_FAIR", label: "Education Fair" },
-    { value: "PARTNER", label: "Partner Institution" },
-    { value: "MANUAL", label: "Manual Entry" },
-  ];
+  // Use the same source configuration from constants
+  const sourceOptions = Object.entries(SOURCE_CONFIG).map(
+    ([value, config]) => ({
+      value,
+      label: config.label,
+      icon: config.icon,
+    })
+  );
 
   const handleInputChange = (field) => (event) => {
     setFormData({ ...formData, [field]: event.target.value });
@@ -295,7 +290,7 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
               >
                 {sourceOptions.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
-                    {option.label}
+                    {option.icon} {option.label}
                   </MenuItem>
                 ))}
               </Select>

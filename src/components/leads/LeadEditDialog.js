@@ -18,7 +18,12 @@ import {
   Chip,
 } from "@mui/material";
 import { leadService } from "../../services/leadService";
-import { LEAD_STATUSES, LEAD_SOURCES } from "../../config/lead.constants";
+import {
+  LEAD_STATUSES,
+  LEAD_SOURCES,
+  STATUS_CONFIG,
+  SOURCE_CONFIG,
+} from "../../config/lead.constants";
 
 const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
   const [formData, setFormData] = useState({
@@ -34,35 +39,23 @@ const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Status configuration with colors
-  const statusConfig = {
-    INQUIRY: { label: "Inquiry", color: "info" },
-    QUALIFIED: { label: "Qualified", color: "primary" },
-    IN_PROGRESS: { label: "In Progress", color: "warning" },
-    APPLIED: { label: "Applied", color: "secondary" },
-    ENROLLED: { label: "Enrolled", color: "success" },
-    REJECTED: { label: "Rejected", color: "error" },
-    WITHDRAWN: { label: "Withdrawn", color: "default" },
-  };
-
-  // Source configuration
-  const sourceConfig = {
-    WEBSITE: "Website",
-    WHATSAPP: "WhatsApp",
-    GOOGLE_ADS: "Google Ads",
-    META_ADS: "Meta Ads",
-    REFERRAL: "Referral",
-    DIRECT: "Direct",
-    OTHER: "Other",
-  };
-
   useEffect(() => {
     if (lead) {
+      // Handle name field - split if it's a combined name
+      let firstName = lead.firstName || "";
+      let lastName = lead.lastName || "";
+
+      if (!firstName && !lastName && lead.name) {
+        const nameParts = lead.name.trim().split(" ");
+        firstName = nameParts[0] || "";
+        lastName = nameParts.slice(1).join(" ") || "";
+      }
+
       setFormData({
-        firstName: lead.firstName || "",
-        lastName: lead.lastName || "",
+        firstName,
+        lastName,
         email: lead.email || "",
-        phone: lead.phone || "",
+        phone: lead.phone || lead.phoneNumber || "",
         program: lead.program || "",
         source: lead.source || "",
         status: lead.status || "",
@@ -205,9 +198,9 @@ const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
                 onChange={handleChange}
                 label="Source"
               >
-                {Object.entries(sourceConfig).map(([value, label]) => (
+                {Object.entries(SOURCE_CONFIG).map(([value, config]) => (
                   <MenuItem key={value} value={value}>
-                    {label}
+                    {config.icon} {config.label}
                   </MenuItem>
                 ))}
               </Select>
@@ -223,7 +216,7 @@ const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
                 onChange={handleChange}
                 label="Status"
               >
-                {Object.entries(statusConfig).map(([value, config]) => (
+                {Object.entries(STATUS_CONFIG).map(([value, config]) => (
                   <MenuItem key={value} value={value}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <Chip

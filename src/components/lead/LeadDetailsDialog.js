@@ -230,7 +230,6 @@ const LeadDetailsDialog = ({
       ENROLLED: { color: "success", progress: 100, label: "Enrolled" },
       REJECTED: { color: "error", progress: 0, label: "Rejected" },
       NURTURE: { color: "warning", progress: 20, label: "Nurture" },
-      FOLLOW_UP: { color: "warning", progress: 30, label: "Follow-up" },
     };
     return (
       statusMap[status] || { color: "default", progress: 0, label: status }
@@ -559,7 +558,6 @@ const LeadDetailsDialog = ({
                         <MenuItem value="ENROLLED">Enrolled</MenuItem>
                         <MenuItem value="REJECTED">Rejected</MenuItem>
                         <MenuItem value="NURTURE">Nurture</MenuItem>
-                        <MenuItem value="FOLLOW_UP">Follow-up</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>

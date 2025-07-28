@@ -10,7 +10,6 @@ import {
   Edit as EditIcon,
   Assignment as AssignmentIcon,
   Delete as DeleteIcon,
-  Update as UpdateIcon,
 } from "@mui/icons-material";
 
 const LeadActionMenu = ({
@@ -19,17 +18,11 @@ const LeadActionMenu = ({
   selectedLead,
   onClose,
   onEdit,
-  onUpdateStatus,
   onConvert,
   onDelete,
 }) => {
   const handleEdit = () => {
     onEdit(selectedLead);
-    onClose();
-  };
-
-  const handleUpdateStatus = () => {
-    onUpdateStatus(selectedLead);
     onClose();
   };
 
@@ -63,13 +56,6 @@ const LeadActionMenu = ({
           <EditIcon fontSize="small" color="primary" />
         </ListItemIcon>
         <Typography variant="body2">Edit Lead</Typography>
-      </MenuItem>
-
-      <MenuItem onClick={handleUpdateStatus}>
-        <ListItemIcon>
-          <UpdateIcon fontSize="small" color="secondary" />
-        </ListItemIcon>
-        <Typography variant="body2">Update Status</Typography>
       </MenuItem>
 
       <MenuItem onClick={handleConvert}>

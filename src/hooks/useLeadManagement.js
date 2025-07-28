@@ -298,7 +298,6 @@ export const useLeadManagement = ({
       ENROLLED: "success",
       REJECTED: "error",
       NURTURE: "warning",
-      FOLLOW_UP: "warning",
     };
     return colors[status] || "default";
   }, []);
