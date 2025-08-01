@@ -20,7 +20,6 @@ import Swal from "sweetalert2";
 import ConversationTabs from "../../components/chat/ConversationTabs";
 import ChatLayout from "../../components/chat/ChatLayout";
 import TabPanel from "../../components/chat/TabPanel";
-import KnowledgeBaseTab from "../../components/chat/KnowledgeBaseTab";
 import ErrorBoundary from "../../components/chat/ErrorBoundary";
 import { axiosInstance } from "../../services/axiosConfig";
 import ChatMessageHandler from "../../services/chatMessageHandler";
@@ -107,13 +106,6 @@ const ChatConfig = () => {
       icon: "🎉",
       tabId: "admitted-tab",
     },
-    {
-      label: "Knowledge Base",
-      statuses: [],
-      color: "primary.main",
-      icon: "📚",
-      tabId: "knowledge-tab",
-    },
   ];
 
   // Filter tabs based on user role permissions - only hide UI tabs, don't filter data
@@ -121,8 +113,8 @@ const ChatConfig = () => {
     console.log("🔑 ChatConfig permission check for user:", userRole);
 
     return allTabs.filter((tab) => {
-      // Always show New Contacts and Knowledge Base tabs
-      if (tab.type === "non_leads" || tab.label === "Knowledge Base") {
+      // Always show New Contacts tab
+      if (tab.type === "non_leads") {
         console.log(`  - Tab ${tab.label}: Always visible`);
         return true;
       }
@@ -152,10 +144,6 @@ const ChatConfig = () => {
   // Get filtered conversations based on current tab - now using API filtering
   const getFilteredConversations = useCallback(() => {
     try {
-      if (tabValue === mainTabs.length - 1) {
-        return []; // Knowledge Base tab doesn't show conversations
-      }
-
       // Convert conversations Map to array for display
       // Filtering is now done at API level, so we just return all conversations
       const conversationsArray = Array.from(conversations.entries());
@@ -165,14 +153,12 @@ const ChatConfig = () => {
       console.error("❌ Error filtering conversations:", error);
       return [];
     }
-  }, [tabValue, mainTabs, conversations]);
+  }, [conversations]);
 
   // Get count of conversations for each tab - now using conversation counts
   const getTabCount = useCallback(
     (tabIndex) => {
       try {
-        if (tabIndex >= mainTabs.length - 1) return 0; // Knowledge Base tab
-
         const tab = mainTabs[tabIndex];
 
         // Count conversations by their leadStatus
@@ -1026,42 +1012,38 @@ const ChatConfig = () => {
         {mainTabs.map((tab, index) => (
           <TabPanel key={index} value={tabValue} index={index}>
             <Box sx={{ height: "100%", overflow: "hidden" }}>
-              {index === mainTabs.length - 1 ? (
-                <KnowledgeBaseTab />
-              ) : (
-                <ErrorBoundary>
-                  <ChatLayout
-                    conversations={conversations}
-                    activeConversation={activeConversation}
-                    chatMessages={chatMessages}
-                    unreadCounts={unreadCounts}
-                    autoReplySettings={autoReplySettings}
-                    message={message}
-                    setMessage={setMessage}
-                    loading={loading}
-                    searchTerm={searchTerm}
-                    setSearchTerm={setSearchTerm}
-                    onConversationSelect={switchConversation}
-                    onConversationClear={clearConversation}
-                    onConversationDelete={deleteConversation}
-                    onAutoReplyToggle={toggleAutoReply}
-                    onSendMessage={sendMessage}
-                    onKeyPress={handleKeyPress}
-                    onInputChange={handleInputChange}
-                    getConversationsList={getConversationsList}
-                    getProfileName={getProfileName}
-                    aiTyping={aiTyping}
-                    userTyping={userTyping}
-                    conversationsLoading={conversationsLoading}
-                    messagesLoading={messagesLoading}
-                    onRefresh={refreshConversations}
-                    onStartConversation={handleStartConversation}
-                    hasMoreConversations={hasMoreConversations}
-                    loadingMoreConversations={loadingMoreConversations}
-                    onLoadMore={loadMoreConversations}
-                  />
-                </ErrorBoundary>
-              )}
+              <ErrorBoundary>
+                <ChatLayout
+                  conversations={conversations}
+                  activeConversation={activeConversation}
+                  chatMessages={chatMessages}
+                  unreadCounts={unreadCounts}
+                  autoReplySettings={autoReplySettings}
+                  message={message}
+                  setMessage={setMessage}
+                  loading={loading}
+                  searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
+                  onConversationSelect={switchConversation}
+                  onConversationClear={clearConversation}
+                  onConversationDelete={deleteConversation}
+                  onAutoReplyToggle={toggleAutoReply}
+                  onSendMessage={sendMessage}
+                  onKeyPress={handleKeyPress}
+                  onInputChange={handleInputChange}
+                  getConversationsList={getConversationsList}
+                  getProfileName={getProfileName}
+                  aiTyping={aiTyping}
+                  userTyping={userTyping}
+                  conversationsLoading={conversationsLoading}
+                  messagesLoading={messagesLoading}
+                  onRefresh={refreshConversations}
+                  onStartConversation={handleStartConversation}
+                  hasMoreConversations={hasMoreConversations}
+                  loadingMoreConversations={loadingMoreConversations}
+                  onLoadMore={loadMoreConversations}
+                />
+              </ErrorBoundary>
             </Box>
           </TabPanel>
         ))}

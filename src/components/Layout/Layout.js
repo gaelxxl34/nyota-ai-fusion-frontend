@@ -16,7 +16,6 @@ import {
 } from "@mui/material";
 import {
   Dashboard as DashboardIcon,
-  Business as BusinessIcon,
   People as PeopleIcon,
   Chat as ChatIcon,
   Settings as SettingsIcon,
@@ -26,6 +25,7 @@ import {
   Insights as InsightsIcon,
   Menu as MenuIcon,
   Storage as DataCenterIcon,
+  MenuBook as KnowledgeBaseIcon,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -107,6 +107,13 @@ const Layout = ({ children }) => {
         path: "/admin/chat-config",
       });
     }
+
+    // Knowledge Base is available to all admin roles
+    adminMenuItems.push({
+      text: "Knowledge Base",
+      icon: <KnowledgeBaseIcon />,
+      path: "/admin/knowledge-base",
+    });
 
     if (checkPermission(role, PERMISSIONS.DATA_CENTER)) {
       adminMenuItems.push({
@@ -254,9 +261,6 @@ const Layout = ({ children }) => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
-            Nyota AI Fusion - Admin Dashboard
-          </Typography>
         </Toolbar>
       </AppBar>
 

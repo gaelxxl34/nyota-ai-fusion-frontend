@@ -325,9 +325,6 @@ const AdminDashboard = () => {
         }}
       >
         <Box>
-          <Typography variant="h4" fontWeight="bold">
-            System Admin Dashboard
-          </Typography>
           <Typography variant="body2" color="text.secondary">
             Platform-wide overview and management
           </Typography>
@@ -848,12 +845,6 @@ const AdminDashboard = () => {
               <Typography variant="h6">
                 Top Organizations by Performance
               </Typography>
-              <Button
-                size="small"
-                onClick={() => navigate("/admin/organizations")}
-              >
-                View All
-              </Button>
             </Box>
             {loading ? (
               <Skeleton variant="rectangular" width="100%" height={300} />

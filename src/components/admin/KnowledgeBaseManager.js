@@ -20,6 +20,10 @@ import {
   Alert,
   Snackbar,
   CircularProgress,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
 } from "@mui/material";
 import {
   School as SchoolIcon,
@@ -37,7 +41,7 @@ import {
 } from "@mui/icons-material";
 import { axiosInstance } from "../../services/axiosConfig";
 
-const KnowledgeBaseTab = () => {
+const KnowledgeBaseManager = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -49,9 +53,8 @@ const KnowledgeBaseTab = () => {
     message: "",
     severity: "success",
   });
-
   const [newItem, setNewItem] = useState({
-    category: "general",
+    category: "academics",
     title: "",
     content: "",
     tags: "",
@@ -156,8 +159,6 @@ const KnowledgeBaseTab = () => {
         );
         await loadKnowledgeBase();
         handleCloseDialog();
-      } else {
-        showSnackbar(data.error || "Failed to save knowledge item", "error");
       }
     } catch (error) {
       console.error("Error saving knowledge item:", error);
@@ -167,17 +168,10 @@ const KnowledgeBaseTab = () => {
     }
   };
 
-  const handleEditItem = (item) => {
-    setEditingItem(item);
-    setNewItem({
-      ...item,
-      tags: item.tags ? item.tags.join(", ") : "",
-    });
-    setDialogOpen(true);
-  };
-
   const handleDeleteItem = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this item?")) return;
+    if (!window.confirm("Are you sure you want to delete this item?")) {
+      return;
+    }
 
     try {
       setLoading(true);
@@ -185,12 +179,9 @@ const KnowledgeBaseTab = () => {
         `/api/whatsapp/knowledge/${id}`
       );
       const data = response.data;
-
       if (data.success) {
         showSnackbar("Knowledge item deleted successfully");
         await loadKnowledgeBase();
-      } else {
-        showSnackbar(data.error || "Failed to delete knowledge item", "error");
       }
     } catch (error) {
       console.error("Error deleting knowledge item:", error);
@@ -200,11 +191,23 @@ const KnowledgeBaseTab = () => {
     }
   };
 
+  const handleEditItem = (item) => {
+    setEditingItem(item);
+    setNewItem({
+      category: item.category || "academics",
+      title: item.title || "",
+      content: item.content || "",
+      tags: Array.isArray(item.tags) ? item.tags.join(", ") : "",
+      priority: item.priority || "medium",
+    });
+    setDialogOpen(true);
+  };
+
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingItem(null);
     setNewItem({
-      category: "general",
+      category: "academics",
       title: "",
       content: "",
       tags: "",
@@ -229,24 +232,26 @@ const KnowledgeBaseTab = () => {
     }
   };
 
+  if (loading && knowledgeItems.length === 0) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight={400}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Box sx={{ p: 2, height: "100%", overflow: "auto" }}>
+    <Box sx={{ p: 3, maxWidth: "100%", mx: "auto" }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-          <Avatar sx={{ bgcolor: "#2196f3", mr: 2, width: 48, height: 48 }}>
-            <PsychologyIcon />
-          </Avatar>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
-              Knowledge Base
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Manage AI assistant knowledge for student responses
-            </Typography>
-          </Box>
-        </Box>
-
+        <Typography variant="h4" gutterBottom>
+          Knowledge Base Management
+        </Typography>
         <Alert severity="info" sx={{ mb: 2 }}>
           <Typography variant="body2">
             Add knowledge items to help the AI assistant provide accurate
@@ -295,6 +300,10 @@ const KnowledgeBaseTab = () => {
                       selectedCategory === category.id
                         ? "white"
                         : category.color,
+                    "&:hover": {
+                      bgcolor: category.color,
+                      color: "white",
+                    },
                   }}
                 />
               ))}
@@ -302,10 +311,10 @@ const KnowledgeBaseTab = () => {
           </Grid>
           <Grid item xs={12} md={2}>
             <Button
+              fullWidth
               variant="contained"
               startIcon={<AddIcon />}
               onClick={() => setDialogOpen(true)}
-              fullWidth
               size="small"
             >
               Add Item
@@ -314,139 +323,131 @@ const KnowledgeBaseTab = () => {
         </Grid>
       </Paper>
 
-      {/* Knowledge Items */}
+      {/* Statistics */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="body2" color="text.secondary">
+          Showing {filteredItems.length} of {knowledgeItems.length} items
+        </Typography>
+      </Box>
+
+      {/* Knowledge Items Grid */}
       <Grid container spacing={2}>
-        {loading ? (
-          <Grid item xs={12}>
-            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-              <CircularProgress />
-            </Box>
-          </Grid>
-        ) : filteredItems.length === 0 ? (
-          <Grid item xs={12}>
-            <Box sx={{ textAlign: "center", py: 4 }}>
-              <PsychologyIcon
-                sx={{ fontSize: 48, color: "text.secondary", mb: 2 }}
-              />
-              <Typography variant="h6" color="text.secondary">
-                No knowledge items found
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                {searchTerm
-                  ? "Try adjusting your search terms"
-                  : "Start by adding knowledge items"}
-              </Typography>
-            </Box>
-          </Grid>
-        ) : (
-          filteredItems.map((item) => {
-            const categoryInfo = getCategoryInfo(item.category);
-            return (
-              <Grid item xs={12} md={6} lg={4} key={item.id}>
-                <Card
-                  sx={{
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                >
-                  <CardContent sx={{ flexGrow: 1, pb: 1 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                      <Avatar
-                        sx={{
-                          bgcolor: categoryInfo.color,
-                          width: 24,
-                          height: 24,
-                          mr: 1,
-                        }}
-                      >
-                        {React.cloneElement(categoryInfo.icon, {
-                          sx: { fontSize: 14 },
-                        })}
-                      </Avatar>
-                      <Typography
-                        variant="caption"
-                        sx={{ fontSize: 11, fontWeight: 500 }}
-                      >
-                        {categoryInfo.label}
-                      </Typography>
-                      <Chip
-                        label={item.priority}
-                        size="small"
-                        sx={{
-                          ml: "auto",
-                          height: 16,
-                          fontSize: 9,
-                          bgcolor: getPriorityColor(item.priority),
-                          color: "white",
-                        }}
-                      />
+        {filteredItems.map((item) => {
+          const categoryInfo = getCategoryInfo(item.category);
+          return (
+            <Grid item xs={12} sm={6} md={4} key={item.id}>
+              <Card
+                sx={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  "&:hover": {
+                    boxShadow: 4,
+                  },
+                }}
+              >
+                <CardContent sx={{ flexGrow: 1, pb: 1 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                    <Avatar
+                      sx={{
+                        bgcolor: categoryInfo.color,
+                        width: 24,
+                        height: 24,
+                        mr: 1,
+                      }}
+                    >
+                      {React.cloneElement(categoryInfo.icon, {
+                        sx: { fontSize: 14 },
+                      })}
+                    </Avatar>
+                    <Typography
+                      variant="caption"
+                      sx={{ fontSize: 11, fontWeight: 500 }}
+                    >
+                      {categoryInfo.label}
+                    </Typography>
+                    <Chip
+                      label={item.priority}
+                      size="small"
+                      sx={{
+                        ml: "auto",
+                        height: 16,
+                        fontSize: 9,
+                        bgcolor: getPriorityColor(item.priority),
+                        color: "white",
+                      }}
+                    />
+                  </Box>
+
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      fontWeight: 600,
+                      mb: 1,
+                      fontSize: 14,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {item.title}
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      mb: 1.5,
+                      fontSize: 12,
+                      lineHeight: 1.4,
+                      display: "-webkit-box",
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {item.content}
+                  </Typography>
+
+                  {item.tags && item.tags.length > 0 && (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {item.tags.map((tag, index) => (
+                        <Chip
+                          key={index}
+                          label={tag}
+                          size="small"
+                          variant="outlined"
+                          sx={{ height: 16, fontSize: 9 }}
+                        />
+                      ))}
                     </Box>
+                  )}
+                </CardContent>
 
-                    <Typography
-                      variant="subtitle1"
-                      sx={{
-                        fontWeight: 600,
-                        mb: 1,
-                        fontSize: 14,
-                        lineHeight: 1.3,
-                      }}
-                    >
-                      {item.title}
-                    </Typography>
-
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        mb: 1.5,
-                        fontSize: 12,
-                        lineHeight: 1.4,
-                        display: "-webkit-box",
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {item.content}
-                    </Typography>
-
-                    {item.tags && item.tags.length > 0 && (
-                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                        {item.tags.map((tag, index) => (
-                          <Chip
-                            key={index}
-                            label={tag}
-                            size="small"
-                            variant="outlined"
-                            sx={{ height: 16, fontSize: 9 }}
-                          />
-                        ))}
-                      </Box>
-                    )}
-                  </CardContent>
-
-                  <CardActions sx={{ pt: 0, px: 2, pb: 1.5 }}>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleEditItem(item)}
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleDeleteItem(item.id)}
-                      color="error"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </CardActions>
-                </Card>
-              </Grid>
-            );
-          })
-        )}
+                <CardActions sx={{ pt: 0, px: 2, pb: 1.5 }}>
+                  <IconButton size="small" onClick={() => handleEditItem(item)}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleDeleteItem(item.id)}
+                    color="error"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </CardActions>
+              </Card>
+            </Grid>
+          );
+        })}
       </Grid>
+
+      {/* No Results */}
+      {filteredItems.length === 0 && (
+        <Box textAlign="center" py={4}>
+          <Typography variant="body1" color="text.secondary">
+            No knowledge base items found.
+          </Typography>
+        </Box>
+      )}
 
       {/* Add/Edit Dialog */}
       <Dialog
@@ -456,45 +457,43 @@ const KnowledgeBaseTab = () => {
         fullWidth
       >
         <DialogTitle>
-          {editingItem ? "Edit Knowledge Item" : "Add New Knowledge Item"}
+          {editingItem ? "Edit Knowledge Item" : "Add Knowledge Item"}
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Category"
-                select
-                value={newItem.category}
-                onChange={(e) =>
-                  setNewItem({ ...newItem, category: e.target.value })
-                }
-                SelectProps={{ native: true }}
-                size="small"
-              >
-                {categories.slice(1).map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.label}
-                  </option>
-                ))}
-              </TextField>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Category</InputLabel>
+                <Select
+                  value={newItem.category}
+                  onChange={(e) =>
+                    setNewItem({ ...newItem, category: e.target.value })
+                  }
+                  label="Category"
+                >
+                  {categories.slice(1).map((category) => (
+                    <MenuItem key={category.id} value={category.id}>
+                      {category.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Priority"
-                select
-                value={newItem.priority}
-                onChange={(e) =>
-                  setNewItem({ ...newItem, priority: e.target.value })
-                }
-                SelectProps={{ native: true }}
-                size="small"
-              >
-                <option value="high">High Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="low">Low Priority</option>
-              </TextField>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Priority</InputLabel>
+                <Select
+                  value={newItem.priority}
+                  onChange={(e) =>
+                    setNewItem({ ...newItem, priority: e.target.value })
+                  }
+                  label="Priority"
+                >
+                  <MenuItem value="low">Low</MenuItem>
+                  <MenuItem value="medium">Medium</MenuItem>
+                  <MenuItem value="high">High</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={12}>
               <TextField
@@ -570,4 +569,4 @@ const KnowledgeBaseTab = () => {
   );
 };
 
-export default KnowledgeBaseTab;
+export default KnowledgeBaseManager;

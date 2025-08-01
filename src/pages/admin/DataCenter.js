@@ -59,7 +59,10 @@ const DataCenter = () => {
   const [leads, setLeads] = useState([]);
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [tabSwitching, setTabSwitching] = useState(false);
   const [error, setError] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Add refresh trigger
   const [inquiryDialogOpen, setInquiryDialogOpen] = useState(false);
   const [applicationDialogOpen, setApplicationDialogOpen] = useState(false);
   const [leadStats, setLeadStats] = useState({
@@ -67,7 +70,11 @@ const DataCenter = () => {
     byStatus: {},
     bySource: {},
   });
-  const [hasMoreLeads, setHasMoreLeads] = useState(true);
+  const [pagination, setPagination] = useState({
+    hasMore: true,
+    offset: 0,
+    limit: 25,
+  });
   // State for action menu and dialogs
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -77,66 +84,74 @@ const DataCenter = () => {
   // const { } = useAuth(); // Keep for future use
 
   // Define lead status categories for tabs
-  const leadStatusTabs = [
-    {
-      label: "All Leads",
-      statuses: [
-        "INQUIRY",
-        "CONTACTED",
-        "PRE_QUALIFIED",
-        "QUALIFIED",
-        "APPLIED",
-        "ADMITTED",
-        "ENROLLED",
-        "REJECTED",
-        "NURTURE",
-      ],
-      icon: ContactMailIcon,
-      color: "primary",
-    },
-    {
-      label: "Contacted",
-      statuses: ["CONTACTED", "NURTURE"],
-      icon: WhatsAppIcon,
-      color: "info",
-    },
-    {
-      label: "Interested",
-      statuses: ["PRE_QUALIFIED"],
-      icon: AssessmentIcon,
-      color: "warning",
-    },
-    {
-      label: "Applied",
-      statuses: ["APPLIED"],
-      icon: AssignmentIcon,
-      color: "info",
-    },
-    {
-      label: "Qualified",
-      statuses: ["QUALIFIED"],
-      icon: SchoolIcon,
-      color: "success",
-    },
-    {
-      label: "Admitted",
-      statuses: ["ADMITTED"],
-      icon: PersonAddIcon,
-      color: "success",
-    },
-    {
-      label: "Enrolled",
-      statuses: ["ENROLLED"],
-      icon: SchoolIcon,
-      color: "success",
-    },
-  ];
+  const leadStatusTabs = useMemo(
+    () => [
+      {
+        label: "All Leads",
+        statuses: [
+          "INQUIRY",
+          "CONTACTED",
+          "PRE_QUALIFIED",
+          "QUALIFIED",
+          "APPLIED",
+          "ADMITTED",
+          "ENROLLED",
+          "REJECTED",
+          "NURTURE",
+        ],
+        icon: ContactMailIcon,
+        color: "primary",
+      },
+      {
+        label: "Contacted",
+        statuses: ["CONTACTED", "NURTURE"],
+        icon: WhatsAppIcon,
+        color: "info",
+      },
+      {
+        label: "Interested",
+        statuses: ["PRE_QUALIFIED"],
+        icon: AssessmentIcon,
+        color: "warning",
+      },
+      {
+        label: "Applied",
+        statuses: ["APPLIED"],
+        icon: AssignmentIcon,
+        color: "info",
+      },
+      {
+        label: "Qualified",
+        statuses: ["QUALIFIED"],
+        icon: SchoolIcon,
+        color: "success",
+      },
+      {
+        label: "Admitted",
+        statuses: ["ADMITTED"],
+        icon: PersonAddIcon,
+        color: "success",
+      },
+      {
+        label: "Enrolled",
+        statuses: ["ENROLLED"],
+        icon: SchoolIcon,
+        color: "success",
+      },
+    ],
+    []
+  );
 
   // Filter tabs based on user role - only show tabs for stages they have access to
   const filteredTabs = useMemo(() => {
     console.log("🔑 Permission check for user:", userRole);
 
-    return leadStatusTabs
+    if (!userRole) {
+      console.log("❌ No user role found, returning empty tabs");
+      return [];
+    }
+
+    const filtered = leadStatusTabs
       .filter((tab) => {
         // All Leads tab - filter statuses based on access
         if (tab.label === "All Leads") {
@@ -168,7 +183,13 @@ const DataCenter = () => {
         }
         return tab;
       });
-  }, [userRole, checkLeadStageAccess]);
+
+    console.log(
+      "🎯 Filtered tabs:",
+      filtered.map((t) => t.label)
+    );
+    return filtered;
+  }, [userRole, leadStatusTabs, checkLeadStageAccess]);
 
   // Debug logging
   console.log("🔍 DataCenter Debug:", {
@@ -176,105 +197,308 @@ const DataCenter = () => {
     allTabsCount: leadStatusTabs.length,
     filteredTabsCount: filteredTabs.length,
     filteredTabs: filteredTabs.map((t) => t.label),
+    currentTab,
     leadsCount: leads.length,
-    leadStatuses: [...new Set(leads.map((l) => l.status))],
+    hasMore: pagination.hasMore,
   });
 
-  // Fetch data from backend with pagination
-  const fetchData = useCallback(
-    async (loadMore = false) => {
-      try {
-        if (!loadMore) {
-          setLoading(true);
-          setError("");
-        }
+  // Manual refresh function - only refreshes leads, not stats
+  const refreshCurrentTab = useCallback(() => {
+    console.log("📊 Manual refresh: updating leads only");
+    setPagination({ hasMore: true, offset: 0, limit: 25 });
+    setRefreshTrigger((prev) => prev + 1);
+    // Don't refresh stats on manual refresh - only leads
+  }, []);
 
-        const currentOffset = loadMore ? leads.length : 0;
-        const limit = 25; // Reduced page size for better performance
+  // Load more leads
+  const loadMoreLeads = useCallback(async () => {
+    if (
+      loadingMore ||
+      !pagination.hasMore ||
+      filteredTabs.length === 0 ||
+      tabSwitching
+    )
+      return;
 
-        console.log(
-          `📊 DataCenter: Fetching data (loadMore: ${loadMore}, offset: ${currentOffset})`
-        );
+    const currentTabConfig = filteredTabs[currentTab];
+    if (!currentTabConfig) return;
 
-        // Fetch leads and applications with pagination
-        const [leadsResponse, applicationsResponse, statsResponse] =
-          await Promise.all([
-            leadService.getAllLeads({
-              limit,
-              offset: currentOffset,
-              sortBy: "createdAt",
-              sortOrder: "desc",
-            }),
-            currentOffset === 0
-              ? leadService.getApplications({ limit: 50 })
-              : Promise.resolve({ data: [] }),
-            currentOffset === 0
-              ? leadService.getLeadStats()
-              : Promise.resolve(leadStats),
-          ]);
+    try {
+      setLoadingMore(true);
 
-        const newLeads = leadsResponse.data || [];
-        const hasMore = leadsResponse.pagination?.hasMore || false;
+      const currentOffset = pagination.offset;
+      const limit = 25;
 
-        console.log(
-          `📊 DataCenter: Received ${newLeads.length} leads, hasMore: ${hasMore}`
-        );
+      console.log(
+        `📊 Loading more leads for tab ${currentTab} (offset: ${currentOffset})`
+      );
 
-        if (loadMore) {
-          // Append new leads to existing ones
-          setLeads((prevLeads) => [...prevLeads, ...newLeads]);
-        } else {
-          // Replace leads with new data
-          setLeads(newLeads);
-          setApplications(applicationsResponse.data || []);
-          setLeadStats(
-            statsResponse.data || { total: 0, byStatus: {}, bySource: {} }
+      let leadsResponse;
+
+      if (currentTabConfig.label === "All Leads") {
+        leadsResponse = await leadService.getAllLeads({
+          limit,
+          offset: currentOffset,
+          sortBy: "createdAt",
+          sortOrder: "desc",
+        });
+
+        if (leadsResponse.data) {
+          leadsResponse.data = leadsResponse.data.filter((lead) =>
+            currentTabConfig.statuses.includes(lead.status)
           );
         }
+      } else {
+        if (currentTabConfig.statuses.length === 1) {
+          leadsResponse = await leadService.getLeadsByStatus(
+            currentTabConfig.statuses[0],
+            { limit, offset: currentOffset }
+          );
+        } else {
+          leadsResponse = await leadService.getAllLeads({
+            limit: limit * 2,
+            offset: Math.floor(
+              currentOffset / currentTabConfig.statuses.length
+            ),
+            sortBy: "createdAt",
+            sortOrder: "desc",
+          });
 
-        setHasMoreLeads(hasMore);
+          if (leadsResponse.data) {
+            leadsResponse.data = leadsResponse.data
+              .filter((lead) => currentTabConfig.statuses.includes(lead.status))
+              .slice(0, limit);
+          }
+        }
+      }
+
+      const newLeads = leadsResponse.data || [];
+      const hasMore = leadsResponse.pagination?.hasMore || false;
+
+      console.log(
+        `📊 Received ${newLeads.length} more leads, hasMore: ${hasMore}`
+      );
+
+      setLeads((prev) => [...prev, ...newLeads]);
+      setPagination({
+        hasMore,
+        offset: currentOffset + newLeads.length,
+        limit,
+      });
+    } catch (err) {
+      console.error(`Error loading more leads:`, err);
+      setError(err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [
+    currentTab,
+    loadingMore,
+    pagination.hasMore,
+    pagination.offset,
+    filteredTabs,
+    tabSwitching,
+  ]);
+
+  // Handle tab change
+  const handleTabChange = useCallback(
+    (event, newTabIndex) => {
+      console.log(`🔄 Tab change from ${currentTab} to ${newTabIndex}`);
+
+      // Clear any existing errors
+      setError("");
+
+      // Set tab switching state for smooth transition
+      setTabSwitching(true);
+      setLoading(true);
+
+      // Update current tab
+      setCurrentTab(newTabIndex);
+
+      // Clear search when changing tabs
+      setSearchTerm("");
+
+      // Reset pagination for new tab
+      setPagination({ hasMore: true, offset: 0, limit: 25 });
+
+      // Clear current leads to prevent showing old data during transition
+      setLeads([]);
+
+      // The useEffect will handle fetching ONLY leads data when currentTab changes
+      // No stats refresh needed - they stay the same across tabs
+    },
+    [currentTab]
+  );
+
+  // Fetch initial data only once on component mount
+  useEffect(() => {
+    console.log("🏁 Component mounted - fetching initial data once");
+
+    const fetchData = async () => {
+      try {
+        console.log(`📊 Fetching initial data`);
+
+        const [applicationsResponse, statsResponse] = await Promise.all([
+          leadService.getApplications({ limit: 50 }),
+          leadService.getLeadStats(),
+        ]);
+
+        setApplications(applicationsResponse.data || []);
+        setLeadStats(
+          statsResponse.data || { total: 0, byStatus: {}, bySource: {} }
+        );
       } catch (err) {
-        console.error("Error fetching data:", err);
+        console.error("Error fetching initial data:", err);
+        setError(err.message);
+      }
+    };
+
+    fetchData();
+  }, []); // Empty dependency array - only run once on mount
+
+  // Fetch leads when component mounts or current tab changes or refresh is triggered
+  useEffect(() => {
+    const loadData = async () => {
+      console.log("🔄 useEffect triggered:", {
+        currentTab,
+        filteredTabsLength: filteredTabs.length,
+        userRole,
+      });
+
+      // Early exit if no user role (not authenticated)
+      if (!userRole) {
+        console.log("❌ No user role found, user might not be authenticated");
+        setLoading(false);
+        return;
+      }
+
+      // Early exit if no tabs available
+      if (filteredTabs.length === 0) {
+        console.log("❌ No filtered tabs available, setting loading to false");
+        setLoading(false);
+        return;
+      }
+
+      // Get current state values
+      const currentTabConfig = filteredTabs[currentTab];
+      if (!currentTabConfig) {
+        console.log("❌ No current tab config found, setting loading to false");
+        setLoading(false);
+        return;
+      }
+
+      if (currentTab >= filteredTabs.length) {
+        console.log(
+          "❌ Current tab index out of bounds, setting loading to false"
+        );
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError("");
+
+        const limit = 25;
+        console.log(`📊 Fetching ${currentTabConfig.label} data`);
+
+        let leadsResponse;
+
+        if (currentTabConfig.label === "All Leads") {
+          leadsResponse = await leadService.getAllLeads({
+            limit,
+            offset: 0,
+            sortBy: "createdAt",
+            sortOrder: "desc",
+          });
+
+          if (leadsResponse.data) {
+            leadsResponse.data = leadsResponse.data.filter((lead) =>
+              currentTabConfig.statuses.includes(lead.status)
+            );
+          }
+        } else {
+          if (currentTabConfig.statuses.length === 1) {
+            leadsResponse = await leadService.getLeadsByStatus(
+              currentTabConfig.statuses[0],
+              { limit, offset: 0 }
+            );
+          } else {
+            // For tabs with multiple statuses, get all leads and filter
+            leadsResponse = await leadService.getAllLeads({
+              limit: limit * 3, // Get more to ensure we have enough after filtering
+              offset: 0,
+              sortBy: "createdAt",
+              sortOrder: "desc",
+            });
+
+            if (leadsResponse.data) {
+              leadsResponse.data = leadsResponse.data
+                .filter((lead) =>
+                  currentTabConfig.statuses.includes(lead.status)
+                )
+                .slice(0, limit);
+            }
+          }
+        }
+
+        const newLeads = leadsResponse.data || [];
+        const hasMore =
+          leadsResponse.pagination?.hasMore || newLeads.length >= limit;
+
+        console.log(
+          `📊 Received ${newLeads.length} leads, hasMore: ${hasMore}`
+        );
+
+        setLeads(newLeads);
+        setPagination({
+          hasMore,
+          offset: newLeads.length,
+          limit,
+        });
+      } catch (err) {
+        console.error(`Error fetching leads:`, err);
         setError(err.message);
       } finally {
         setLoading(false);
+        setTabSwitching(false);
       }
-    },
-    [leads.length, leadStats]
-  );
+    };
 
-  // Load more leads function
-  const loadMoreLeads = useCallback(async () => {
-    if (!loading && hasMoreLeads) {
-      console.log("📊 DataCenter: Loading more leads...");
-      await fetchData(true);
-    }
-  }, [loading, hasMoreLeads, fetchData]);
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTab, refreshTrigger, userRole]);
 
+  // Auto-refresh every 2 minutes (120 seconds) - only refreshes leads, not stats
   useEffect(() => {
-    fetchData();
-
-    // Reduced auto-refresh interval from 30s to 60s and only refresh first page
     const interval = setInterval(() => {
-      console.log("🔄 DataCenter: Auto-refreshing first page...");
-      fetchData(false);
-    }, 60000); // Increased to 60 seconds
+      console.log("🔄 Auto-refreshing current tab leads only...");
+      setRefreshTrigger((prev) => prev + 1);
+    }, 120000); // Changed from 60000 to 120000 (2 minutes)
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Remove fetchData dependency to prevent excessive refreshes
+  }, []); // No dependencies needed
 
-  // Get leads for current tab
-  const getCurrentTabLeads = () => {
+  // Get leads for current tab with status filtering
+  const getCurrentTabLeads = useMemo(() => {
     const currentTabConfig = filteredTabs[currentTab];
     if (!currentTabConfig) return [];
 
-    // Filter leads by tab statuses
-    return leads.filter((lead) => {
-      // Check if lead matches the tab's statuses
-      return currentTabConfig.statuses.includes(lead.status);
-    });
-  };
+    // Since we're already filtering in the API calls, we should return all leads
+    // The leads state already contains the filtered data for the current tab
+    return leads;
+  }, [leads, currentTab, filteredTabs]);
+
+  // Get tab count for badge display
+  const getTabCount = useCallback(
+    (statuses) => {
+      // Use stats data for accurate counts
+      return statuses.reduce((total, status) => {
+        return total + (leadStats.byStatus[status] || 0);
+      }, 0);
+    },
+    [leadStats]
+  );
 
   // Get stats cards based on user role
   const getVisibleStatsCards = () => {
@@ -420,7 +644,7 @@ const DataCenter = () => {
 
   // Filter data based on search term
   const filteredLeads = useMemo(() => {
-    const tabLeads = getCurrentTabLeads();
+    const tabLeads = getCurrentTabLeads;
     if (!searchTerm) return tabLeads;
 
     const lowerSearchTerm = searchTerm.toLowerCase();
@@ -432,7 +656,7 @@ const DataCenter = () => {
         lead.program?.toLowerCase().includes(lowerSearchTerm) ||
         lead.source?.toLowerCase().includes(lowerSearchTerm)
     );
-  }, [leads, currentTab, searchTerm, filteredTabs]);
+  }, [getCurrentTabLeads, searchTerm]);
 
   // Keep applications filtering for future use
   // const filteredApplications = applications.filter(
@@ -442,11 +666,6 @@ const DataCenter = () => {
   //     app.phoneNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
   //     app.program?.toLowerCase().includes(searchTerm.toLowerCase())
   // );
-
-  // Get count for each tab
-  const getTabCount = (statuses) => {
-    return leads.filter((lead) => statuses.includes(lead.status)).length;
-  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -508,12 +727,34 @@ const DataCenter = () => {
 
   const handleLeadUpdated = (updatedLead) => {
     console.log("Lead updated:", updatedLead.id);
-    fetchData(); // Refresh the data
+
+    // Update the lead in the current leads array
+    setLeads((prev) =>
+      prev.map((lead) =>
+        lead.id === updatedLead.id ? { ...lead, ...updatedLead } : lead
+      )
+    );
+
+    // Update stats locally instead of full refresh
+    setLeadStats((prevStats) => {
+      const updatedStats = { ...prevStats };
+      // This is a simple approach - in a real app you might want more sophisticated stats updating
+      return updatedStats;
+    });
   };
 
   const handleLeadDeleted = (leadId) => {
     console.log("Lead deleted:", leadId);
-    fetchData(); // Refresh the data
+
+    // Remove the deleted lead from the current leads array
+    setLeads((prev) => prev.filter((lead) => lead.id !== leadId));
+
+    // Update stats locally instead of full refresh
+    setLeadStats((prevStats) => {
+      const updatedStats = { ...prevStats };
+      updatedStats.total = Math.max(0, updatedStats.total - 1);
+      return updatedStats;
+    });
   };
 
   const handleStartConversation = (lead) => {
@@ -526,18 +767,26 @@ const DataCenter = () => {
     // Extract lead data from the result object
     const newLead = result.lead || result;
 
-    // Add the new lead to the leads list
-    setLeads((prevLeads) => [
+    // Add the new lead to the beginning of the leads array
+    setLeads((prev) => [
       {
         id: newLead.id,
         ...newLead,
         createdAt: newLead.createdAt || new Date().toISOString(),
       },
-      ...prevLeads,
+      ...prev,
     ]);
 
-    // Optionally refetch data to ensure consistency
-    fetchData();
+    // Update stats locally instead of full refresh
+    setLeadStats((prevStats) => {
+      const updatedStats = { ...prevStats };
+      updatedStats.total = updatedStats.total + 1;
+      if (newLead.status) {
+        updatedStats.byStatus[newLead.status] =
+          (updatedStats.byStatus[newLead.status] || 0) + 1;
+      }
+      return updatedStats;
+    });
   };
 
   // Handler for when a new application is submitted
@@ -546,21 +795,19 @@ const DataCenter = () => {
     const newApplication = result.application;
     const updatedLead = result.lead;
 
-    // Add/update the lead in the leads list
+    // Update or add the lead
     if (updatedLead) {
-      setLeads((prevLeads) => {
-        const existingIndex = prevLeads.findIndex(
+      setLeads((prev) => {
+        const existingIndex = prev.findIndex(
           (lead) => lead.id === updatedLead.id
         );
         if (existingIndex >= 0) {
           // Update existing lead
-          const updatedLeads = [...prevLeads];
-          updatedLeads[existingIndex] = {
-            ...updatedLeads[existingIndex],
-            ...updatedLead,
-            updatedAt: new Date().toISOString(),
-          };
-          return updatedLeads;
+          return prev.map((lead, index) =>
+            index === existingIndex
+              ? { ...lead, ...updatedLead, updatedAt: new Date().toISOString() }
+              : lead
+          );
         } else {
           // Add new lead
           return [
@@ -569,7 +816,7 @@ const DataCenter = () => {
               ...updatedLead,
               createdAt: updatedLead.createdAt || new Date().toISOString(),
             },
-            ...prevLeads,
+            ...prev,
           ];
         }
       });
@@ -587,8 +834,15 @@ const DataCenter = () => {
       ]);
     }
 
-    // Refetch data to ensure consistency
-    fetchData();
+    // Update stats locally instead of full refresh
+    setLeadStats((prevStats) => {
+      const updatedStats = { ...prevStats };
+      if (updatedLead && updatedLead.status) {
+        updatedStats.byStatus[updatedLead.status] =
+          (updatedStats.byStatus[updatedLead.status] || 0) + 1;
+      }
+      return updatedStats;
+    });
   };
 
   const TabPanel = React.memo(({ children, value, index, ...other }) => {
@@ -832,7 +1086,7 @@ const DataCenter = () => {
                     <Typography variant="h6">Contact Forms</Typography>
                   </Box>
                   <Typography variant="h4" color="primary">
-                    {leads.length}
+                    {leadStats.total || 0}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Total leads
@@ -861,13 +1115,13 @@ const DataCenter = () => {
                 <CardContent>
                   <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                     <PersonAddIcon color="warning" sx={{ mr: 1 }} />
-                    <Typography variant="h6">New Inquiries</Typography>
+                    <Typography variant="h6">New Contacts</Typography>
                   </Box>
                   <Typography variant="h4" color="warning.main">
-                    {leads.filter((lead) => lead.status === "INQUIRY").length}
+                    {leadStats.byStatus.CONTACTED || 0}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    To be contacted
+                    Recent form submissions
                   </Typography>
                 </CardContent>
               </Card>
@@ -880,8 +1134,10 @@ const DataCenter = () => {
                     <Typography variant="h6">Conversion Rate</Typography>
                   </Box>
                   <Typography variant="h4" color="info.main">
-                    {leads.length > 0
-                      ? Math.round((applications.length / leads.length) * 100)
+                    {leadStats.total > 0
+                      ? Math.round(
+                          (applications.length / leadStats.total) * 100
+                        )
                       : 0}
                     %
                   </Typography>
@@ -899,7 +1155,7 @@ const DataCenter = () => {
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
               <Tabs
                 value={currentTab}
-                onChange={(event, newValue) => setCurrentTab(newValue)}
+                onChange={handleTabChange}
                 aria-label="data center tabs"
                 variant="scrollable"
                 scrollButtons="auto"
@@ -907,6 +1163,8 @@ const DataCenter = () => {
                 {filteredTabs.map((tab, index) => {
                   const TabIcon = tab.icon;
                   const count = getTabCount(tab.statuses);
+                  const isCurrentTab = currentTab === index;
+                  const showLoading = isCurrentTab && (loading || tabSwitching);
 
                   return (
                     <Tab
@@ -915,7 +1173,11 @@ const DataCenter = () => {
                         <Box
                           sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
-                          <TabIcon fontSize="small" />
+                          {showLoading ? (
+                            <CircularProgress size={16} />
+                          ) : (
+                            <TabIcon fontSize="small" />
+                          )}
                           <Badge badgeContent={count} color={tab.color}>
                             {tab.label}
                           </Badge>
@@ -993,6 +1255,7 @@ const DataCenter = () => {
                       variant="outlined"
                       size="small"
                       autoComplete="off"
+                      disabled={loading || tabSwitching}
                       inputProps={{
                         "aria-label": "search leads",
                       }}
@@ -1017,7 +1280,7 @@ const DataCenter = () => {
                       <IconButton
                         onClick={() => {
                           console.log("Manual refresh triggered");
-                          fetchData();
+                          refreshCurrentTab();
                         }}
                         title="Refresh Data"
                       >
@@ -1046,7 +1309,7 @@ const DataCenter = () => {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {loading ? (
+                        {loading || tabSwitching ? (
                           Array.from({ length: 5 }).map((_, index) => (
                             <TableRow key={index}>
                               {Array.from({ length: 7 }).map((_, cellIndex) => (
@@ -1167,7 +1430,7 @@ const DataCenter = () => {
                   </TableContainer>
 
                   {/* Load More Button */}
-                  {hasMoreLeads && !loading && (
+                  {pagination.hasMore && (
                     <Box
                       sx={{
                         display: "flex",
@@ -1179,17 +1442,17 @@ const DataCenter = () => {
                       <Button
                         variant="outlined"
                         onClick={loadMoreLeads}
-                        disabled={loading}
+                        disabled={loadingMore}
                         startIcon={
-                          loading ? <CircularProgress size={16} /> : null
+                          loadingMore ? <CircularProgress size={16} /> : null
                         }
                       >
-                        {loading ? "Loading..." : `Load More Leads`}
+                        {loadingMore ? "Loading..." : `Load More Leads`}
                       </Button>
                     </Box>
                   )}
 
-                  {!hasMoreLeads && leads.length > 25 && (
+                  {!pagination.hasMore && leads.length > 25 && (
                     <Box
                       sx={{
                         display: "flex",

@@ -9,7 +9,6 @@ import Layout from "./components/Layout/Layout";
 import SuperAdminDashboard from "./pages/super-admin/Dashboard";
 import ChatManagement from "./pages/super-admin/ChatManagement";
 import Settings from "./pages/super-admin/Settings";
-import Organizations from "./pages/super-admin/Organizations";
 import UserManagement from "./pages/super-admin/UserManagement";
 import SuperAdminSettings from "./pages/super-admin/AdminSettings";
 // Admin Pages (formerly organization)
@@ -18,6 +17,7 @@ import LeadsOverview from "./pages/admin/LeadsOverview";
 import ChatConfig from "./pages/admin/ChatConfig";
 import Analytics from "./pages/admin/Analytics";
 import DataCenter from "./pages/admin/DataCenter";
+import KnowledgeBase from "./pages/admin/KnowledgeBase";
 // Auth Pages
 import Login from "./pages/auth/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
@@ -125,10 +125,6 @@ function App() {
                           path="dashboard"
                           element={<SuperAdminDashboard />}
                         />
-                        <Route
-                          path="organizations"
-                          element={<Organizations />}
-                        />
                         <Route path="users" element={<UserManagement />} />
                         <Route path="chat" element={<ChatManagement />} />
                         <Route
@@ -202,6 +198,24 @@ function App() {
                         >
                           <Layout>
                             <ChatConfig />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="knowledge-base"
+                      element={
+                        <ProtectedRoute
+                          allowedRoles={[
+                            "admin",
+                            "superAdmin",
+                            "marketingManager",
+                            "admissionsOfficer",
+                            "teamMember",
+                          ]}
+                        >
+                          <Layout>
+                            <KnowledgeBase />
                           </Layout>
                         </ProtectedRoute>
                       }
