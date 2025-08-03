@@ -244,9 +244,16 @@ const DataCenter = () => {
         });
 
         if (leadsResponse.data) {
-          leadsResponse.data = leadsResponse.data.filter((lead) =>
-            currentTabConfig.statuses.includes(lead.status)
-          );
+          leadsResponse.data = leadsResponse.data.filter((lead) => {
+            // Get the current status from timeline if available, otherwise fallback to status field
+            const currentStatus =
+              lead.timeline &&
+              Array.isArray(lead.timeline) &&
+              lead.timeline.length > 0
+                ? lead.timeline[lead.timeline.length - 1].status
+                : lead.status;
+            return currentTabConfig.statuses.includes(currentStatus);
+          });
         }
       } else {
         if (currentTabConfig.statuses.length === 1) {
@@ -266,7 +273,16 @@ const DataCenter = () => {
 
           if (leadsResponse.data) {
             leadsResponse.data = leadsResponse.data
-              .filter((lead) => currentTabConfig.statuses.includes(lead.status))
+              .filter((lead) => {
+                // Get the current status from timeline if available, otherwise fallback to status field
+                const currentStatus =
+                  lead.timeline &&
+                  Array.isArray(lead.timeline) &&
+                  lead.timeline.length > 0
+                    ? lead.timeline[lead.timeline.length - 1].status
+                    : lead.status;
+                return currentTabConfig.statuses.includes(currentStatus);
+              })
               .slice(0, limit);
           }
         }
@@ -413,9 +429,16 @@ const DataCenter = () => {
           });
 
           if (leadsResponse.data) {
-            leadsResponse.data = leadsResponse.data.filter((lead) =>
-              currentTabConfig.statuses.includes(lead.status)
-            );
+            leadsResponse.data = leadsResponse.data.filter((lead) => {
+              // Get the current status from timeline if available, otherwise fallback to status field
+              const currentStatus =
+                lead.timeline &&
+                Array.isArray(lead.timeline) &&
+                lead.timeline.length > 0
+                  ? lead.timeline[lead.timeline.length - 1].status
+                  : lead.status;
+              return currentTabConfig.statuses.includes(currentStatus);
+            });
           }
         } else {
           if (currentTabConfig.statuses.length === 1) {
@@ -434,9 +457,16 @@ const DataCenter = () => {
 
             if (leadsResponse.data) {
               leadsResponse.data = leadsResponse.data
-                .filter((lead) =>
-                  currentTabConfig.statuses.includes(lead.status)
-                )
+                .filter((lead) => {
+                  // Get the current status from timeline if available, otherwise fallback to status field
+                  const currentStatus =
+                    lead.timeline &&
+                    Array.isArray(lead.timeline) &&
+                    lead.timeline.length > 0
+                      ? lead.timeline[lead.timeline.length - 1].status
+                      : lead.status;
+                  return currentTabConfig.statuses.includes(currentStatus);
+                })
                 .slice(0, limit);
             }
           }
@@ -684,16 +714,27 @@ const DataCenter = () => {
   const formatDate = (dateValue) => {
     if (!dateValue) return "N/A";
 
+    const dateTimeOptions = {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    };
+
     if (dateValue instanceof Date) {
-      return dateValue.toLocaleDateString();
+      return dateValue.toLocaleString(undefined, dateTimeOptions);
     }
 
     if (typeof dateValue === "object" && dateValue.seconds) {
-      return new Date(dateValue.seconds * 1000).toLocaleDateString();
+      return new Date(dateValue.seconds * 1000).toLocaleString(
+        undefined,
+        dateTimeOptions
+      );
     }
 
     if (typeof dateValue === "string") {
-      return new Date(dateValue).toLocaleDateString();
+      return new Date(dateValue).toLocaleString(undefined, dateTimeOptions);
     }
 
     return "N/A";
