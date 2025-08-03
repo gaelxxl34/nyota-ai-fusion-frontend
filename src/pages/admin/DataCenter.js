@@ -575,18 +575,11 @@ const DataCenter = () => {
   const getVisibleFunnelStages = () => {
     const allStages = [
       {
-        key: "inquiry",
-        status: "INQUIRY",
-        label: "Inquiry",
-        color: "default",
-        subtitle: "Initial Interest",
-      },
-      {
         key: "contacted",
         status: "CONTACTED",
         label: "Contacted",
         color: "info",
-        subtitle: "First Contact",
+        subtitle: "Initial Contact",
       },
       {
         key: "interested",
@@ -634,7 +627,7 @@ const DataCenter = () => {
       case "admissionAgent":
         // Admission agents see from applied onwards
         return allStages.filter(
-          (stage) => !["inquiry", "contacted", "interested"].includes(stage.key)
+          (stage) => !["contacted", "interested"].includes(stage.key)
         );
       case "organizationAdmin":
       default:
@@ -669,10 +662,8 @@ const DataCenter = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "INQUIRY":
-        return "primary";
       case "CONTACTED":
-        return "info";
+        return "primary";
       case "PRE_QUALIFIED":
         return "warning";
       case "APPLIED":

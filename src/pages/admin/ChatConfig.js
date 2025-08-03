@@ -79,11 +79,11 @@ const ChatConfig = () => {
       tabId: "new-contacts-tab",
     },
     {
-      label: "Inquiries",
-      statuses: ["INQUIRY", "CONTACTED", "NURTURE"],
+      label: "Contacted",
+      statuses: ["CONTACTED", "NURTURE"],
       color: "primary.main",
-      icon: "�",
-      tabId: "inquiries-tab",
+      icon: "📞",
+      tabId: "contacted-tab",
     },
     {
       label: "Interested",
