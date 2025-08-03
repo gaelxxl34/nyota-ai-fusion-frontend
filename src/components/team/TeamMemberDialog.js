@@ -184,7 +184,7 @@ const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
                     {formData.role === "admin" && (
                       <Chip label="Full Access" color="primary" size="small" />
                     )}
-                    {formData.role === "marketingManager" && (
+                    {formData.role === "marketingAgent" && (
                       <>
                         <Chip
                           label="Chat Config (New Contact → Applied)"
@@ -198,7 +198,7 @@ const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
                         <Chip label="Settings (View Only)" size="small" />
                       </>
                     )}
-                    {formData.role === "admissionsOfficer" && (
+                    {formData.role === "admissionAgent" && (
                       <>
                         <Chip
                           label="Chat Config (Applied → Enrolled)"

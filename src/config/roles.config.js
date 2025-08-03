@@ -50,14 +50,13 @@ export const ROLES = {
     },
   },
 
-  marketingManager: {
-    name: "Marketing Manager",
+  marketingAgent: {
+    name: "Marketing Agent",
     description:
       "Access to marketing-related features (new contact to applied)",
     permissions: [
       PERMISSIONS.CHAT_CONFIG,
       PERMISSIONS.DATA_CENTER,
-      PERMISSIONS.ANALYTICS,
       PERMISSIONS.SETTINGS,
       PERMISSIONS.VIEW_MARKETING_LEADS,
     ],
@@ -67,32 +66,17 @@ export const ROLES = {
     },
   },
 
-  admissionsOfficer: {
-    name: "Admissions Officer",
+  admissionAgent: {
+    name: "Admission Agent",
     description: "Access to admissions-related features (applied to enrolled)",
     permissions: [
       PERMISSIONS.CHAT_CONFIG,
       PERMISSIONS.DATA_CENTER,
-      PERMISSIONS.ANALYTICS,
       PERMISSIONS.SETTINGS,
       PERMISSIONS.VIEW_ADMISSIONS_LEADS,
     ],
     leadStageAccess: {
       from: LEAD_STAGES.APPLIED,
-      to: LEAD_STAGES.ENROLLED,
-    },
-  },
-
-  teamMember: {
-    name: "Team Member",
-    description: "Basic access to leads and chat features",
-    permissions: [
-      PERMISSIONS.LEADS_OVERVIEW,
-      PERMISSIONS.CHAT_CONFIG,
-      PERMISSIONS.VIEW_ALL_LEADS,
-    ],
-    leadStageAccess: {
-      from: LEAD_STAGES.NEW_CONTACT,
       to: LEAD_STAGES.ENROLLED,
     },
   },

@@ -172,12 +172,10 @@ class AuthService {
         return "/super-admin/dashboard";
       case "admin":
         return "/admin/leads";
-      case "marketingManager":
+      case "marketingAgent":
         return "/admin/chat-config";
-      case "admissionsOfficer":
+      case "admissionAgent":
         return "/admin/chat-config";
-      case "teamMember":
-        return "/admin/leads";
       default:
         return "/login";
     }

@@ -23,7 +23,6 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import {
-  AccountBalance as AccountBalanceIcon,
   GroupAdd as GroupAddIcon,
   Forum as ForumIcon,
   EmojiEvents as EmojiEventsIcon,
@@ -32,17 +31,14 @@ import {
   TrendingUp as TrendingUpIcon,
   Chat as ChatIcon,
   School as SchoolIcon,
-  WhatsApp as WhatsAppIcon,
   Speed as SpeedIcon,
   Error as ErrorIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
   Refresh as RefreshIcon,
   Assignment as AssignmentIcon,
-  Timeline as TimelineIcon,
   ArrowForward as ArrowForwardIcon,
   Download as DownloadIcon,
-  Add as AddIcon,
   Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
   PersonAdd as PersonAddIcon,
@@ -62,17 +58,18 @@ const AdminDashboard = () => {
 
   // State for different dashboard sections
   const [platformStats, setPlatformStats] = useState({
-    totalOrganizations: 0,
-    activeUsers: 0,
+    totalUsers: 0,
     totalLeads: 0,
-    activeSessions: 0,
-    conversionRate: 0,
-    systemUptime: 99.9,
+    totalApplications: 0,
+    activeUsers: 0,
+    conversionRates: {},
+    systemHealth: "operational",
   });
 
-  const [organizationMetrics, setOrganizationMetrics] = useState([]);
+  const [roleMetrics, setRoleMetrics] = useState([]);
   const [leadFunnel, setLeadFunnel] = useState({
-    inquiry: 0,
+    new_contact: 0,
+    contacted: 0,
     qualified: 0,
     applied: 0,
     admitted: 0,
@@ -80,21 +77,18 @@ const AdminDashboard = () => {
   });
 
   const [systemPerformance, setSystemPerformance] = useState({
-    apiResponseTime: 0,
-    whatsappDeliveryRate: 0,
-    errorRate: 0,
-    activeWebhooks: 0,
+    uptime: "99.9%",
+    responseTime: "< 200ms",
+    errorRate: "< 0.1%",
+    activeConnections: 0,
+    memoryUsage: 0,
+    cpuUsage: 0,
   });
 
-  const [recentActivities, setRecentActivities] = useState([]);
-  const [userStats, setUserStats] = useState({
-    superAdmins: 0,
-    admins: 0,
-    marketingManagers: 0,
-    admissionsOfficers: 0,
-    teamMembers: 0,
-    recentLogins: 0,
-  });
+  // eslint-disable-next-line no-unused-vars
+  const [userAnalytics, setUserAnalytics] = useState({});
+  // eslint-disable-next-line no-unused-vars
+  const [leadAnalytics, setLeadAnalytics] = useState({});
 
   // Fetch all dashboard data
   const fetchDashboardData = useCallback(async () => {
@@ -127,54 +121,69 @@ const AdminDashboard = () => {
 
       // Fetch all data in parallel for better performance
       const [
-        platformStatsData,
-        organizationMetricsData,
+        systemStatsData,
+        userAnalyticsData,
         leadAnalyticsData,
-        systemPerformanceData,
-        recentActivitiesData,
-        userStatsData,
+        performanceData,
       ] = await Promise.all([
         superAdminService.getSystemStats().catch((err) => {
-          console.error("Platform stats error:", err);
+          console.error("System stats error:", err);
           return null;
         }),
-        superAdminService.getAllUsers().catch((err) => {
-          console.error("Organization metrics error:", err);
-          return [];
+        superAdminService.getUserAnalytics().catch((err) => {
+          console.error("User analytics error:", err);
+          return null;
         }),
-        superAdminService.getSystemStats().catch((err) => {
+        superAdminService.getLeadAnalytics().catch((err) => {
           console.error("Lead analytics error:", err);
           return null;
         }),
-        superAdminService.getSystemStats().catch((err) => {
-          console.error("System performance error:", err);
-          return null;
-        }),
-        superAdminService.getSystemStats().catch((err) => {
-          console.error("Recent activities error:", err);
-          return [];
-        }),
-        superAdminService.getAllUsers().catch((err) => {
-          console.error("User statistics error:", err);
+        superAdminService.getPerformanceMetrics().catch((err) => {
+          console.error("Performance metrics error:", err);
           return null;
         }),
       ]);
 
-      // Only update state if we got some data
-      if (platformStatsData) setPlatformStats(platformStatsData);
-      if (organizationMetricsData)
-        setOrganizationMetrics(organizationMetricsData);
-      if (leadAnalyticsData) setLeadFunnel(leadAnalyticsData);
-      if (systemPerformanceData) setSystemPerformance(systemPerformanceData);
-      if (recentActivitiesData) setRecentActivities(recentActivitiesData);
-      if (userStatsData) setUserStats(userStatsData);
+      // Update states with new data structure
+      if (systemStatsData) {
+        setPlatformStats({
+          totalUsers: systemStatsData.totalUsers || 0,
+          totalLeads: systemStatsData.totalLeads || 0,
+          totalApplications: systemStatsData.totalApplications || 0,
+          activeUsers: systemStatsData.systemPerformance?.activeUsers || 0,
+          conversionRates: systemStatsData.conversionRates || {},
+          systemHealth: systemStatsData.systemHealth || "operational",
+        });
+
+        setRoleMetrics(systemStatsData.roleDetails || []);
+        setLeadFunnel(systemStatsData.leadFunnel || {});
+
+        if (systemStatsData.systemPerformance) {
+          setSystemPerformance({
+            uptime: systemStatsData.systemPerformance.uptime || "99.9%",
+            responseTime:
+              systemStatsData.systemPerformance.responseTime || "< 200ms",
+            errorRate: systemStatsData.systemPerformance.errorRate || "< 0.1%",
+            activeConnections:
+              systemStatsData.systemPerformance.activeUsers || 0,
+          });
+        }
+      }
+
+      if (userAnalyticsData) setUserAnalytics(userAnalyticsData);
+      if (leadAnalyticsData) setLeadAnalytics(leadAnalyticsData);
+
+      if (performanceData) {
+        setSystemPerformance((prev) => ({
+          ...prev,
+          memoryUsage: performanceData.memoryUsage || 0,
+          cpuUsage: performanceData.cpuUsage || 0,
+          activeConnections: performanceData.activeConnections || 0,
+        }));
+      }
 
       // If all requests failed, show error
-      if (
-        !platformStatsData &&
-        !organizationMetricsData &&
-        !leadAnalyticsData
-      ) {
+      if (!systemStatsData && !userAnalyticsData && !leadAnalyticsData) {
         setError(
           "Failed to load dashboard data. Please check your permissions and try again."
         );
@@ -189,16 +198,16 @@ const AdminDashboard = () => {
 
       // Set some default values to prevent UI breaking
       setPlatformStats({
-        totalOrganizations: 0,
-        activeUsers: 0,
+        totalUsers: 0,
         totalLeads: 0,
-        activeSessions: 0,
-        conversionRate: 0,
-        systemUptime: 0,
+        totalApplications: 0,
+        activeUsers: 0,
+        conversionRates: {},
+        systemHealth: "unknown",
       });
-      setOrganizationMetrics([]);
+      setRoleMetrics([]);
       setLeadFunnel({
-        inquiry: 0,
+        new_contact: 0,
         qualified: 0,
         applied: 0,
         admitted: 0,
@@ -210,15 +219,9 @@ const AdminDashboard = () => {
         errorRate: 0,
         activeWebhooks: 0,
       });
-      setRecentActivities([]);
-      setUserStats({
-        superAdmins: 0,
-        admins: 0,
-        marketingManagers: 0,
-        admissionsOfficers: 0,
-        teamMembers: 0,
-        recentLogins: 0,
-      });
+      setRoleMetrics([]);
+      setUserAnalytics({});
+      setLeadAnalytics({});
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -243,36 +246,6 @@ const AdminDashboard = () => {
     fetchDashboardData();
   };
 
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case "organization":
-        return <BusinessIcon />;
-      case "lead":
-        return <SchoolIcon />;
-      case "user":
-        return <PersonAddIcon />;
-      case "system":
-        return <SettingsIcon />;
-      case "error":
-        return <ErrorIcon />;
-      default:
-        return <ForumIcon />;
-    }
-  };
-
-  const getActivityColor = (severity) => {
-    switch (severity) {
-      case "success":
-        return theme.palette.success.main;
-      case "warning":
-        return theme.palette.warning.main;
-      case "error":
-        return theme.palette.error.main;
-      default:
-        return theme.palette.info.main;
-    }
-  };
-
   const formatNumber = (num) => {
     if (num >= 1000000) {
       return (num / 1000000).toFixed(1) + "M";
@@ -286,32 +259,62 @@ const AdminDashboard = () => {
   // Platform statistics cards
   const stats = [
     {
-      title: "Total Organizations",
-      value: formatNumber(platformStats.totalOrganizations),
-      icon: <AccountBalanceIcon />,
+      title: "Total Users",
+      value: formatNumber(platformStats.totalUsers),
+      icon: <GroupAddIcon />,
       gradient: "linear-gradient(45deg, #1a237e 30%, #3949ab 90%)",
-      subtitle: "Active subscriptions",
+      subtitle: "All system users",
     },
     {
       title: "Active Users",
       value: formatNumber(platformStats.activeUsers),
-      icon: <GroupAddIcon />,
+      icon: <GroupIcon />,
       gradient: "linear-gradient(45deg, #0d47a1 30%, #1976d2 90%)",
-      subtitle: "Across all organizations",
+      subtitle: "Currently active",
     },
     {
       title: "Total Leads",
       value: formatNumber(platformStats.totalLeads),
       icon: <SchoolIcon />,
       gradient: "linear-gradient(45deg, #2962ff 30%, #448aff 90%)",
-      subtitle: "Platform-wide",
+      subtitle: "All time leads",
     },
     {
-      title: "Conversion Rate",
-      value: `${platformStats.conversionRate}%`,
+      title: "Applications",
+      value: formatNumber(platformStats.totalApplications),
+      icon: <AssignmentIcon />,
+      gradient: "linear-gradient(45deg, #f57c00 30%, #ff9800 90%)",
+      subtitle: "Total applications",
+    },
+    {
+      title: "Enrolled",
+      value: formatNumber(leadFunnel.enrolled || 0),
+      icon: <SchoolIcon />,
+      gradient: "linear-gradient(45deg, #16a34a 30%, #22c55e 90%)",
+      subtitle: "Successfully enrolled",
+    },
+    {
+      title: "Overall Conversion",
+      value: `${platformStats.conversionRates?.overallConversion || 0}%`,
       icon: <TrendingUpIcon />,
       gradient: "linear-gradient(45deg, #2e7d32 30%, #4caf50 90%)",
-      subtitle: "Inquiry to enrolled",
+      subtitle: "Lead to enrollment",
+    },
+    {
+      title: "System Health",
+      value:
+        platformStats.systemHealth === "operational" ? "Healthy" : "Issues",
+      icon:
+        platformStats.systemHealth === "operational" ? (
+          <CheckCircleIcon />
+        ) : (
+          <ErrorIcon />
+        ),
+      gradient:
+        platformStats.systemHealth === "operational"
+          ? "linear-gradient(45deg, #2e7d32 30%, #4caf50 90%)"
+          : "linear-gradient(45deg, #d32f2f 30%, #f44336 90%)",
+      subtitle: "System status",
     },
   ];
 
@@ -443,6 +446,278 @@ const AdminDashboard = () => {
           </Grid>
         ))}
 
+        {/* User Role Distribution - Modern Card Design */}
+        <Grid item xs={12} md={6}>
+          <Paper
+            elevation={2}
+            sx={{
+              p: 3,
+              height: 400,
+              background: "linear-gradient(to bottom right, #f8fafc, #ffffff)",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+              <GroupIcon sx={{ color: "#6366f1", mr: 1.5, fontSize: 28 }} />
+              <Typography variant="h6" fontWeight="bold">
+                Team Overview
+              </Typography>
+            </Box>
+
+            {loading ? (
+              <Grid container spacing={2}>
+                {[1, 2, 3, 4].map((i) => (
+                  <Grid item xs={6} key={i}>
+                    <Skeleton
+                      variant="rectangular"
+                      height={80}
+                      sx={{ borderRadius: 2 }}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Box sx={{ height: "calc(100% - 60px)", overflow: "auto" }}>
+                <Grid container spacing={2}>
+                  {roleMetrics.map((roleData, index) => {
+                    const getRoleConfig = (role) => {
+                      const configs = {
+                        superAdmin: {
+                          color: "#dc2626",
+                          bgColor: "#fef2f2",
+                          icon: "👑",
+                          title: "Super Admin",
+                        },
+                        admin: {
+                          color: "#2563eb",
+                          bgColor: "#eff6ff",
+                          icon: "⚡",
+                          title: "Admin",
+                        },
+                        marketingAgent: {
+                          color: "#16a34a",
+                          bgColor: "#f0fdf4",
+                          icon: "📈",
+                          title: "Marketing",
+                        },
+                        admissionAgent: {
+                          color: "#ea580c",
+                          bgColor: "#fff7ed",
+                          icon: "🎓",
+                          title: "Admission",
+                        },
+                      };
+                      return (
+                        configs[role] || {
+                          color: "#6b7280",
+                          bgColor: "#f9fafb",
+                          icon: "👤",
+                          title: roleData.name,
+                        }
+                      );
+                    };
+
+                    const config = getRoleConfig(roleData.role);
+                    const totalUsers = roleMetrics.reduce(
+                      (sum, r) => sum + r.count,
+                      0
+                    );
+                    const percentage =
+                      totalUsers > 0
+                        ? ((roleData.count / totalUsers) * 100).toFixed(0)
+                        : 0;
+
+                    return (
+                      <Grid item xs={6} key={roleData.role}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2.5,
+                            height: 100,
+                            bgcolor: config.bgColor,
+                            border: `1px solid ${config.color}20`,
+                            borderRadius: 3,
+                            transition: "all 0.2s ease-in-out",
+                            cursor: "pointer",
+                            position: "relative",
+                            overflow: "hidden",
+                            "&:hover": {
+                              transform: "translateY(-2px)",
+                              boxShadow: `0 8px 25px ${config.color}20`,
+                              borderColor: `${config.color}40`,
+                            },
+                          }}
+                        >
+                          {/* Background Icon */}
+                          <Box
+                            sx={{
+                              position: "absolute",
+                              right: -5,
+                              top: -5,
+                              fontSize: "3rem",
+                              opacity: 0.1,
+                              transform: "rotate(15deg)",
+                            }}
+                          >
+                            {config.icon}
+                          </Box>
+
+                          {/* Content */}
+                          <Box sx={{ position: "relative", zIndex: 1 }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                mb: 1,
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontSize: "1.2rem",
+                                  mr: 1,
+                                }}
+                              >
+                                {config.icon}
+                              </Typography>
+                              <Typography
+                                variant="subtitle2"
+                                fontWeight="bold"
+                                sx={{ color: config.color }}
+                              >
+                                {config.title}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "baseline",
+                                mb: 0.5,
+                              }}
+                            >
+                              <Typography
+                                variant="h4"
+                                fontWeight="bold"
+                                sx={{ color: config.color, mr: 1 }}
+                              >
+                                {roleData.count}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                sx={{ color: "#6b7280" }}
+                              >
+                                users
+                              </Typography>
+                            </Box>
+
+                            <Box sx={{ display: "flex", alignItems: "center" }}>
+                              <Box
+                                sx={{
+                                  width: 20,
+                                  height: 4,
+                                  bgcolor: "#e5e7eb",
+                                  borderRadius: 2,
+                                  mr: 1,
+                                  overflow: "hidden",
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    width: `${percentage}%`,
+                                    height: "100%",
+                                    bgcolor: config.color,
+                                    borderRadius: 2,
+                                  }}
+                                />
+                              </Box>
+                              <Typography
+                                variant="caption"
+                                fontWeight="medium"
+                                sx={{ color: "#6b7280" }}
+                              >
+                                {percentage}%
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+
+                {/* Summary Footer */}
+                {roleMetrics.length > 0 && (
+                  <Box
+                    sx={{
+                      mt: 3,
+                      p: 2,
+                      bgcolor: "#f8fafc",
+                      borderRadius: 2,
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        Total Active Users
+                      </Typography>
+                      <Typography
+                        variant="h6"
+                        fontWeight="bold"
+                        color="primary.main"
+                      >
+                        {roleMetrics.reduce((sum, r) => sum + r.count, 0)}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+
+                {roleMetrics.length === 0 && (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      textAlign: "center",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: "50%",
+                        bgcolor: "#f3f4f6",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        mb: 2,
+                      }}
+                    >
+                      <GroupIcon sx={{ fontSize: 32, color: "#9ca3af" }} />
+                    </Box>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 1 }}
+                    >
+                      No user data available
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      User roles will appear here once data is loaded
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+
         {/* Lead Conversion Pipeline - Modern Professional Style */}
         <Grid item xs={12}>
           <Paper
@@ -491,7 +766,8 @@ const AdminDashboard = () => {
                 >
                   {Object.entries(leadFunnel).map(([stage, count], index) => {
                     const stages = Object.keys(leadFunnel);
-                    const maxCount = leadFunnel.inquiry || 1;
+                    const maxCount =
+                      leadFunnel.new_contact || leadFunnel.contacted || 1;
                     const percentage = ((count / maxCount) * 100).toFixed(1);
                     const previousStage =
                       index > 0 ? leadFunnel[stages[index - 1]] : count;
@@ -502,35 +778,41 @@ const AdminDashboard = () => {
                         : "0";
 
                     const stageConfig = {
-                      inquiry: {
+                      new_contact: {
                         color: "#1e40af",
                         icon: <ForumIcon />,
-                        label: "Inquiries",
-                        sublabel: "Initial Interest",
+                        label: "New Contacts",
+                        sublabel: "Initial Inquiries",
+                      },
+                      contacted: {
+                        color: "#7c3aed",
+                        icon: <ChatIcon />,
+                        label: "Contacted",
+                        sublabel: "Follow-up Made",
                       },
                       qualified: {
-                        color: "#7c3aed",
+                        color: "#0891b2",
                         icon: <EmojiEventsIcon />,
                         label: "Qualified",
                         sublabel: "Met Criteria",
                       },
                       applied: {
-                        color: "#0891b2",
+                        color: "#059669",
                         icon: <AssignmentIcon />,
                         label: "Applied",
-                        sublabel: "Submitted Form",
+                        sublabel: "Submitted Application",
                       },
                       admitted: {
-                        color: "#059669",
+                        color: "#dc2626",
                         icon: <CheckCircleIcon />,
                         label: "Admitted",
-                        sublabel: "Approved",
+                        sublabel: "Accepted",
                       },
                       enrolled: {
-                        color: "#dc2626",
+                        color: "#16a34a",
                         icon: <SchoolIcon />,
                         label: "Enrolled",
-                        sublabel: "Confirmed",
+                        sublabel: "Confirmed & Registered",
                       },
                     };
 
@@ -720,16 +1002,19 @@ const AdminDashboard = () => {
                             Overall Conversion
                           </Typography>
                           <Typography variant="h3" fontWeight="bold">
-                            {leadFunnel.inquiry > 0
+                            {(leadFunnel.new_contact || leadFunnel.contacted) >
+                            0
                               ? (
-                                  (leadFunnel.enrolled / leadFunnel.inquiry) *
+                                  (leadFunnel.enrolled /
+                                    (leadFunnel.new_contact ||
+                                      leadFunnel.contacted)) *
                                   100
                                 ).toFixed(1)
                               : "0.0"}
                             %
                           </Typography>
                           <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                            From inquiry to enrollment
+                            From contact to enrollment
                           </Typography>
                         </Box>
                         <TrendingUpIcon sx={{ fontSize: 40, opacity: 0.3 }} />
@@ -763,16 +1048,19 @@ const AdminDashboard = () => {
                             Application Rate
                           </Typography>
                           <Typography variant="h3" fontWeight="bold">
-                            {leadFunnel.inquiry > 0
+                            {(leadFunnel.new_contact || leadFunnel.contacted) >
+                            0
                               ? (
-                                  (leadFunnel.applied / leadFunnel.inquiry) *
+                                  (leadFunnel.applied /
+                                    (leadFunnel.new_contact ||
+                                      leadFunnel.contacted)) *
                                   100
                                 ).toFixed(1)
                               : "0.0"}
                             %
                           </Typography>
                           <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                            Inquiries that applied
+                            Contacts that applied
                           </Typography>
                         </Box>
                         <AssignmentIcon sx={{ fontSize: 40, opacity: 0.3 }} />
@@ -809,9 +1097,9 @@ const AdminDashboard = () => {
                             color="#d97706"
                           >
                             {formatNumber(
-                              leadFunnel.inquiry -
-                                leadFunnel.applied -
-                                leadFunnel.qualified
+                              (leadFunnel.new_contact || 0) -
+                                (leadFunnel.applied || 0) -
+                                (leadFunnel.qualified || 0)
                             )}
                           </Typography>
                           <Typography
@@ -833,74 +1121,11 @@ const AdminDashboard = () => {
           </Paper>
         </Grid>
 
-        {/* Organization Performance Table */}
-        <Grid item xs={12} md={7}>
-          <Paper elevation={2} sx={{ p: 3 }}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mb: 2,
-              }}
-            >
-              <Typography variant="h6">
-                Top Organizations by Performance
-              </Typography>
-            </Box>
-            {loading ? (
-              <Skeleton variant="rectangular" width="100%" height={300} />
-            ) : (
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Organization</TableCell>
-                      <TableCell align="center">Users</TableCell>
-                      <TableCell align="center">Leads</TableCell>
-                      <TableCell align="center">Conversion</TableCell>
-                      <TableCell align="center">Status</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {organizationMetrics.map((org, index) => (
-                      <TableRow key={index} hover>
-                        <TableCell>{org.name}</TableCell>
-                        <TableCell align="center">{org.users}</TableCell>
-                        <TableCell align="center">
-                          {formatNumber(org.leads)}
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip
-                            label={`${org.conversion}%`}
-                            size="small"
-                            color={org.conversion > 13 ? "success" : "default"}
-                          />
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip
-                            label={org.status}
-                            size="small"
-                            color={
-                              org.status === "active" ? "success" : "warning"
-                            }
-                            variant="outlined"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </Paper>
-        </Grid>
-
-        {/* System Performance Metrics */}
+        {/* Conversion Rate Insights */}
         <Grid item xs={12} md={5}>
           <Paper elevation={2} sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              System Performance
+              Conversion Insights
             </Typography>
             {loading ? (
               <Box>
@@ -916,7 +1141,7 @@ const AdminDashboard = () => {
               </Box>
             ) : (
               <Box>
-                {/* API Response Time */}
+                {/* Contact to Qualified */}
                 <Box sx={{ mb: 3 }}>
                   <Box
                     sx={{
@@ -926,26 +1151,23 @@ const AdminDashboard = () => {
                     }}
                   >
                     <Typography variant="body2" color="text.secondary">
-                      API Response Time
+                      Contact to Qualified
                     </Typography>
                     <Typography variant="body2" fontWeight="bold">
-                      {systemPerformance.apiResponseTime}ms
+                      {platformStats.conversionRates?.contactedToQualified || 0}
+                      %
                     </Typography>
                   </Box>
                   <LinearProgress
                     variant="determinate"
-                    value={
-                      100 - (systemPerformance.apiResponseTime / 500) * 100
-                    }
-                    color={
-                      systemPerformance.apiResponseTime < 200
-                        ? "success"
-                        : "warning"
-                    }
+                    value={parseFloat(
+                      platformStats.conversionRates?.contactedToQualified || 0
+                    )}
+                    color="primary"
                   />
                 </Box>
 
-                {/* WhatsApp Delivery Rate */}
+                {/* Qualified to Applied */}
                 <Box sx={{ mb: 3 }}>
                   <Box
                     sx={{
@@ -955,20 +1177,22 @@ const AdminDashboard = () => {
                     }}
                   >
                     <Typography variant="body2" color="text.secondary">
-                      WhatsApp Delivery Rate
+                      Qualified to Applied
                     </Typography>
                     <Typography variant="body2" fontWeight="bold">
-                      {systemPerformance.whatsappDeliveryRate}%
+                      {platformStats.conversionRates?.qualifiedToApplied || 0}%
                     </Typography>
                   </Box>
                   <LinearProgress
                     variant="determinate"
-                    value={systemPerformance.whatsappDeliveryRate}
-                    color="success"
+                    value={parseFloat(
+                      platformStats.conversionRates?.qualifiedToApplied || 0
+                    )}
+                    color="info"
                   />
                 </Box>
 
-                {/* Error Rate */}
+                {/* Applied to Admitted */}
                 <Box sx={{ mb: 3 }}>
                   <Box
                     sx={{
@@ -978,271 +1202,106 @@ const AdminDashboard = () => {
                     }}
                   >
                     <Typography variant="body2" color="text.secondary">
-                      Error Rate
+                      Applied to Admitted
                     </Typography>
                     <Typography variant="body2" fontWeight="bold">
-                      {systemPerformance.errorRate}%
+                      {platformStats.conversionRates?.appliedToAdmitted || 0}%
                     </Typography>
                   </Box>
                   <LinearProgress
                     variant="determinate"
-                    value={systemPerformance.errorRate * 10}
-                    color="error"
+                    value={parseFloat(
+                      platformStats.conversionRates?.appliedToAdmitted || 0
+                    )}
+                    color="warning"
                   />
                 </Box>
 
-                {/* System Uptime */}
+                {/* Overall Success Rate */}
                 <Box
                   sx={{
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
                     mt: 3,
+                    p: 2,
+                    bgcolor: "success.light",
+                    borderRadius: 1,
                   }}
                 >
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <CheckCircleIcon color="success" />
-                    <Typography variant="body2">System Uptime</Typography>
+                    <Typography variant="body2" color="success.dark">
+                      Overall Success
+                    </Typography>
                   </Box>
-                  <Typography variant="h6" color="success.main">
-                    {platformStats.systemUptime}%
+                  <Typography variant="h6" color="success.dark">
+                    {platformStats.conversionRates?.overallConversion || 0}%
                   </Typography>
                 </Box>
-              </Box>
-            )}
-          </Paper>
-        </Grid>
-
-        {/* User Statistics */}
-        <Grid item xs={12} md={6}>
-          <Paper elevation={2} sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              User Distribution
-            </Typography>
-            {loading ? (
-              <Skeleton variant="rectangular" width="100%" height={200} />
-            ) : (
-              <Box>
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Box
-                      sx={{
-                        textAlign: "center",
-                        p: 2,
-                        bgcolor: "background.default",
-                        borderRadius: 1,
-                      }}
-                    >
-                      <Typography variant="h4" color="primary">
-                        {userStats.superAdmins}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Super Admins
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box
-                      sx={{
-                        textAlign: "center",
-                        p: 2,
-                        bgcolor: "background.default",
-                        borderRadius: 1,
-                      }}
-                    >
-                      <Typography variant="h4" color="primary">
-                        {userStats.admins}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Admins
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box
-                      sx={{
-                        textAlign: "center",
-                        p: 2,
-                        bgcolor: "background.default",
-                        borderRadius: 1,
-                      }}
-                    >
-                      <Typography variant="h4" color="primary">
-                        {userStats.marketingManagers}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Marketing Managers
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box
-                      sx={{
-                        textAlign: "center",
-                        p: 2,
-                        bgcolor: "background.default",
-                        borderRadius: 1,
-                      }}
-                    >
-                      <Typography variant="h4" color="primary">
-                        {userStats.admissionsOfficers}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Admissions Officers
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-                <Box
-                  sx={{ mt: 2, p: 2, bgcolor: "info.light", borderRadius: 1 }}
-                >
-                  <Typography variant="body2" align="center">
-                    <strong>{userStats.recentLogins}</strong> users logged in
-                    today
-                  </Typography>
-                </Box>
-              </Box>
-            )}
-          </Paper>
-        </Grid>
-
-        {/* Recent Activities */}
-        <Grid item xs={12} md={6}>
-          <Paper elevation={2} sx={{ p: 3, height: "100%" }}>
-            <Typography variant="h6" gutterBottom>
-              Recent Platform Activities
-            </Typography>
-            {loading ? (
-              <Box>
-                {[...Array(5)].map((_, index) => (
-                  <Box
-                    key={index}
-                    sx={{ display: "flex", alignItems: "center", mb: 2 }}
-                  >
-                    <Skeleton variant="circular" width={40} height={40} />
-                    <Box sx={{ ml: 2, flex: 1 }}>
-                      <Skeleton variant="text" width="80%" height={20} />
-                      <Skeleton variant="text" width="50%" height={16} />
-                    </Box>
-                  </Box>
-                ))}
-              </Box>
-            ) : (
-              <Box>
-                {recentActivities.map((activity, index) => (
-                  <Box
-                    key={index}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      mb: 2,
-                      p: 2,
-                      borderRadius: 1,
-                      bgcolor: "background.default",
-                      "&:hover": {
-                        bgcolor: "action.hover",
-                      },
-                    }}
-                  >
-                    <Avatar
-                      sx={{
-                        bgcolor: getActivityColor(activity.severity),
-                        mr: 2,
-                      }}
-                    >
-                      {getActivityIcon(activity.type)}
-                    </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="body2">{activity.text}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {activity.time}
-                      </Typography>
-                    </Box>
-                  </Box>
-                ))}
               </Box>
             )}
           </Paper>
         </Grid>
 
         {/* Quick Actions */}
-        <Grid item xs={12}>
+        <Grid item xs={12} md={6}>
           <Paper elevation={2} sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              System Administration
+              Quick Actions
             </Typography>
-            <Grid container spacing={2}>
-              {[
-                {
-                  title: "User Management",
-                  icon: <GroupIcon />,
-                  color: "info",
-                  path: "/admin/users",
-                  description: "Manage system administrators",
-                },
-                {
-                  title: "System Logs",
-                  icon: <AnalyticsIcon />,
-                  color: "warning",
-                  path: "/admin/logs",
-                  description: "View system logs and events",
-                },
-                {
-                  title: "Platform Settings",
-                  icon: <SettingsIcon />,
-                  color: "secondary",
-                  path: "/admin/settings",
-                  description: "Configure platform settings",
-                },
-                {
-                  title: "Broadcast Message",
-                  icon: <CampaignIcon />,
-                  color: "success",
-                  path: "/admin/broadcast",
-                  description: "Send announcements",
-                },
-                {
-                  title: "API Management",
-                  icon: <SpeedIcon />,
-                  color: "error",
-                  path: "/admin/api",
-                  description: "Monitor API usage",
-                },
-              ].map((action, index) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                  <Card
-                    sx={{
-                      cursor: "pointer",
-                      height: "100%",
-                      "&:hover": {
-                        boxShadow: 4,
-                        transform: "translateY(-2px)",
-                        transition: "all 0.3s",
-                      },
-                    }}
-                    onClick={() => navigate(action.path)}
+            <Box>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={4}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    startIcon={<PersonAddIcon />}
+                    onClick={() => navigate("/super-admin/users")}
+                    sx={{ py: 2 }}
                   >
-                    <CardContent>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", mb: 1 }}
-                      >
-                        <Avatar
-                          sx={{ bgcolor: `${action.color}.light`, mr: 2 }}
-                        >
-                          {React.cloneElement(action.icon, {
-                            color: action.color,
-                          })}
-                        </Avatar>
-                        <Typography variant="h6">{action.title}</Typography>
-                      </Box>
-                      <Typography variant="body2" color="text.secondary">
-                        {action.description}
-                      </Typography>
-                    </CardContent>
-                  </Card>
+                    Manage Users
+                  </Button>
                 </Grid>
-              ))}
-            </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    startIcon={<AnalyticsIcon />}
+                    onClick={() => navigate("/analytics")}
+                    sx={{ py: 2 }}
+                  >
+                    View Analytics
+                  </Button>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    startIcon={<CampaignIcon />}
+                    onClick={() => navigate("/leads")}
+                    sx={{ py: 2 }}
+                  >
+                    Lead Management
+                  </Button>
+                </Grid>
+              </Grid>
+              <Box
+                sx={{
+                  mt: 3,
+                  p: 2,
+                  bgcolor: "primary.light",
+                  borderRadius: 1,
+                  color: "primary.contrastText",
+                }}
+              >
+                <Typography variant="body2" align="center">
+                  <strong>Welcome to Nyota AI Fusion</strong>
+                  <br />
+                  Super Admin Dashboard - Full System Control
+                </Typography>
+              </Box>
+            </Box>
           </Paper>
         </Grid>
       </Grid>

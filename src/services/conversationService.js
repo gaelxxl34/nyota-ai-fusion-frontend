@@ -51,8 +51,54 @@ class ConversationService {
 
         const processedData = this.processConversationsData(apiConversations);
 
+        // Convert Maps to array format
+        // First check if we have conversationMetadataMap which contains ALL conversations
+        const metadataMap = processedData.conversationMetadataMap || new Map();
+        const conversationsMap = processedData.conversationsMap || new Map();
+        const unreadCountsMap = processedData.unreadCountsMap || new Map();
+
+        console.log("Processing Maps:", {
+          metadataSize: metadataMap.size,
+          conversationsSize: conversationsMap.size,
+          unreadCountsSize: unreadCountsMap.size,
+        });
+
+        // Use metadataMap as the source of truth for all conversations
+        const conversations = Array.from(metadataMap.entries()).map(
+          ([phoneNumber, metadata]) => {
+            const messages = conversationsMap.get(phoneNumber) || [];
+            const unreadCount = unreadCountsMap.get(phoneNumber) || 0;
+            const lastMessage =
+              messages.length > 0 ? messages[messages.length - 1] : null;
+
+            return {
+              id: phoneNumber,
+              phoneNumber,
+              contactName:
+                metadata.contactName || `Contact ${phoneNumber.slice(-4)}`,
+              leadName: metadata.leadName || null,
+              leadId: metadata.leadId || null,
+              leadStatus: metadata.leadStatus || "NO_LEAD",
+              lastMessage: lastMessage?.content || "No messages",
+              lastMessageTime:
+                lastMessage?.timestamp ||
+                metadata.lastMessageTime ||
+                new Date(),
+              lastMessageFrom: lastMessage?.sender || null,
+              messageCount: messages.length,
+              status: metadata.status || "active",
+              unreadCount: unreadCount,
+              aiEnabled: metadata.aiEnabled !== false,
+              createdAt: metadata.createdAt || new Date(),
+              updatedAt: metadata.updatedAt || new Date(),
+              responsesCount:
+                messages.filter((msg) => msg.sender === "business").length || 0,
+            };
+          }
+        );
+
         return {
-          ...processedData,
+          conversations,
           pagination: {
             hasMore: pagination.hasMore || false,
             limit: pagination.limit || limit,
@@ -303,6 +349,48 @@ class ConversationService {
       const timeB = b.lastMessage?.timestamp || new Date(0);
       return new Date(timeB) - new Date(timeA);
     });
+  }
+
+  /**
+   * Get messages for a specific conversation
+   */
+  static async getConversationMessages(phoneNumber, options = {}) {
+    const { limit = 50, offset = 0 } = options;
+
+    console.log(`🔄 Fetching messages for conversation: ${phoneNumber}`);
+
+    try {
+      const response = await axiosInstance.get(
+        `/api/whatsapp/conversations/${encodeURIComponent(
+          phoneNumber
+        )}/messages`,
+        {
+          params: { limit, offset },
+        }
+      );
+
+      if (response.data.success) {
+        console.log(
+          `✅ Loaded ${response.data.messages.length} messages for ${phoneNumber}`
+        );
+        return {
+          messages: response.data.messages || [],
+          phoneNumber: response.data.phoneNumber,
+          conversationId: response.data.conversationId,
+          pagination: response.data.pagination || {},
+        };
+      }
+
+      return {
+        messages: [],
+        phoneNumber,
+        conversationId: null,
+        pagination: {},
+      };
+    } catch (error) {
+      console.error(`❌ Error fetching messages for ${phoneNumber}:`, error);
+      throw error;
+    }
   }
 
   /**

@@ -432,8 +432,7 @@ const TeamManagement = () => {
                         color="info"
                         size="small"
                       />
-                    ) : (member.role || member.jobRole) ===
-                      "admissionsAgent" ? (
+                    ) : (member.role || member.jobRole) === "admissionAgent" ? (
                       <Chip
                         label="Admissions Access"
                         color="secondary"

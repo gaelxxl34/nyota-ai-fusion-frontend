@@ -64,13 +64,12 @@ const UserManagement = () => {
   const ROLES = [
     { value: "superAdmin", label: "Super Admin", color: "error" },
     { value: "admin", label: "Admin", color: "primary" },
-    { value: "marketingManager", label: "Marketing Manager", color: "info" },
+    { value: "marketingAgent", label: "Marketing Agent", color: "info" },
     {
-      value: "admissionsOfficer",
-      label: "Admissions Officer",
+      value: "admissionAgent",
+      label: "Admission Agent",
       color: "warning",
     },
-    { value: "teamMember", label: "Team Member", color: "default" },
   ];
 
   // Form data
@@ -100,6 +99,46 @@ const UserManagement = () => {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Helper function to convert Firestore timestamp to DD/MM/YYYY format
+  const formatFirestoreDate = (timestamp) => {
+    if (!timestamp) return "N/A";
+
+    try {
+      let date;
+
+      // Handle Firestore Timestamp object
+      if (timestamp && typeof timestamp === "object" && timestamp._seconds) {
+        date = new Date(timestamp._seconds * 1000);
+      }
+      // Handle Firestore Timestamp with seconds and nanoseconds
+      else if (
+        timestamp &&
+        typeof timestamp === "object" &&
+        timestamp.seconds
+      ) {
+        date = new Date(timestamp.seconds * 1000);
+      }
+      // Handle regular timestamp or string
+      else {
+        date = new Date(timestamp);
+      }
+
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return "N/A";
+      }
+
+      const day = date.getDate().toString().padStart(2, "0");
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
+      const year = date.getFullYear();
+
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "N/A";
+    }
+  };
 
   // Handle form changes
   const handleFormChange = (e) => {
@@ -198,15 +237,36 @@ const UserManagement = () => {
   };
 
   // Handle delete
-  const handleDelete = async (userId) => {
-    if (window.confirm("Are you sure you want to delete this user?")) {
+  const handleDelete = async (userToDelete) => {
+    // Prevent self-deletion
+    if (userToDelete.id === user?.uid || userToDelete.email === user?.email) {
+      setError("You cannot delete your own account!");
+      return;
+    }
+
+    const confirmMessage = `Are you sure you want to delete user "${userToDelete.name}" (${userToDelete.email})?
+
+This will permanently:
+• Remove their account from the system
+• Delete all their authentication data
+• Remove all their data from Firestore database
+
+This action cannot be undone!`;
+
+    if (window.confirm(confirmMessage)) {
       try {
-        await superAdminService.deleteUser(userId);
-        setSuccess("User deleted successfully");
+        setLoading(true);
+        await superAdminService.deleteUser(userToDelete.id);
+        setSuccess(`User "${userToDelete.name}" has been successfully deleted`);
         fetchUsers();
       } catch (error) {
         console.error("Error deleting user:", error);
-        setError("Failed to delete user");
+        setError(
+          error.response?.data?.message ||
+            "Failed to delete user. The user may have associated data that needs to be removed first."
+        );
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -383,8 +443,8 @@ const UserManagement = () => {
               ) : (
                 filteredUsers
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((user) => (
-                    <TableRow key={user.id} hover>
+                  .map((tableUser) => (
+                    <TableRow key={tableUser.id} hover>
                       <TableCell>
                         <Box
                           sx={{ display: "flex", alignItems: "center", gap: 2 }}
@@ -394,13 +454,13 @@ const UserManagement = () => {
                           </Avatar>
                           <Box>
                             <Typography variant="subtitle2" fontWeight="medium">
-                              {user.name}
+                              {tableUser.name}
                             </Typography>
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
-                              ID: {user.id}
+                              ID: {tableUser.id}
                             </Typography>
                           </Box>
                         </Box>
@@ -411,9 +471,9 @@ const UserManagement = () => {
                         >
                           <ShieldIcon fontSize="small" color="action" />
                           <Chip
-                            label={getRoleConfig(user.role).label}
+                            label={getRoleConfig(tableUser.role).label}
                             size="small"
-                            color={getRoleConfig(user.role).color}
+                            color={getRoleConfig(tableUser.role).color}
                           />
                         </Box>
                       </TableCell>
@@ -428,51 +488,33 @@ const UserManagement = () => {
                           >
                             <EmailIcon fontSize="small" color="action" />
                             <Typography variant="body2">
-                              {user.email}
+                              {tableUser.email}
                             </Typography>
                           </Box>
-                          {user.phone && (
+                          {tableUser.phone && (
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
-                              {user.phone}
+                              {tableUser.phone}
                             </Typography>
                           )}
                         </Box>
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={user.status || "Active"}
+                          label={tableUser.status || "Active"}
                           size="small"
                           color={
-                            user.status === "Active" ? "success" : "default"
+                            tableUser.status === "Active"
+                              ? "success"
+                              : "default"
                           }
                         />
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {user.createdAt
-                            ? (() => {
-                                try {
-                                  const date = new Date(user.createdAt);
-                                  if (!isNaN(date.getTime())) {
-                                    const day = date
-                                      .getDate()
-                                      .toString()
-                                      .padStart(2, "0");
-                                    const month = (date.getMonth() + 1)
-                                      .toString()
-                                      .padStart(2, "0");
-                                    const year = date.getFullYear();
-                                    return `${day}/${month}/${year}`;
-                                  }
-                                  return "N/A";
-                                } catch (error) {
-                                  return "N/A";
-                                }
-                              })()
-                            : "N/A"}
+                          {formatFirestoreDate(tableUser.createdAt)}
                         </Typography>
                       </TableCell>
                       <TableCell align="center">
@@ -487,29 +529,42 @@ const UserManagement = () => {
                             <IconButton
                               size="small"
                               color="primary"
-                              onClick={() => handleOpenDialog(user)}
+                              onClick={() => handleOpenDialog(tableUser)}
                               disabled={
-                                user.id === user.id &&
-                                user.role === "superAdmin"
+                                tableUser.id === user?.uid &&
+                                tableUser.role === "superAdmin"
                               }
                             >
                               <EditIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleDelete(user.id)}
-                              disabled={user.id === user.id}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
+                          <Tooltip
+                            title={
+                              tableUser.id === user?.uid ||
+                              tableUser.email === user?.email
+                                ? "Cannot delete your own account"
+                                : "Delete user permanently"
+                            }
+                          >
+                            <span>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDelete(tableUser)}
+                                disabled={
+                                  tableUser.id === user?.uid ||
+                                  tableUser.email === user?.email ||
+                                  loading
+                                }
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </span>
                           </Tooltip>
                           <Tooltip title="More actions">
                             <IconButton
                               size="small"
-                              onClick={(e) => handleMenuOpen(e, user)}
+                              onClick={(e) => handleMenuOpen(e, tableUser)}
                             >
                               <MoreVertIcon fontSize="small" />
                             </IconButton>

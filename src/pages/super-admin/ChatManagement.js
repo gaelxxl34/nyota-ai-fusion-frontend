@@ -1,26 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Box,
-  Grid,
   Paper,
   Typography,
   Tabs,
   Tab,
-  Card,
-  CardContent,
-  IconButton,
-  Chip,
-  TextField,
-  InputAdornment,
-  FormControl,
-  Select,
-  MenuItem,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  Skeleton,
-  Alert,
   Button,
   Dialog,
   DialogTitle,
@@ -32,136 +16,160 @@ import {
   MenuItem as MenuItemComponent,
   Checkbox,
   FormControlLabel,
+  Alert,
 } from "@mui/material";
 import {
-  Search as SearchIcon,
   Settings as SettingsIcon,
   Assessment as AssessmentIcon,
   Chat as ChatIcon,
   Person as PersonIcon,
   Warning as WarningIcon,
   Delete as DeleteIcon,
-  MoreVert as MoreVertIcon,
   DeleteSweep as DeleteSweepIcon,
+  Refresh as RefreshIcon,
+  GetApp as ExportIcon,
 } from "@mui/icons-material";
-import ConversationService from "../../services/conversationService";
 
+// Custom hooks and components
+import { useConversations } from "../../hooks/useConversations";
+import ConversationFilters from "../../components/chat/ConversationFilters";
+import EnhancedConversationList from "../../components/chat/EnhancedConversationList";
+import StatsCards from "../../components/common/StatsCards";
+import ConversationDetailsDialog from "../../components/chat/ConversationDetailsDialog";
+import ChatAnalyticsDashboard from "../../components/chat/ChatAnalyticsDashboard";
+import ChatSettingsPanel from "../../components/chat/ChatSettingsPanel";
+
+// Utilities
+import {
+  generateCSVExport,
+  downloadCSV,
+  calculateConversationStats,
+} from "../../utils/conversationUtils";
+
+/**
+ * Chat Management Component
+ * Main component for managing WhatsApp conversations with clean architecture
+ * Features: filtering, sorting, bulk operations, analytics, and settings
+ */
 const ChatManagement = () => {
+  // Component state
   const [activeTab, setActiveTab] = useState(0);
-  const [timeFilter, setTimeFilter] = useState("today");
-  const [organizationFilter, setOrganizationFilter] = useState("all");
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [selectedConversationForDetails, setSelectedConversationForDetails] =
+    useState(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedConversations, setSelectedConversations] = useState(new Set());
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
-  // Delete functionality state
+  // Dialog states
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState(null);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
-  const [selectedConversations, setSelectedConversations] = useState(new Set());
+
+  // Snackbar state
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+
+  // Menu state
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuConversation, setMenuConversation] = useState(null);
 
-  // Load conversations on component mount
-  useEffect(() => {
-    loadConversations();
-  }, []);
+  // Use conversations hook for data management
+  const {
+    conversations,
+    filteredConversations,
+    loading,
+    error,
+    lastRefresh,
+    pagination,
+    filters,
+    deleteConversation,
+    deleteConversations,
+    updateFilter,
+    loadMore,
+    refresh,
+  } = useConversations();
 
-  const loadConversations = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log("🔄 Loading conversations in ChatManagement...");
+  // Debug logging
+  console.log("ChatManagement - Conversations:", {
+    all: conversations?.length || 0,
+    filtered: filteredConversations?.length || 0,
+    loading,
+    error,
+    filters,
+  });
 
-      const data = await ConversationService.fetchConversations();
+  // Calculate statistics from conversations
+  const stats = React.useMemo(() => {
+    const conversationStats = calculateConversationStats(
+      filteredConversations
+    ) || {
+      active: 0,
+      totalLeads: 0,
+      responseRate: 0,
+      issues: 0,
+    };
 
-      // Convert the conversations map to array format for display
-      const conversationsList = Array.from(data.conversationsMap.entries()).map(
-        ([phoneNumber, messages]) => {
-          const metadata = data.conversationMetadataMap.get(phoneNumber) || {};
-          const lastMessage = messages[messages.length - 1];
+    return [
+      {
+        title: "Active Conversations",
+        value: loading ? "..." : (conversationStats.active || 0).toString(),
+        icon: <ChatIcon />,
+        color: "primary",
+      },
+      {
+        title: "Total Leads",
+        value: loading ? "..." : (conversationStats.totalLeads || 0).toString(),
+        icon: <PersonIcon />,
+        color: "success",
+      },
+      {
+        title: "Response Rate",
+        value: loading ? "..." : `${conversationStats.responseRate || 0}%`,
+        icon: <AssessmentIcon />,
+        color: "info",
+      },
+      {
+        title: "Issues",
+        value: loading ? "..." : (conversationStats.issues || 0).toString(),
+        icon: <WarningIcon />,
+        color: "warning",
+      },
+    ];
+  }, [filteredConversations, loading]);
 
-          return {
-            id: phoneNumber,
-            phoneNumber,
-            contactName:
-              metadata.contactName || `Contact ${phoneNumber.slice(-4)}`,
-            lastMessage: lastMessage?.content || "No messages",
-            lastMessageTime: lastMessage?.timestamp || new Date(),
-            messageCount: messages.length,
-            status: metadata.status || "Active",
-            unreadCount: data.unreadCountsMap.get(phoneNumber) || 0,
-            leadId: metadata.leadId,
-          };
-        }
-      );
-
-      setConversations(conversationsList);
-      console.log(`✅ Loaded ${conversationsList.length} conversations`);
-    } catch (err) {
-      console.error("❌ Error loading conversations:", err);
-      setError("Failed to load conversations from backend");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Calculate dynamic stats based on conversations
-  const stats = [
-    {
-      title: "Active Conversations",
-      value: loading
-        ? "..."
-        : conversations.filter((c) => c.status === "Active").length.toString(),
-      icon: <ChatIcon />,
-      color: "#2196f3",
-    },
-    {
-      title: "Total Messages",
-      value: loading
-        ? "..."
-        : conversations.reduce((sum, c) => sum + c.messageCount, 0).toString(),
-      icon: <AssessmentIcon />,
-      color: "#4caf50",
-    },
-    {
-      title: "Unread Messages",
-      value: loading
-        ? "..."
-        : conversations.reduce((sum, c) => sum + c.unreadCount, 0).toString(),
-      icon: <WarningIcon />,
-      color: "#ff9800",
-    },
-    {
-      title: "Connected Leads",
-      value: loading
-        ? "..."
-        : conversations.filter((c) => c.leadId).length.toString(),
-      icon: <PersonIcon />,
-      color: "#9c27b0",
-    },
-  ];
-
-  const recentChats = [
-    {
-      id: 1,
-      organization: "Tech Solutions Inc",
-      status: "Active",
-      startTime: new Date(),
-      messages: 45,
-      performance: 98,
-    },
-    // Add more mock data
-  ];
-
+  // Event handlers
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
   };
 
-  // Delete functionality handlers
+  const handleRefresh = () => {
+    refresh();
+  };
+
+  const handleExportConversations = () => {
+    try {
+      const csvContent = generateCSVExport(filteredConversations);
+      const filename = `conversations_export_${
+        new Date().toISOString().split("T")[0]
+      }.csv`;
+      downloadCSV(csvContent, filename);
+
+      showSnackbar(
+        `Exported ${filteredConversations.length} conversations to CSV`,
+        "success"
+      );
+    } catch (error) {
+      showSnackbar(`Export failed: ${error.message}`, "error");
+    }
+  };
+
+  const handleViewDetails = (conversation) => {
+    setSelectedConversationForDetails(conversation);
+    setDetailsDialogOpen(true);
+    setAnchorEl(null);
+  };
+
   const handleDeleteClick = (conversation) => {
     setConversationToDelete(conversation);
     setDeleteDialogOpen(true);
@@ -170,27 +178,18 @@ const ChatManagement = () => {
 
   const handleDeleteConfirm = async () => {
     try {
-      setLoading(true);
-      await ConversationService.deleteConversationByPhone(
-        conversationToDelete.phoneNumber
-      );
-
-      // Update local state
-      setConversations((prev) =>
-        prev.filter((c) => c.phoneNumber !== conversationToDelete.phoneNumber)
-      );
-
-      setSnackbarMessage(
-        `Conversation with ${conversationToDelete.contactName} deleted successfully`
-      );
-      setSnackbarSeverity("success");
-      setSnackbarOpen(true);
+      const result = await deleteConversation(conversationToDelete.phoneNumber);
+      if (result.success) {
+        showSnackbar(
+          `Conversation with ${conversationToDelete.contactName} deleted successfully`,
+          "success"
+        );
+      } else {
+        showSnackbar(`Failed to delete conversation: ${result.error}`, "error");
+      }
     } catch (error) {
-      setSnackbarMessage(`Failed to delete conversation: ${error.message}`);
-      setSnackbarSeverity("error");
-      setSnackbarOpen(true);
+      showSnackbar(`Failed to delete conversation: ${error.message}`, "error");
     } finally {
-      setLoading(false);
       setDeleteDialogOpen(false);
       setConversationToDelete(null);
     }
@@ -198,9 +197,7 @@ const ChatManagement = () => {
 
   const handleBulkDeleteClick = () => {
     if (selectedConversations.size === 0) {
-      setSnackbarMessage("Please select conversations to delete");
-      setSnackbarSeverity("warning");
-      setSnackbarOpen(true);
+      showSnackbar("Please select conversations to delete", "warning");
       return;
     }
     setBulkDeleteDialogOpen(true);
@@ -208,31 +205,28 @@ const ChatManagement = () => {
 
   const handleBulkDeleteConfirm = async () => {
     try {
-      setLoading(true);
       const phoneNumbers = Array.from(selectedConversations);
+      const results = await deleteConversations(phoneNumbers);
 
-      // Delete each conversation
-      for (const phoneNumber of phoneNumbers) {
-        await ConversationService.deleteConversationByPhone(phoneNumber);
+      const successCount = results.filter((r) => r.success).length;
+      const failureCount = results.length - successCount;
+
+      if (failureCount === 0) {
+        showSnackbar(
+          `Successfully deleted ${successCount} conversations`,
+          "success"
+        );
+      } else {
+        showSnackbar(
+          `Deleted ${successCount} conversations, ${failureCount} failed`,
+          "warning"
+        );
       }
 
-      // Update local state
-      setConversations((prev) =>
-        prev.filter((c) => !selectedConversations.has(c.phoneNumber))
-      );
       setSelectedConversations(new Set());
-
-      setSnackbarMessage(
-        `Successfully deleted ${phoneNumbers.length} conversations`
-      );
-      setSnackbarSeverity("success");
-      setSnackbarOpen(true);
     } catch (error) {
-      setSnackbarMessage(`Failed to delete conversations: ${error.message}`);
-      setSnackbarSeverity("error");
-      setSnackbarOpen(true);
+      showSnackbar(`Failed to delete conversations: ${error.message}`, "error");
     } finally {
-      setLoading(false);
       setBulkDeleteDialogOpen(false);
     }
   };
@@ -260,312 +254,179 @@ const ChatManagement = () => {
   };
 
   const handleSelectAll = () => {
-    if (selectedConversations.size === conversations.length) {
+    if (selectedConversations.size === filteredConversations.length) {
       setSelectedConversations(new Set());
     } else {
       setSelectedConversations(
-        new Set(conversations.map((c) => c.phoneNumber))
+        new Set(filteredConversations.map((c) => c.phoneNumber))
       );
     }
   };
 
+  // Helper function for showing snackbar messages
+  const showSnackbar = (message, severity = "info") => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  // Error state
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">
+          Error loading conversations: {error}
+          <Button onClick={handleRefresh} sx={{ ml: 2 }}>
+            Try Again
+          </Button>
+        </Alert>
+      </Box>
+    );
+  }
+
   return (
-    <Box>
+    <Box sx={{ p: 3 }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
+      <Box
+        sx={{
+          mb: 3,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <Typography variant="h4" gutterBottom>
           Chat Management
         </Typography>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<ExportIcon />}
+            onClick={handleExportConversations}
+            disabled={loading || filteredConversations.length === 0}
+          >
+            Export CSV
+          </Button>
+          {selectedConversations.size > 0 && (
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<DeleteSweepIcon />}
+              onClick={handleBulkDeleteClick}
+            >
+              Delete Selected ({selectedConversations.size})
+            </Button>
+          )}
+        </Box>
+      </Box>
+
+      {/* Statistics Cards */}
+      <StatsCards stats={stats} />
+
+      {/* Tabs */}
+      <Paper sx={{ mb: 3 }}>
         <Tabs
           value={activeTab}
           onChange={handleTabChange}
-          sx={{ borderBottom: 1, borderColor: "divider" }}
+          indicatorColor="primary"
+          textColor="primary"
+          variant="fullWidth"
         >
-          <Tab label="Overview" />
-          <Tab label="Active Sessions" />
-          <Tab label="Chat Logs" />
+          <Tab label="Conversations" />
+          <Tab label="Analytics" />
           <Tab label="Settings" />
         </Tabs>
-      </Box>
-
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Search chats..."
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small">
-              <Select
-                value={timeFilter}
-                onChange={(e) => setTimeFilter(e.target.value)}
-              >
-                <MenuItem value="today">Today</MenuItem>
-                <MenuItem value="week">This Week</MenuItem>
-                <MenuItem value="month">This Month</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small">
-              <Select
-                value={organizationFilter}
-                onChange={(e) => setOrganizationFilter(e.target.value)}
-              >
-                <MenuItem value="all">All Organizations</MenuItem>
-                <MenuItem value="tech">Tech Solutions Inc</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
       </Paper>
 
-      {/* Error Alert */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
+      {/* Tab Content */}
+      {activeTab === 0 && (
+        <Box>
+          {/* Filters */}
+          <ConversationFilters
+            filters={filters}
+            onFilterChange={updateFilter}
+            totalCount={conversations.length}
+            filteredCount={filteredConversations.length}
+          />
+
+          {/* Bulk Actions */}
+          {filteredConversations.length > 0 && (
+            <Box
+              sx={{ mb: 2, p: 2, bgcolor: "background.paper", borderRadius: 1 }}
+            >
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={
+                      selectedConversations.size ===
+                        filteredConversations.length &&
+                      filteredConversations.length > 0
+                    }
+                    indeterminate={
+                      selectedConversations.size > 0 &&
+                      selectedConversations.size < filteredConversations.length
+                    }
+                    onChange={handleSelectAll}
+                  />
+                }
+                label={`Select All (${selectedConversations.size} selected)`}
+              />
+            </Box>
+          )}
+
+          {/* Conversations List */}
+          <EnhancedConversationList
+            conversations={filteredConversations}
+            loading={loading}
+            selectedConversations={selectedConversations}
+            onConversationSelect={handleConversationSelect}
+            onMenuOpen={handleMenuOpen}
+            onLoadMore={loadMore}
+            hasMore={pagination.hasMore}
+            lastRefresh={lastRefresh}
+          />
+        </Box>
       )}
 
-      {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        {stats.map((stat, index) => (
-          <Grid item xs={12} sm={6} md={3} key={index}>
-            <Card>
-              <CardContent>
-                {loading ? (
-                  <>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <Skeleton
-                        variant="circular"
-                        width={40}
-                        height={40}
-                        sx={{ mr: 2 }}
-                      />
-                      <Skeleton variant="text" width="60%" height={24} />
-                    </Box>
-                    <Skeleton variant="text" width="40%" height={40} />
-                    <Skeleton variant="text" width="50%" height={16} />
-                  </>
-                ) : (
-                  <>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <Box
-                        sx={{
-                          color: stat.color,
-                          mr: 2,
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                      >
-                        {stat.icon}
-                      </Box>
-                      <Typography variant="h6" color="textSecondary">
-                        {stat.title}
-                      </Typography>
-                    </Box>
-                    <Typography variant="h4" gutterBottom>
-                      {stat.value}
-                    </Typography>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+      {activeTab === 1 && (
+        <ChatAnalyticsDashboard conversations={conversations} />
+      )}
 
-      {/* Conversations List */}
-      <Paper sx={{ p: 2, maxHeight: "600px", overflow: "auto" }}>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 2,
-          }}
-        >
-          <Typography variant="h6">Active Conversations</Typography>
-          <Box sx={{ display: "flex", gap: 1 }}>
-            {conversations.length > 0 && (
-              <>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={
-                        selectedConversations.size === conversations.length &&
-                        conversations.length > 0
-                      }
-                      indeterminate={
-                        selectedConversations.size > 0 &&
-                        selectedConversations.size < conversations.length
-                      }
-                      onChange={handleSelectAll}
-                    />
-                  }
-                  label="Select All"
-                />
-                {selectedConversations.size > 0 && (
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    startIcon={<DeleteSweepIcon />}
-                    onClick={handleBulkDeleteClick}
-                    size="small"
-                  >
-                    Delete Selected ({selectedConversations.size})
-                  </Button>
-                )}
-              </>
-            )}
-          </Box>
-        </Box>
+      {activeTab === 2 && (
+        <ChatSettingsPanel
+          autoRefresh={autoRefresh}
+          onAutoRefreshChange={setAutoRefresh}
+        />
+      )}
 
-        {loading ? (
-          <List>
-            {[...Array(5)].map((_, index) => (
-              <React.Fragment key={index}>
-                <ListItem>
-                  <ListItemText
-                    primary={
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Skeleton variant="text" width="30%" height={24} />
-                        <Skeleton
-                          variant="rectangular"
-                          width={60}
-                          height={24}
-                        />
-                      </Box>
-                    }
-                    secondary={
-                      <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
-                        <Skeleton variant="text" width="15%" height={16} />
-                        <Skeleton variant="text" width="15%" height={16} />
-                        <Skeleton variant="text" width="20%" height={16} />
-                      </Box>
-                    }
-                  />
-                  <Skeleton variant="circular" width={40} height={40} />
-                </ListItem>
-                <Divider />
-              </React.Fragment>
-            ))}
-          </List>
-        ) : conversations.length === 0 ? (
-          <Typography
-            variant="body2"
-            color="textSecondary"
-            sx={{ textAlign: "center", py: 4 }}
-          >
-            No conversations found
-          </Typography>
-        ) : (
-          <List>
-            {conversations.map((conversation) => (
-              <React.Fragment key={conversation.id}>
-                <ListItem
-                  secondaryAction={
-                    <IconButton
-                      edge="end"
-                      size="small"
-                      onClick={(e) => handleMenuOpen(e, conversation)}
-                    >
-                      <MoreVertIcon />
-                    </IconButton>
-                  }
-                >
-                  <Checkbox
-                    checked={selectedConversations.has(
-                      conversation.phoneNumber
-                    )}
-                    onChange={() =>
-                      handleConversationSelect(conversation.phoneNumber)
-                    }
-                    sx={{ mr: 1 }}
-                  />
-                  <ListItemText
-                    primary={
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Typography variant="body1">
-                          {conversation.contactName}
-                        </Typography>
-                        <Chip
-                          size="small"
-                          label={conversation.status}
-                          color={
-                            conversation.status === "Active"
-                              ? "success"
-                              : "default"
-                          }
-                        />
-                        {conversation.unreadCount > 0 && (
-                          <Chip
-                            size="small"
-                            label={conversation.unreadCount}
-                            color="error"
-                            variant="outlined"
-                          />
-                        )}
-                      </Box>
-                    }
-                    secondary={
-                      <Box sx={{ display: "flex", flex: 1, gap: 2, mt: 1 }}>
-                        <Typography variant="caption">
-                          Phone: {conversation.phoneNumber}
-                        </Typography>
-                        <Typography variant="caption">
-                          Messages: {conversation.messageCount}
-                        </Typography>
-                        <Typography variant="caption">
-                          Last:{" "}
-                          {new Date(
-                            conversation.lastMessageTime
-                          ).toLocaleString()}
-                        </Typography>
-                        {conversation.leadId && (
-                          <Typography variant="caption" color="primary">
-                            Lead: {conversation.leadId.slice(0, 8)}...
-                          </Typography>
-                        )}
-                      </Box>
-                    }
-                  />
-                </ListItem>
-                <Divider />
-              </React.Fragment>
-            ))}
-          </List>
-        )}
-      </Paper>
-
-      {/* Action Menu */}
+      {/* Context Menu */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "right",
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "right",
+        }}
       >
-        <MenuItemComponent onClick={() => handleDeleteClick(menuConversation)}>
-          <DeleteIcon sx={{ mr: 1 }} color="error" />
-          Delete Conversation
+        <MenuItemComponent onClick={() => handleViewDetails(menuConversation)}>
+          View Details
         </MenuItemComponent>
-        <MenuItemComponent onClick={handleMenuClose}>
-          <SettingsIcon sx={{ mr: 1 }} />
-          Settings
+        <MenuItemComponent onClick={() => handleDeleteClick(menuConversation)}>
+          <DeleteIcon sx={{ mr: 1, fontSize: 16 }} />
+          Delete
         </MenuItemComponent>
       </Menu>
 
@@ -578,11 +439,8 @@ const ChatManagement = () => {
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete the conversation with{" "}
-            <strong>{conversationToDelete?.contactName}</strong>?
-            <br />
-            This will permanently remove all{" "}
-            {conversationToDelete?.messageCount || 0} messages and cannot be
-            undone.
+            {conversationToDelete?.contactName || "this contact"}? This action
+            cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -591,7 +449,6 @@ const ChatManagement = () => {
             onClick={handleDeleteConfirm}
             color="error"
             variant="contained"
-            startIcon={<DeleteIcon />}
           >
             Delete
           </Button>
@@ -606,11 +463,8 @@ const ChatManagement = () => {
         <DialogTitle>Delete Multiple Conversations</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete{" "}
-            <strong>{selectedConversations.size}</strong> conversations?
-            <br />
-            This will permanently remove all associated messages and cannot be
-            undone.
+            Are you sure you want to delete {selectedConversations.size}{" "}
+            selected conversations? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -619,9 +473,8 @@ const ChatManagement = () => {
             onClick={handleBulkDeleteConfirm}
             color="error"
             variant="contained"
-            startIcon={<DeleteSweepIcon />}
           >
-            Delete All Selected
+            Delete All
           </Button>
         </DialogActions>
       </Dialog>
@@ -631,6 +484,7 @@ const ChatManagement = () => {
         open={snackbarOpen}
         autoHideDuration={6000}
         onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
       >
         <Alert
           onClose={() => setSnackbarOpen(false)}
@@ -641,51 +495,12 @@ const ChatManagement = () => {
         </Alert>
       </Snackbar>
 
-      {/* Chat Sessions Table */}
-      <Paper sx={{ p: 2 }}>
-        <List>
-          {recentChats.map((chat) => (
-            <React.Fragment key={chat.id}>
-              <ListItem
-                secondaryAction={
-                  <IconButton edge="end" size="small">
-                    <SettingsIcon />
-                  </IconButton>
-                }
-              >
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Typography variant="body1">
-                        {chat.organization}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={chat.status}
-                        color={chat.status === "Active" ? "success" : "default"}
-                      />
-                    </Box>
-                  }
-                  secondary={
-                    <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
-                      <Typography variant="caption">
-                        Started: {chat.startTime.toLocaleTimeString()}
-                      </Typography>
-                      <Typography variant="caption">
-                        Messages: {chat.messages}
-                      </Typography>
-                      <Typography variant="caption">
-                        Performance: {chat.performance}%
-                      </Typography>
-                    </Box>
-                  }
-                />
-              </ListItem>
-              <Divider />
-            </React.Fragment>
-          ))}
-        </List>
-      </Paper>
+      {/* Conversation Details Dialog */}
+      <ConversationDetailsDialog
+        open={detailsDialogOpen}
+        onClose={() => setDetailsDialogOpen(false)}
+        conversation={selectedConversationForDetails}
+      />
     </Box>
   );
 };

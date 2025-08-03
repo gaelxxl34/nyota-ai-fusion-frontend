@@ -4,7 +4,7 @@ export const superAdminService = {
   // User Management
   async getAllUsers() {
     try {
-      const response = await axiosInstance.get("/super-admin/users");
+      const response = await axiosInstance.get("/api/super-admin/users");
       return response.data;
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -14,7 +14,10 @@ export const superAdminService = {
 
   async createUser(userData) {
     try {
-      const response = await axiosInstance.post("/super-admin/users", userData);
+      const response = await axiosInstance.post(
+        "/api/super-admin/users",
+        userData
+      );
       return response.data;
     } catch (error) {
       console.error("Error creating user:", error);
@@ -25,7 +28,7 @@ export const superAdminService = {
   async updateUser(userId, userData) {
     try {
       const response = await axiosInstance.put(
-        `/super-admin/users/${userId}`,
+        `/api/super-admin/users/${userId}`,
         userData
       );
       return response.data;
@@ -38,7 +41,7 @@ export const superAdminService = {
   async deleteUser(userId) {
     try {
       const response = await axiosInstance.delete(
-        `/super-admin/users/${userId}`
+        `/api/super-admin/users/${userId}`
       );
       return response.data;
     } catch (error) {
@@ -50,7 +53,7 @@ export const superAdminService = {
   async resetUserPassword(userId) {
     try {
       const response = await axiosInstance.post(
-        `/super-admin/users/${userId}/reset-password`
+        `/api/super-admin/users/${userId}/reset-password`
       );
       return response.data;
     } catch (error) {
@@ -64,8 +67,8 @@ export const superAdminService = {
   // System Statistics
   async getSystemStats() {
     try {
-      const response = await axiosInstance.get("/super-admin/stats");
-      return response.data;
+      const response = await axiosInstance.get("/api/super-admin/stats");
+      return response.data.stats;
     } catch (error) {
       console.error("Error fetching system stats:", error);
       throw new Error(
@@ -77,7 +80,7 @@ export const superAdminService = {
   // System Configuration
   async getSystemConfig() {
     try {
-      const response = await axiosInstance.get("/super-admin/config");
+      const response = await axiosInstance.get("/api/super-admin/config");
       return response.data;
     } catch (error) {
       console.error("Error fetching system config:", error);
@@ -89,7 +92,10 @@ export const superAdminService = {
 
   async updateSystemConfig(config) {
     try {
-      const response = await axiosInstance.put("/super-admin/config", config);
+      const response = await axiosInstance.put(
+        "/api/super-admin/config",
+        config
+      );
       return response.data;
     } catch (error) {
       console.error("Error updating system config:", error);
@@ -99,15 +105,47 @@ export const superAdminService = {
     }
   },
 
-  // System Stats
-  async getSystemStats() {
+  // User Analytics
+  async getUserAnalytics(timeRange = "30") {
     try {
-      const response = await axiosInstance.get("/super-admin/stats");
-      return response.data.stats;
+      const response = await axiosInstance.get(
+        `/api/super-admin/analytics/users?timeRange=${timeRange}`
+      );
+      return response.data.data;
     } catch (error) {
-      console.error("Error fetching system stats:", error);
+      console.error("Error fetching user analytics:", error);
       throw new Error(
-        error.response?.data?.message || "Failed to fetch system stats"
+        error.response?.data?.message || "Failed to fetch user analytics"
+      );
+    }
+  },
+
+  // Lead Analytics
+  async getLeadAnalytics(timeRange = "30") {
+    try {
+      const response = await axiosInstance.get(
+        `/api/super-admin/analytics/leads?timeRange=${timeRange}`
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching lead analytics:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch lead analytics"
+      );
+    }
+  },
+
+  // Performance Metrics
+  async getPerformanceMetrics() {
+    try {
+      const response = await axiosInstance.get(
+        "/api/super-admin/analytics/performance"
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching performance metrics:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch performance metrics"
       );
     }
   },

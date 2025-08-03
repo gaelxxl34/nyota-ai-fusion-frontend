@@ -71,24 +71,17 @@ export const useRolePermissions = () => {
   };
 
   /**
-   * Check if user is marketing manager
+   * Check if user is marketing agent
    */
-  const isMarketingManager = () => {
-    return role === "marketingManager";
+  const isMarketingAgent = () => {
+    return role === "marketingAgent";
   };
 
   /**
-   * Check if user is admissions officer
+   * Check if user is admission agent
    */
-  const isAdmissionsOfficer = () => {
-    return role === "admissionsOfficer";
-  };
-
-  /**
-   * Check if user is team member
-   */
-  const isTeamMember = () => {
-    return role === "teamMember";
+  const isAdmissionAgent = () => {
+    return role === "admissionAgent";
   };
 
   return {
@@ -99,8 +92,7 @@ export const useRolePermissions = () => {
     filterLeadsByRole,
     getVisibleLeadStages,
     isAdmin,
-    isMarketingManager,
-    isAdmissionsOfficer,
-    isTeamMember,
+    isMarketingAgent,
+    isAdmissionAgent,
   };
 };

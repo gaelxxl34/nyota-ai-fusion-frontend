@@ -23,11 +23,10 @@ const Login = () => {
       let redirectPath = "/login";
       if (user.role === "superAdmin") redirectPath = "/super-admin/dashboard";
       else if (user.role === "admin") redirectPath = "/admin/leads";
-      else if (user.role === "marketingManager")
+      else if (user.role === "marketingAgent")
         redirectPath = "/admin/chat-config";
-      else if (user.role === "admissionsOfficer")
+      else if (user.role === "admissionAgent")
         redirectPath = "/admin/chat-config";
-      else if (user.role === "teamMember") redirectPath = "/admin/leads";
 
       navigate(redirectPath, { replace: true });
     }

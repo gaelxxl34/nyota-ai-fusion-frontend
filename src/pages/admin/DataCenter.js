@@ -560,8 +560,8 @@ const DataCenter = () => {
         return allCards.filter(
           (card) => !["admitted", "enrolled"].includes(card.key)
         );
-      case "admissionsAgent":
-        // Admissions agents don't see interested/contacted stats
+      case "admissionAgent":
+        // Admission agents don't see interested/contacted stats
         return allCards.filter(
           (card) => !["interested", "contacted"].includes(card.key)
         );
@@ -631,8 +631,8 @@ const DataCenter = () => {
         return allStages.filter(
           (stage) => !["admitted", "enrolled"].includes(stage.key)
         );
-      case "admissionsAgent":
-        // Admissions agents see from applied onwards
+      case "admissionAgent":
+        // Admission agents see from applied onwards
         return allStages.filter(
           (stage) => !["inquiry", "contacted", "interested"].includes(stage.key)
         );

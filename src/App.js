@@ -67,11 +67,8 @@ const ProtectedRoute = ({
     let redirectPath = "/login";
     if (userRole === "superAdmin") redirectPath = "/super-admin/dashboard";
     else if (userRole === "admin") redirectPath = "/admin/leads";
-    else if (userRole === "marketingManager")
-      redirectPath = "/admin/chat-config";
-    else if (userRole === "admissionsOfficer")
-      redirectPath = "/admin/chat-config";
-    else if (userRole === "teamMember") redirectPath = "/admin/leads";
+    else if (userRole === "marketingAgent") redirectPath = "/admin/chat-config";
+    else if (userRole === "admissionAgent") redirectPath = "/admin/chat-config";
 
     return <Navigate to={redirectPath} replace />;
   }
@@ -151,7 +148,7 @@ function App() {
                     <Route
                       path="leads"
                       element={
-                        <ProtectedRoute allowedRoles={["admin", "teamMember"]}>
+                        <ProtectedRoute allowedRoles={["admin"]}>
                           <Layout>
                             <LeadsOverview />
                           </Layout>
@@ -166,9 +163,8 @@ function App() {
                         <ProtectedRoute
                           allowedRoles={[
                             "admin",
-                            "marketingManager",
-                            "admissionsOfficer",
-                            "teamMember",
+                            "marketingAgent",
+                            "admissionAgent",
                           ]}
                         >
                           <Navigate to="leads" replace />
@@ -192,8 +188,8 @@ function App() {
                         <ProtectedRoute
                           allowedRoles={[
                             "admin",
-                            "marketingManager",
-                            "admissionsOfficer",
+                            "marketingAgent",
+                            "admissionAgent",
                           ]}
                         >
                           <Layout>
@@ -209,9 +205,8 @@ function App() {
                           allowedRoles={[
                             "admin",
                             "superAdmin",
-                            "marketingManager",
-                            "admissionsOfficer",
-                            "teamMember",
+                            "marketingAgent",
+                            "admissionAgent",
                           ]}
                         >
                           <Layout>
@@ -226,8 +221,8 @@ function App() {
                         <ProtectedRoute
                           allowedRoles={[
                             "admin",
-                            "marketingManager",
-                            "admissionsOfficer",
+                            "marketingAgent",
+                            "admissionAgent",
                           ]}
                         >
                           <Layout>
@@ -242,8 +237,8 @@ function App() {
                         <ProtectedRoute
                           allowedRoles={[
                             "admin",
-                            "marketingManager",
-                            "admissionsOfficer",
+                            "marketingAgent",
+                            "admissionAgent",
                           ]}
                         >
                           <Layout>
@@ -258,8 +253,8 @@ function App() {
                         <ProtectedRoute
                           allowedRoles={[
                             "admin",
-                            "marketingManager",
-                            "admissionsOfficer",
+                            "marketingAgent",
+                            "admissionAgent",
                           ]}
                         >
                           <Layout>
