@@ -207,7 +207,7 @@ export const isValidPhoneNumber = (phoneNumber) => {
   if (!phoneNumber) return false;
 
   // Basic validation - adjust based on your requirements
-  const phoneRegex = /^\+?[\d\s\-\(\)]+$/;
+  const phoneRegex = /^\+?[\d\s\-()]+$/;
   return (
     phoneRegex.test(phoneNumber) && phoneNumber.replace(/\D/g, "").length >= 10
   );

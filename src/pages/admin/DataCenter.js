@@ -872,7 +872,7 @@ const DataCenter = () => {
 
         // If the standard parsing fails, try different formats:
         // Try to parse date format like "DD/MM/YYYY" or "DD-MM-YYYY"
-        const parts = dateValue.split(/[\/\-\.]/);
+        const parts = dateValue.split(/[/\-.]/);
         if (parts.length === 3) {
           // Try different date arrangements (US, European, etc)
           const potentialDates = [

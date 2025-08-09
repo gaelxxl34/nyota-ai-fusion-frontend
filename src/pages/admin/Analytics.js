@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -8,10 +8,6 @@ import {
   CardContent,
   ToggleButton,
   ToggleButtonGroup,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Table,
   TableBody,
   TableCell,
@@ -24,7 +20,6 @@ import {
   LinearProgress,
   Avatar,
   IconButton,
-  Tooltip,
   Button,
   CircularProgress,
 } from "@mui/material";
@@ -32,7 +27,6 @@ import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
   CalendarToday as CalendarTodayIcon,
-  Person as PersonIcon,
   School as SchoolIcon,
   Assignment as AssignmentIcon,
   WhatsApp as WhatsAppIcon,
@@ -41,8 +35,6 @@ import {
   Download as DownloadIcon,
 } from "@mui/icons-material";
 import {
-  BarChart,
-  Bar,
   LineChart,
   Line,
   XAxis,
@@ -51,18 +43,13 @@ import {
   Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 import { analyticsService } from "../../services/analyticsService";
-import { useAuth } from "../../contexts/AuthContext";
 import { useRolePermissions } from "../../hooks/useRolePermissions";
 import { PERMISSIONS } from "../../config/roles.config";
 
 const Analytics = () => {
   const { checkPermission, role, getLeadStageRange } = useRolePermissions();
-  const { user } = useAuth();
 
   // Check if user has permission to view analytics
   const hasAnalyticsPermission = checkPermission(PERMISSIONS.ANALYTICS);
@@ -104,72 +91,75 @@ const Analytics = () => {
   };
 
   // Filter analytics data based on user role
-  const filterAnalyticsDataByRole = (data) => {
-    // If role is admin or superAdmin, return all data
-    if (role === "admin" || role === "superAdmin") {
-      return data;
-    }
-
-    // For admissionAdmin, filter to only show admission-related stages
-    if (role === "admissionAdmin") {
-      // Get the role's lead stage access
-      const stageAccess = getLeadStageRange();
-
-      // Filter progression data
-      const filteredProgression = data.progression?.map((day) => {
-        const filtered = { ...day };
-        // Remove stages that aren't relevant to admission admin
-        if (filtered.contacted !== undefined) delete filtered.contacted;
-        if (filtered.preQualified !== undefined) delete filtered.preQualified;
-        return filtered;
-      });
-
-      // Filter agent performance to only admission agents or only show admission-related metrics
-      const filteredAgentPerformance = data.agentPerformance?.filter(
-        (agent) =>
-          agent.role === "admissionAgent" ||
-          agent.role === "admin" ||
-          agent.role === "admissionAdmin"
-      );
-
-      // Filter status counts to only include stages in the admissionAdmin's access
-      const filteredStatusCounts = { ...data.overview?.statusCounts };
-      if (filteredStatusCounts) {
-        // Clear stages that shouldn't be visible
-        if (filteredStatusCounts.CONTACTED !== undefined)
-          delete filteredStatusCounts.CONTACTED;
-        if (filteredStatusCounts.PRE_QUALIFIED !== undefined)
-          delete filteredStatusCounts.PRE_QUALIFIED;
+  const filterAnalyticsDataByRole = useCallback(
+    (data) => {
+      // If role is admin or superAdmin, return all data
+      if (role === "admin" || role === "superAdmin") {
+        return data;
       }
 
-      // Only keep conversion rates relevant to admission admin
-      const filteredConversionRates = {
-        rates: {
-          appliedToQualified:
-            data.conversionRates?.rates?.appliedToQualified || 0,
-          qualifiedToEnrolled:
-            data.conversionRates?.rates?.qualifiedToEnrolled || 0,
-          overallConversion:
-            data.conversionRates?.rates?.overallConversion || 0,
-        },
-      };
+      // For admissionAdmin, filter to only show admission-related stages
+      if (role === "admissionAdmin") {
+        // Get the role's lead stage access
+        getLeadStageRange();
 
-      return {
-        ...data,
-        progression: filteredProgression,
-        agentPerformance: filteredAgentPerformance,
-        overview: {
-          ...data.overview,
-          statusCounts: filteredStatusCounts,
-        },
-        conversionRates: filteredConversionRates,
-      };
-    }
+        // Filter progression data
+        const filteredProgression = data.progression?.map((day) => {
+          const filtered = { ...day };
+          // Remove stages that aren't relevant to admission admin
+          if (filtered.contacted !== undefined) delete filtered.contacted;
+          if (filtered.preQualified !== undefined) delete filtered.preQualified;
+          return filtered;
+        });
 
-    // For other roles, return filtered data according to their permissions
-    // (currently just returns unfiltered data - implement as needed)
-    return data;
-  };
+        // Filter agent performance to only admission agents or only show admission-related metrics
+        const filteredAgentPerformance = data.agentPerformance?.filter(
+          (agent) =>
+            agent.role === "admissionAgent" ||
+            agent.role === "admin" ||
+            agent.role === "admissionAdmin"
+        );
+
+        // Filter status counts to only include stages in the admissionAdmin's access
+        const filteredStatusCounts = { ...data.overview?.statusCounts };
+        if (filteredStatusCounts) {
+          // Clear stages that shouldn't be visible
+          if (filteredStatusCounts.CONTACTED !== undefined)
+            delete filteredStatusCounts.CONTACTED;
+          if (filteredStatusCounts.PRE_QUALIFIED !== undefined)
+            delete filteredStatusCounts.PRE_QUALIFIED;
+        }
+
+        // Only keep conversion rates relevant to admission admin
+        const filteredConversionRates = {
+          rates: {
+            appliedToQualified:
+              data.conversionRates?.rates?.appliedToQualified || 0,
+            qualifiedToEnrolled:
+              data.conversionRates?.rates?.qualifiedToEnrolled || 0,
+            overallConversion:
+              data.conversionRates?.rates?.overallConversion || 0,
+          },
+        };
+
+        return {
+          ...data,
+          progression: filteredProgression,
+          agentPerformance: filteredAgentPerformance,
+          overview: {
+            ...data.overview,
+            statusCounts: filteredStatusCounts,
+          },
+          conversionRates: filteredConversionRates,
+        };
+      }
+
+      // For other roles, return filtered data according to their permissions
+      // (currently just returns unfiltered data - implement as needed)
+      return data;
+    },
+    [role, getLeadStageRange]
+  );
 
   // Define colors for different statuses
   const statusColors = {
@@ -189,7 +179,7 @@ const Analytics = () => {
   }, [role]);
 
   // Fetch analytics data
-  const fetchAnalyticsData = async () => {
+  const fetchAnalyticsData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -236,7 +226,7 @@ const Analytics = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange, filterAnalyticsDataByRole]);
 
   // Handle export
   const handleExport = async () => {
@@ -268,7 +258,7 @@ const Analytics = () => {
 
   useEffect(() => {
     fetchAnalyticsData();
-  }, [timeRange]);
+  }, [timeRange, fetchAnalyticsData]);
 
   // Calculate percentage change
   const calculateChange = (current, previous) => {

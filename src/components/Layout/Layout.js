@@ -21,7 +21,6 @@ import {
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   AdminPanelSettings as AdminIcon,
-  Assessment as AssessmentIcon,
   Insights as InsightsIcon,
   Menu as MenuIcon,
   Storage as DataCenterIcon,
@@ -38,7 +37,7 @@ const drawerWidth = 280;
 const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, hasPermission, getUserRole } = useAuth();
+  const { user, logout, getUserRole } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -55,7 +54,6 @@ const Layout = ({ children }) => {
 
   const getMenuItems = () => {
     const role = getUserRole();
-    const items = [];
 
     // Super Admin menu
     if (role === "superAdmin") {

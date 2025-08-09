@@ -19,7 +19,6 @@ import {
   Alert,
 } from "@mui/material";
 import {
-  Settings as SettingsIcon,
   Assessment as AssessmentIcon,
   Chat as ChatIcon,
   Person as PersonIcon,

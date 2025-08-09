@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Grid,
@@ -15,8 +15,6 @@ import {
 } from "@mui/material";
 import {
   TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  Schedule as ScheduleIcon,
   Message as MessageIcon,
   Person as PersonIcon,
   Phone as PhoneIcon,
@@ -34,13 +32,7 @@ const ChatAnalyticsDashboard = ({ conversations = [] }) => {
     conversationsByStatus: {},
   });
 
-  useEffect(() => {
-    if (conversations.length > 0) {
-      calculateAnalytics();
-    }
-  }, [conversations]);
-
-  const calculateAnalytics = () => {
+  const calculateAnalytics = useCallback(() => {
     const totalConversations = conversations.length;
     const totalMessages = conversations.reduce(
       (sum, conv) => sum + conv.messageCount,
@@ -83,7 +75,13 @@ const ChatAnalyticsDashboard = ({ conversations = [] }) => {
       messagesByTimeOfDay,
       conversationsByStatus,
     });
-  };
+  }, [conversations]);
+
+  useEffect(() => {
+    if (conversations.length > 0) {
+      calculateAnalytics();
+    }
+  }, [conversations, calculateAnalytics]);
 
   const analyzeMessageTiming = (conversations) => {
     // This is a simplified analysis - in a real app you'd analyze actual message timestamps
@@ -118,11 +116,6 @@ const ChatAnalyticsDashboard = ({ conversations = [] }) => {
       default:
         return "primary";
     }
-  };
-
-  const calculateGrowth = (current, previous) => {
-    if (previous === 0) return 0;
-    return Math.round(((current - previous) / previous) * 100);
   };
 
   return (

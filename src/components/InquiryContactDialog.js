@@ -24,7 +24,7 @@ import {
 } from "@mui/icons-material";
 import { leadService } from "../services/leadService";
 import { useAuth } from "../contexts/AuthContext";
-import { LEAD_SOURCES, SOURCE_CONFIG } from "../config/lead.constants";
+import { SOURCE_CONFIG } from "../config/lead.constants";
 
 const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
   const { user } = useAuth();

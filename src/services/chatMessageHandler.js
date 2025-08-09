@@ -243,7 +243,6 @@ class ChatMessageHandler {
 
     setConversations((prev) => {
       const newConversations = new Map(prev);
-      let updated = false;
 
       for (const [phoneNumber, messages] of newConversations.entries()) {
         const updatedMessages = this.updateMessageStatus(

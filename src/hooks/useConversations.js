@@ -132,7 +132,7 @@ export const useConversations = (initialFilters = {}) => {
         setLoading(false);
       }
     },
-    [pagination.limit, pagination.offset, filters]
+    [pagination, filters]
   );
 
   // Filter and sort conversations
@@ -289,6 +289,7 @@ export const useConversations = (initialFilters = {}) => {
       }));
 
       // Reset pagination when filters change
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       setPagination((prev) => ({ ...prev, offset: 0 }));
 
       // Reload conversations with new filters

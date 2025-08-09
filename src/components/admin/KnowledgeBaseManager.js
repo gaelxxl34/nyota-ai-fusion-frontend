@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Paper,
@@ -28,14 +28,12 @@ import {
 import {
   School as SchoolIcon,
   AttachMoney as MoneyIcon,
-  Event as EventIcon,
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Search as SearchIcon,
   Save as SaveIcon,
   Cancel as CancelIcon,
-  Psychology as PsychologyIcon,
   Info as InfoIcon,
   Assignment as AssignmentIcon,
 } from "@mui/icons-material";
@@ -80,11 +78,7 @@ const KnowledgeBaseManager = () => {
     { id: "general", label: "General", icon: <InfoIcon />, color: "#607d8b" },
   ];
 
-  useEffect(() => {
-    loadKnowledgeBase();
-  }, []);
-
-  const loadKnowledgeBase = async () => {
+  const loadKnowledgeBase = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axiosInstance.get("/api/whatsapp/knowledge");
@@ -99,7 +93,11 @@ const KnowledgeBaseManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadKnowledgeBase();
+  }, [loadKnowledgeBase]);
 
   const showSnackbar = (message, severity = "success") => {
     setSnackbar({ open: true, message, severity });

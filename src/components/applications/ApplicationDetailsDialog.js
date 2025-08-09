@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -348,12 +348,73 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
     return result;
   };
 
+  // Helper function to fetch application data
+  const fetchApplicationData = useCallback(async () => {
+    if (!open) return;
+    if (!applicationId && !leadId) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      let response;
+      console.log("Fetching application data:", { applicationId, leadId });
+
+      // First try to fetch by applicationId if available
+      if (applicationId) {
+        console.log("Fetching by applicationId:", applicationId);
+        response = await applicationService.getApplication(applicationId);
+      }
+      // If no applicationId but leadId is available, fetch by leadId
+      else if (leadId) {
+        console.log("Fetching by leadId:", leadId);
+        response = await applicationService.getApplicationByLeadId(leadId);
+      }
+
+      console.log("Application API response:", response);
+
+      if (response && response.success) {
+        const applicationData = response.data.data || response.data;
+        console.log("Application data loaded:", applicationData);
+
+        // Process the data to handle timestamp objects
+        const processedData = sanitizeFirestoreTimestamps(applicationData);
+
+        // Set application state
+        setApplication(processedData);
+
+        // Initialize form data with a deep copy of application data to avoid reference issues
+        const initialFormData = JSON.parse(JSON.stringify(applicationData));
+
+        // Make sure to map any fields that might have different names
+        if (applicationData.intake && !applicationData.preferredIntake) {
+          initialFormData.preferredIntake = applicationData.intake;
+        }
+
+        if (applicationData.program && !applicationData.preferredProgram) {
+          initialFormData.preferredProgram = applicationData.program;
+        }
+
+        console.log("Setting initial form data:", initialFormData);
+        setFormData(initialFormData);
+      } else {
+        console.error("Failed to fetch application data:", response);
+        setError("No application data found");
+      }
+    } catch (err) {
+      console.error("Error fetching application data:", err);
+      setError("An error occurred while loading application details");
+    } finally {
+      setLoading(false);
+    }
+  }, [open, applicationId, leadId]);
+
   useEffect(() => {
     // Use the fetchApplicationData function that's defined above
     // We don't need to redefine it here anymore
 
     fetchApplicationData();
-  }, [open, applicationId, leadId]);
+  }, [fetchApplicationData, open, applicationId, leadId]);
 
   const handleEditApplication = () => {
     // Initialize form data with current application data
@@ -736,73 +797,6 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
         reject(new Error("Failed to read file for compression"));
       };
     });
-  };
-
-  // Helper function to fetch application data
-  const fetchApplicationData = async () => {
-    if (!open) return;
-    if (!applicationId && !leadId) return;
-
-    setLoading(true);
-    setError("");
-
-    try {
-      let response;
-      console.log("Fetching application data:", { applicationId, leadId });
-
-      // First try to fetch by applicationId if available
-      if (applicationId) {
-        console.log("Fetching by applicationId:", applicationId);
-        response = await applicationService.getApplication(applicationId);
-      }
-      // If no applicationId but leadId is available, fetch by leadId
-      else if (leadId) {
-        console.log("Fetching by leadId:", leadId);
-        response = await applicationService.getApplicationByLeadId(leadId);
-      }
-
-      console.log("Application API response:", response);
-
-      if (response && response.success) {
-        const applicationData = response.data.data || response.data;
-        console.log("Application data loaded:", applicationData);
-
-        // Process the data to handle timestamp objects
-        const processedData = sanitizeFirestoreTimestamps(applicationData);
-
-        // Set application state
-        setApplication(processedData);
-
-        // Initialize form data with a deep copy of application data to avoid reference issues
-        const initialFormData = JSON.parse(JSON.stringify(applicationData));
-
-        // Make sure to map any fields that might have different names
-        if (applicationData.intake && !applicationData.preferredIntake) {
-          initialFormData.preferredIntake = applicationData.intake;
-        }
-
-        if (applicationData.program && !applicationData.preferredProgram) {
-          initialFormData.preferredProgram = applicationData.program;
-        }
-
-        console.log("Setting initial form data:", initialFormData);
-        setFormData(initialFormData);
-
-        // Reset form errors
-        setFormErrors({});
-      } else {
-        console.error("Failed to load application:", response);
-        setError(
-          "Failed to load application details: " +
-            (response ? response.message : "No data found")
-        );
-      }
-    } catch (err) {
-      console.error("Error fetching application data:", err);
-      setError("An error occurred while loading application details");
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleSaveApplication = async () => {

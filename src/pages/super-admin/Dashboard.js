@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Grid,
-  Card,
-  CardContent,
   Typography,
   Paper,
   Avatar,
@@ -14,24 +12,15 @@ import {
   Alert,
   IconButton,
   Tooltip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
 import {
   GroupAdd as GroupAddIcon,
   Forum as ForumIcon,
   EmojiEvents as EmojiEventsIcon,
-  Business as BusinessIcon,
   Group as GroupIcon,
   TrendingUp as TrendingUpIcon,
   Chat as ChatIcon,
   School as SchoolIcon,
-  Speed as SpeedIcon,
   Error as ErrorIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
@@ -40,7 +29,6 @@ import {
   ArrowForward as ArrowForwardIcon,
   Download as DownloadIcon,
   Analytics as AnalyticsIcon,
-  Settings as SettingsIcon,
   PersonAdd as PersonAddIcon,
   Campaign as CampaignIcon,
 } from "@mui/icons-material";
@@ -49,7 +37,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 
 const AdminDashboard = () => {
-  const theme = useTheme();
   const navigate = useNavigate();
   const { user, getUserRole } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -76,6 +63,7 @@ const AdminDashboard = () => {
     enrolled: 0,
   });
 
+  // eslint-disable-next-line no-unused-vars
   const [systemPerformance, setSystemPerformance] = useState({
     uptime: "99.9%",
     responseTime: "< 200ms",

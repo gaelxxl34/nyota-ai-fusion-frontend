@@ -6,8 +6,6 @@ import {
   DialogActions,
   Button,
   TextField,
-  FormControlLabel,
-  Checkbox,
   Grid,
   FormControl,
   InputLabel,
@@ -17,15 +15,10 @@ import {
   Box,
   CircularProgress,
   Alert,
-  Tooltip,
   Chip,
 } from "@mui/material";
 import { Info as InfoIcon } from "@mui/icons-material";
-import {
-  getRoleOptions,
-  PERMISSIONS,
-  hasPermission,
-} from "../../config/roles.config";
+import { getRoleOptions } from "../../config/roles.config";
 import { useRolePermissions } from "../../hooks/useRolePermissions";
 
 const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {

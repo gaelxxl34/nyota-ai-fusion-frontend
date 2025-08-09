@@ -42,7 +42,6 @@ import {
   Assignment as AssignmentIcon,
   History as HistoryIcon,
   Note as NoteIcon,
-  Attachment as AttachmentIcon,
   Send as SendIcon,
   CallMade as CallIcon,
   Message as MessageIcon,
@@ -50,7 +49,6 @@ import {
   CalendarToday as CalendarIcon,
   Flag as FlagIcon,
   Schedule as ScheduleIcon,
-  ArticleOutlined as ApplicationIcon,
 } from "@mui/icons-material";
 import { leadService } from "../../services/leadService";
 import whatsappServiceDefault from "../../services/whatsappService";
@@ -326,12 +324,6 @@ const LeadDetailsDialog = ({
       // Refresh lead data to reflect the change
       fetchLeadDetails();
     }
-  };
-
-  // Handle application update success
-  const handleApplicationUpdateSuccess = (result) => {
-    // Refresh lead data to reflect any changes
-    fetchLeadDetails();
   };
 
   // Tab panels

@@ -18,12 +18,7 @@ import {
   Chip,
 } from "@mui/material";
 import { leadService } from "../../services/leadService";
-import {
-  LEAD_STATUSES,
-  LEAD_SOURCES,
-  STATUS_CONFIG,
-  SOURCE_CONFIG,
-} from "../../config/lead.constants";
+import { STATUS_CONFIG, SOURCE_CONFIG } from "../../config/lead.constants";
 
 const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
   const [formData, setFormData] = useState({

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -38,13 +38,7 @@ const ConversationDetailsDialog = ({ open, onClose, conversation }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (open && conversation) {
-      loadConversationMessages();
-    }
-  }, [open, conversation]);
-
-  const loadConversationMessages = async () => {
+  const loadConversationMessages = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -60,7 +54,13 @@ const ConversationDetailsDialog = ({ open, onClose, conversation }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [conversation]);
+
+  useEffect(() => {
+    if (open && conversation) {
+      loadConversationMessages();
+    }
+  }, [open, conversation, loadConversationMessages]);
 
   if (!conversation) return null;
 
