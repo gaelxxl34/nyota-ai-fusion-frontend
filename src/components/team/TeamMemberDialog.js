@@ -26,9 +26,28 @@ import {
   PERMISSIONS,
   hasPermission,
 } from "../../config/roles.config";
+import { useRolePermissions } from "../../hooks/useRolePermissions";
 
 const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
-  const roleOptions = getRoleOptions();
+  const { role: currentUserRole } = useRolePermissions();
+  const isAdmissionAdmin = currentUserRole === "admissionAdmin";
+  const isAdmin = currentUserRole === "admin";
+
+  // Filter role options based on user role
+  const allRoleOptions = getRoleOptions();
+  let roleOptions = allRoleOptions;
+
+  if (isAdmissionAdmin) {
+    // Admission admins can only create admission agents
+    roleOptions = allRoleOptions.filter(
+      (option) => option.value === "admissionAgent"
+    );
+  } else if (isAdmin) {
+    // Regular admins can only create marketing agents
+    roleOptions = allRoleOptions.filter(
+      (option) => option.value === "marketingAgent"
+    );
+  }
 
   const [formData, setFormData] = useState({
     name: "",
@@ -45,14 +64,20 @@ const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
         role: member.role || member.jobRole || "", // Handle both old and new field names
       });
     } else {
+      const defaultRole = isAdmissionAdmin
+        ? "admissionAgent"
+        : isAdmin
+        ? "marketingAgent"
+        : "";
+
       setFormData({
         name: "",
         email: "",
-        role: "",
+        role: defaultRole, // Set default role based on user type
         status: "active",
       });
     }
-  }, [member]);
+  }, [member, isAdmissionAdmin, isAdmin]);
 
   const handleChange = (e) => {
     setFormData({
@@ -84,7 +109,11 @@ const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
-        {member ? "Edit Team Member" : "Add Team Member"}
+        {member
+          ? "Edit Team Member"
+          : isAdmissionAdmin
+          ? "Add Admission Agent"
+          : "Add Team Member"}
       </DialogTitle>
       <DialogContent>
         {formError && (
@@ -122,6 +151,7 @@ const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
                 value={formData.role}
                 onChange={handleChange}
                 label="Role"
+                disabled={isAdmissionAdmin && !member} // Disable for new members if admissionAdmin (pre-selected)
               >
                 {roleOptions.map((role) => (
                   <MenuItem key={role.value} value={role.value}>
@@ -181,7 +211,8 @@ const TeamMemberDialog = ({ open, onClose, onSave, member, loading }) => {
                   <Box
                     sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 1 }}
                   >
-                    {formData.role === "admin" && (
+                    {(formData.role === "admin" ||
+                      formData.role === "admissionAdmin") && (
                       <Chip label="Full Access" color="primary" size="small" />
                     )}
                     {formData.role === "marketingAgent" && (

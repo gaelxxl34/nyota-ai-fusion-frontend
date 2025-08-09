@@ -67,7 +67,7 @@ export const useRolePermissions = () => {
    * Check if user is admin
    */
   const isAdmin = () => {
-    return role === "admin";
+    return role === "admin" || role === "admissionAdmin";
   };
 
   /**

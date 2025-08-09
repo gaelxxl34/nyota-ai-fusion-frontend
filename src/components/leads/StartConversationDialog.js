@@ -127,7 +127,10 @@ const StartConversationDialog = ({ open, onClose, lead }) => {
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <PersonIcon fontSize="small" color="action" />
                 <Typography variant="body2">
-                  Interested in: {lead.program}
+                  Interested in:{" "}
+                  {typeof lead.program === "object" && lead.program !== null
+                    ? lead.program.name || lead.program.code || "Not specified"
+                    : lead.program}
                 </Typography>
               </Box>
             )}

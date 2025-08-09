@@ -4,461 +4,513 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
+  DialogContentText,
+  Stepper,
+  Step,
+  StepLabel,
   Button,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  Box,
+  IconButton,
   Typography,
   Alert,
+  Snackbar,
+  List,
+  ListItem,
+  ListItemText,
   CircularProgress,
-  Box,
 } from "@mui/material";
 import {
-  School as SchoolIcon,
-  Send as SendIcon,
-  Person as PersonIcon,
+  Close as CloseIcon,
+  Warning as WarningIcon,
 } from "@mui/icons-material";
-import { applicationService } from "../../services/applicationService";
-import { useAuth } from "../../contexts/AuthContext";
+import { PersonalDetailsStep } from "./PersonalDetailsStep";
+import { ProgramStep } from "./ProgramStep";
+import { AdditionalDataStep } from "./AdditionalDataStep";
+import { useApplicationForm } from "./useApplicationForm";
 
-const ApplicationFormDialog = ({ open, onClose, onSuccess }) => {
-  const { user } = useAuth();
-  const [formData, setFormData] = useState({
-    name: "",
-    countryOfBirth: "",
-    gender: "",
-    email: "",
-    phoneNumber: "",
-    modeOfStudy: "",
-    preferredIntake: "",
-    preferredProgram: "",
+const steps = [
+  "Personal Details",
+  "Program Selection",
+  "Additional Information",
+];
+
+const ApplicationFormDialog = ({
+  open,
+  onClose,
+  onSuccess,
+  applicationId,
+  mode = "create",
+}) => {
+  const [activeStep, setActiveStep] = useState(0);
+  const {
+    formData,
+    updateFormData,
+    resetForm,
+    validateStep,
+    submitApplication,
+    loadApplication,
+    isSubmitting,
+    isLoading,
+    errors,
+  } = useApplicationForm();
+
+  // Load application data when editing an existing application
+  React.useEffect(() => {
+    if (open && mode === "edit" && applicationId) {
+      loadApplication(applicationId);
+    }
+  }, [open, mode, applicationId, loadApplication]);
+
+  // State for duplicate detection
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [duplicateData, setDuplicateData] = useState(null);
+  const [localSubmitting, setLocalSubmitting] = useState(false);
+
+  const handleNext = async () => {
+    console.log("Attempting to move to next step from step", activeStep);
+    const isValid = await validateStep(activeStep, formData);
+    console.log("Validation result:", isValid);
+    if (isValid) {
+      setActiveStep((prevActiveStep) => prevActiveStep + 1);
+      console.log("Advanced to next step");
+    } else {
+      console.log("Failed to advance due to validation errors");
+    }
+  };
+
+  const handleBack = () => {
+    setActiveStep((prevActiveStep) => prevActiveStep - 1);
+  };
+
+  const [submissionMessage, setSubmissionMessage] = useState({
+    type: "",
+    message: "",
   });
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  // Application form options
-  const genderOptions = [
-    { value: "male", label: "Male" },
-    { value: "female", label: "Female" },
-    { value: "other", label: "Other" },
-    { value: "prefer_not_to_say", label: "Prefer not to say" },
-  ];
-
-  const modeOfStudyOptions = [
-    { value: "on_campus", label: "On Campus" },
-    { value: "online", label: "Online" },
-  ];
-
-  const intakeOptions = [
-    { value: "january", label: "January" },
-    { value: "may", label: "May" },
-    { value: "august", label: "August" },
-  ];
-
-  const programOptions = [
-    {
-      value: "bachelor_information_technology",
-      label: "Bachelor of Information Technology (BIT)",
-    },
-    {
-      value: "bachelor_business_administration",
-      label: "Bachelor of Business Administration (BBA)",
-    },
-    { value: "bachelor_commerce", label: "Bachelor of Commerce (BCOM)" },
-    {
-      value: "master_information_technology",
-      label: "Master of Information Technology (MIT)",
-    },
-    {
-      value: "master_business_administration",
-      label: "Master of Business Administration (MBA)",
-    },
-    {
-      value: "diploma_information_technology",
-      label: "Diploma in Information Technology",
-    },
-    {
-      value: "diploma_business_administration",
-      label: "Diploma in Business Administration",
-    },
-    { value: "certificate_programs", label: "Certificate Programs" },
-  ];
-
-  // Countries list (partial - can be expanded)
-  const countryOptions = [
-    "Afghanistan",
-    "Albania",
-    "Algeria",
-    "Argentina",
-    "Australia",
-    "Austria",
-    "Bangladesh",
-    "Belgium",
-    "Brazil",
-    "Canada",
-    "China",
-    "Colombia",
-    "Denmark",
-    "Egypt",
-    "Finland",
-    "France",
-    "Germany",
-    "Ghana",
-    "Greece",
-    "India",
-    "Indonesia",
-    "Iran",
-    "Iraq",
-    "Ireland",
-    "Italy",
-    "Japan",
-    "Jordan",
-    "Kenya",
-    "Kuwait",
-    "Lebanon",
-    "Malaysia",
-    "Mexico",
-    "Morocco",
-    "Netherlands",
-    "Nigeria",
-    "Norway",
-    "Pakistan",
-    "Philippines",
-    "Poland",
-    "Portugal",
-    "Russia",
-    "Saudi Arabia",
-    "Singapore",
-    "South Africa",
-    "South Korea",
-    "Spain",
-    "Sri Lanka",
-    "Sweden",
-    "Switzerland",
-    "Tanzania",
-    "Thailand",
-    "Turkey",
-    "Uganda",
-    "United Kingdom",
-    "United States",
-    "Vietnam",
-    "Yemen",
-    "Zimbabwe",
-  ];
-
-  const handleInputChange = (field) => (event) => {
-    setFormData({ ...formData, [field]: event.target.value });
-    setError("");
-    setSuccess("");
-  };
-
-  const validateForm = () => {
-    // Required fields validation
-    const requiredFields = [
-      { field: "name", label: "Name" },
-      { field: "countryOfBirth", label: "Country of Birth" },
-      { field: "gender", label: "Gender" },
-      { field: "email", label: "Email Address" },
-      { field: "phoneNumber", label: "Telephone Number" },
-      { field: "modeOfStudy", label: "Mode of Study" },
-      { field: "preferredIntake", label: "Preferred Intake" },
-      { field: "preferredProgram", label: "Preferred Program" },
-    ];
-
-    for (const { field, label } of requiredFields) {
-      if (!formData[field]?.trim()) {
-        setError(`${label} is required`);
-        return false;
-      }
-    }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setError("Please enter a valid email address");
-      return false;
-    }
-
-    // Phone number validation
-    const phoneRegex = /^\+?[\d\s\-()]{10,}$/;
-    if (!phoneRegex.test(formData.phoneNumber)) {
-      setError("Please enter a valid phone number");
-      return false;
-    }
-
-    return true;
-  };
-
   const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    setLoading(true);
-    setError("");
-    setSuccess("");
+    // Clear any previous messages
+    setSubmissionMessage({ type: "", message: "" });
 
     try {
-      // Submit application
-      const result = await applicationService.submitApplication(formData, user);
+      console.log("Submitting application...");
+
+      const result = await submitApplication(false); // First attempt without force submit
 
       if (result.success) {
-        setSuccess(
-          `🎉 Application submitted successfully! Thank you ${
-            formData.name
-          } for applying to our ${
-            programOptions.find((p) => p.value === formData.preferredProgram)
-              ?.label
-          } program.`
+        console.log(
+          mode === "edit"
+            ? "Application updated successfully:"
+            : "Application submitted successfully:",
+          result
         );
+        setSubmissionMessage({
+          type: "success",
+          message:
+            mode === "edit"
+              ? "Application updated successfully!"
+              : "Application submitted successfully! Your application ID is: " +
+                (result.application?.id ||
+                  result.application?.applicationNumber ||
+                  "Generated"),
+        });
 
-        // Call success callback with application data
-        if (onSuccess) {
-          onSuccess({
-            application: result.application,
-            lead: result.lead,
-            whatsappMessage: result.whatsappMessage,
-          });
-        }
-
-        // Close dialog after 3 seconds
+        // Process immediately but keep success message visible
+        onSuccess(result);
+        // Close after a short delay so users can see confirmation
         setTimeout(() => {
           handleClose();
-        }, 3000);
+        }, 1000);
+      } else if (result.duplicatesFound) {
+        console.log("Duplicate records found:", result.existingData);
+        // Show duplicate confirmation dialog
+        setDuplicateData(result.existingData);
+        setShowDuplicateDialog(true);
       } else {
-        throw new Error(result.message || "Failed to submit application");
+        console.error("Application submission failed:", result);
+        setSubmissionMessage({
+          type: "error",
+          message:
+            result.message || "Failed to submit application. Please try again.",
+        });
       }
     } catch (error) {
       console.error("Error submitting application:", error);
-      setError(
-        error.message || "Failed to submit application. Please try again."
-      );
-    } finally {
-      setLoading(false);
+      setSubmissionMessage({
+        type: "error",
+        message:
+          error.message || "An unexpected error occurred. Please try again.",
+      });
     }
   };
 
   const handleClose = () => {
-    if (!loading) {
-      setFormData({
-        name: "",
-        countryOfBirth: "",
-        gender: "",
-        email: "",
-        phoneNumber: "",
-        modeOfStudy: "",
-        preferredIntake: "",
-        preferredProgram: "",
-      });
-      setError("");
-      setSuccess("");
-      onClose();
+    resetForm();
+    setActiveStep(0);
+    setSubmissionMessage({ type: "", message: "" });
+    setShowDuplicateDialog(false);
+    setDuplicateData(null);
+    onClose();
+  };
+
+  const getStepContent = (step) => {
+    switch (step) {
+      case 0:
+        return (
+          <PersonalDetailsStep
+            formData={formData}
+            updateFormData={updateFormData}
+            errors={errors}
+          />
+        );
+      case 1:
+        return (
+          <ProgramStep
+            formData={formData}
+            updateFormData={updateFormData}
+            errors={errors}
+          />
+        );
+      case 2:
+        return (
+          <AdditionalDataStep
+            formData={formData}
+            updateFormData={updateFormData}
+            errors={errors}
+          />
+        );
+      default:
+        return null;
     }
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={handleClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: { borderRadius: 2 },
-      }}
-    >
-      <DialogTitle sx={{ pb: 2 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <SchoolIcon color="primary" />
-          <Typography variant="h5" component="div" sx={{ fontWeight: 600 }}>
-            Application Form
-          </Typography>
-        </Box>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Complete your application to join our academic programs
-        </Typography>
-      </DialogTitle>
-
-      <DialogContent dividers sx={{ py: 3 }}>
-        <Grid container spacing={3}>
-          {/* Personal Information Section */}
-          <Grid item xs={12}>
-            <Typography variant="h6" sx={{ mb: 2, color: "primary.main" }}>
-              <PersonIcon sx={{ mr: 1, verticalAlign: "middle" }} />
-              Personal Information
-            </Typography>
-          </Grid>
-
-          {/* Full Name */}
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Full Name"
-              value={formData.name}
-              onChange={handleInputChange("name")}
-              required
-              variant="outlined"
-              placeholder="Enter your full legal name"
-            />
-          </Grid>
-
-          {/* Country of Birth */}
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth required>
-              <InputLabel>Country of Birth</InputLabel>
-              <Select
-                value={formData.countryOfBirth}
-                onChange={handleInputChange("countryOfBirth")}
-                label="Country of Birth"
-              >
-                {countryOptions.map((country) => (
-                  <MenuItem key={country} value={country}>
-                    {country}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Gender */}
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth required>
-              <InputLabel>Gender</InputLabel>
-              <Select
-                value={formData.gender}
-                onChange={handleInputChange("gender")}
-                label="Gender"
-              >
-                {genderOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Email Address */}
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Email Address"
-              type="email"
-              value={formData.email}
-              onChange={handleInputChange("email")}
-              required
-              variant="outlined"
-              placeholder="your.email@example.com"
-            />
-          </Grid>
-
-          {/* Telephone Number */}
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Telephone Number"
-              value={formData.phoneNumber}
-              onChange={handleInputChange("phoneNumber")}
-              required
-              variant="outlined"
-              placeholder="+256 700 123 456"
-            />
-          </Grid>
-
-          {/* Academic Information Section */}
-          <Grid item xs={12} sx={{ mt: 2 }}>
-            <Typography variant="h6" sx={{ mb: 2, color: "primary.main" }}>
-              <SchoolIcon sx={{ mr: 1, verticalAlign: "middle" }} />
-              Academic Information
-            </Typography>
-          </Grid>
-
-          {/* Mode of Study */}
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth required>
-              <InputLabel>Mode of Study</InputLabel>
-              <Select
-                value={formData.modeOfStudy}
-                onChange={handleInputChange("modeOfStudy")}
-                label="Mode of Study"
-              >
-                {modeOfStudyOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Preferred Intake */}
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth required>
-              <InputLabel>Preferred Intake</InputLabel>
-              <Select
-                value={formData.preferredIntake}
-                onChange={handleInputChange("preferredIntake")}
-                label="Preferred Intake"
-              >
-                {intakeOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Preferred Program */}
-          <Grid item xs={12}>
-            <FormControl fullWidth required>
-              <InputLabel>Preferred Program</InputLabel>
-              <Select
-                value={formData.preferredProgram}
-                onChange={handleInputChange("preferredProgram")}
-                label="Preferred Program"
-              >
-                {programOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Error/Success Messages */}
-          {error && (
-            <Grid item xs={12}>
-              <Alert severity="error">{error}</Alert>
-            </Grid>
-          )}
-
-          {success && (
-            <Grid item xs={12}>
-              <Alert severity="success">{success}</Alert>
-            </Grid>
-          )}
-        </Grid>
-      </DialogContent>
-
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button onClick={handleClose} disabled={loading}>
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          variant="contained"
-          disabled={loading}
-          startIcon={loading ? <CircularProgress size={20} /> : <SendIcon />}
-          sx={{ minWidth: 140 }}
+    <>
+      <Snackbar
+        open={!!submissionMessage.message}
+        autoHideDuration={6000}
+        onClose={() => setSubmissionMessage({ type: "", message: "" })}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity={submissionMessage.type === "success" ? "success" : "error"}
+          onClose={() => setSubmissionMessage({ type: "", message: "" })}
+          sx={{ width: "100%" }}
         >
-          {loading ? "Submitting..." : "Submit Application"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+          {submissionMessage.message}
+        </Alert>
+      </Snackbar>
+
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { minHeight: "600px" },
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Typography variant="h6">
+              {mode === "edit" ? "Edit Application" : "New Application"}
+              {isLoading && <CircularProgress size={20} sx={{ ml: 2 }} />}
+            </Typography>
+            <IconButton onClick={handleClose} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 2 }}>
+          {mode === "edit" && isLoading ? (
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                height: "400px",
+              }}
+            >
+              <CircularProgress />
+              <Typography variant="body1" sx={{ ml: 2 }}>
+                Loading application data...
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+                {steps.map((label) => (
+                  <Step key={label}>
+                    <StepLabel>{label}</StepLabel>
+                  </Step>
+                ))}
+              </Stepper>
+
+              <Box sx={{ minHeight: "400px" }}>
+                {getStepContent(activeStep)}
+              </Box>
+            </>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 3, justifyContent: "space-between" }}>
+          <Button
+            onClick={handleBack}
+            disabled={activeStep === 0}
+            variant="outlined"
+          >
+            Back
+          </Button>
+
+          <Box>
+            {activeStep === steps.length - 1 ? (
+              <Button
+                variant="contained"
+                onClick={handleSubmit}
+                disabled={isSubmitting || localSubmitting || isLoading}
+                startIcon={
+                  isSubmitting || localSubmitting ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : null
+                }
+              >
+                {isSubmitting || localSubmitting
+                  ? "Submitting..."
+                  : mode === "edit"
+                  ? "Update Application"
+                  : "Submit Application"}
+              </Button>
+            ) : (
+              <Button variant="contained" onClick={handleNext}>
+                Next
+              </Button>
+            )}
+          </Box>
+        </DialogActions>
+      </Dialog>
+
+      {/* Duplicate Detection Dialog */}
+      <Dialog
+        open={showDuplicateDialog}
+        onClose={() => setShowDuplicateDialog(false)}
+        maxWidth="md"
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center">
+            <WarningIcon color="warning" sx={{ mr: 1 }} />
+            Existing Records Found
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            We found existing records in our system with the same email address
+            or phone number. This could be a duplicate application.
+          </DialogContentText>
+
+          {duplicateData && (
+            <Box>
+              {/* Display existing applications found by email */}
+              {duplicateData.applications.byEmail.length > 0 && (
+                <Box mt={2}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    Existing applications with the same email:
+                  </Typography>
+                  <List dense>
+                    {duplicateData.applications.byEmail.map((app) => (
+                      <ListItem key={app.id}>
+                        <ListItemText
+                          primary={`${app.name} - ${
+                            typeof app.program === "object" &&
+                            app.program !== null
+                              ? app.program.name ||
+                                app.program.code ||
+                                "Unknown Program"
+                              : app.program || "Unknown Program"
+                          }`}
+                          secondary={`Status: ${
+                            app.status
+                          } | Submitted: ${new Date(
+                            app.submittedAt
+                          ).toLocaleDateString()}`}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              )}
+
+              {/* Display existing applications found by phone */}
+              {duplicateData.applications.byPhone.length > 0 && (
+                <Box mt={2}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    Existing applications with the same phone number:
+                  </Typography>
+                  <List dense>
+                    {duplicateData.applications.byPhone.map((app) => (
+                      <ListItem key={app.id}>
+                        <ListItemText
+                          primary={`${app.name} - ${
+                            typeof app.program === "object" &&
+                            app.program !== null
+                              ? app.program.name ||
+                                app.program.code ||
+                                "Unknown Program"
+                              : app.program || "Unknown Program"
+                          }`}
+                          secondary={`Status: ${
+                            app.status
+                          } | Submitted: ${new Date(
+                            app.submittedAt
+                          ).toLocaleDateString()}`}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              )}
+
+              {/* Display existing leads found by email */}
+              {duplicateData.leads.byEmail && (
+                <Box mt={2}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    Existing lead with the same email:
+                  </Typography>
+                  <List dense>
+                    <ListItem>
+                      <ListItemText
+                        primary={`${duplicateData.leads.byEmail.name} - ${
+                          typeof duplicateData.leads.byEmail.program ===
+                            "object" &&
+                          duplicateData.leads.byEmail.program !== null
+                            ? duplicateData.leads.byEmail.program.name ||
+                              duplicateData.leads.byEmail.program.code ||
+                              "No Program"
+                            : duplicateData.leads.byEmail.program ||
+                              "No Program"
+                        }`}
+                        secondary={`Status: ${
+                          duplicateData.leads.byEmail.status
+                        } | Created: ${new Date(
+                          duplicateData.leads.byEmail.createdAt
+                        ).toLocaleDateString()}`}
+                      />
+                    </ListItem>
+                  </List>
+                </Box>
+              )}
+
+              {/* Display existing leads found by phone */}
+              {duplicateData.leads.byPhone && (
+                <Box mt={2}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    Existing lead with the same phone number:
+                  </Typography>
+                  <List dense>
+                    <ListItem>
+                      <ListItemText
+                        primary={`${duplicateData.leads.byPhone.name} - ${
+                          typeof duplicateData.leads.byPhone.program ===
+                            "object" &&
+                          duplicateData.leads.byPhone.program !== null
+                            ? duplicateData.leads.byPhone.program.name ||
+                              duplicateData.leads.byPhone.program.code ||
+                              "No Program"
+                            : duplicateData.leads.byPhone.program ||
+                              "No Program"
+                        }`}
+                        secondary={`Status: ${
+                          duplicateData.leads.byPhone.status
+                        } | Created: ${new Date(
+                          duplicateData.leads.byPhone.createdAt
+                        ).toLocaleDateString()}`}
+                      />
+                    </ListItem>
+                  </List>
+                </Box>
+              )}
+            </Box>
+          )}
+
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Do you want to proceed with submitting this application anyway?
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setShowDuplicateDialog(false)}
+            color="primary"
+            variant="outlined"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              setShowDuplicateDialog(false);
+              setLocalSubmitting(true); // Set local submitting state
+
+              try {
+                // Force submit the application
+                const result = await submitApplication(true);
+
+                if (result.success) {
+                  console.log(
+                    "Application force submitted successfully:",
+                    result
+                  );
+                  setSubmissionMessage({
+                    type: "success",
+                    message:
+                      "Application submitted successfully! Your application ID is: " +
+                      (result.application?.id ||
+                        result.application?.applicationNumber ||
+                        "Generated"),
+                  });
+
+                  // Process immediately but keep success message visible
+                  onSuccess(result);
+                  // Close after a short delay so users can see confirmation
+                  setTimeout(() => {
+                    handleClose();
+                  }, 1000);
+                } else {
+                  console.error("Application force submission failed:", result);
+                  setSubmissionMessage({
+                    type: "error",
+                    message:
+                      result.message ||
+                      "Failed to submit application. Please try again.",
+                  });
+                }
+              } catch (error) {
+                console.error("Error during force submission:", error);
+                setSubmissionMessage({
+                  type: "error",
+                  message:
+                    error.message ||
+                    "An unexpected error occurred during submission.",
+                });
+              } finally {
+                setLocalSubmitting(false);
+              }
+            }}
+            color="warning"
+            variant="contained"
+            disabled={isSubmitting || localSubmitting}
+            startIcon={
+              isSubmitting || localSubmitting ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : null
+            }
+          >
+            Submit Anyway
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 

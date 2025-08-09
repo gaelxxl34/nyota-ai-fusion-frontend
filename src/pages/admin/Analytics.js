@@ -58,10 +58,14 @@ import {
 import { analyticsService } from "../../services/analyticsService";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRolePermissions } from "../../hooks/useRolePermissions";
+import { PERMISSIONS } from "../../config/roles.config";
 
 const Analytics = () => {
-  const { checkPermission } = useRolePermissions();
+  const { checkPermission, role, getLeadStageRange } = useRolePermissions();
   const { user } = useAuth();
+
+  // Check if user has permission to view analytics
+  const hasAnalyticsPermission = checkPermission(PERMISSIONS.ANALYTICS);
 
   // State
   const [timeRange, setTimeRange] = useState("daily");
@@ -76,6 +80,97 @@ const Analytics = () => {
     dailyTrends: [],
   });
 
+  // Helper function to format role names for display
+  const formatRoleName = (role) => {
+    const roleMap = {
+      marketingAgent: "Marketing Agent",
+      admissionAgent: "Admission Agent",
+      admin: "Admin",
+      superAdmin: "Super Admin",
+    };
+    return roleMap[role] || role;
+  };
+
+  // Helper function to get role color
+  const getRoleColor = (role) => {
+    switch (role) {
+      case "marketingAgent":
+        return "primary";
+      case "admissionAgent":
+        return "secondary";
+      default:
+        return "default";
+    }
+  };
+
+  // Filter analytics data based on user role
+  const filterAnalyticsDataByRole = (data) => {
+    // If role is admin or superAdmin, return all data
+    if (role === "admin" || role === "superAdmin") {
+      return data;
+    }
+
+    // For admissionAdmin, filter to only show admission-related stages
+    if (role === "admissionAdmin") {
+      // Get the role's lead stage access
+      const stageAccess = getLeadStageRange();
+
+      // Filter progression data
+      const filteredProgression = data.progression?.map((day) => {
+        const filtered = { ...day };
+        // Remove stages that aren't relevant to admission admin
+        if (filtered.contacted !== undefined) delete filtered.contacted;
+        if (filtered.preQualified !== undefined) delete filtered.preQualified;
+        return filtered;
+      });
+
+      // Filter agent performance to only admission agents or only show admission-related metrics
+      const filteredAgentPerformance = data.agentPerformance?.filter(
+        (agent) =>
+          agent.role === "admissionAgent" ||
+          agent.role === "admin" ||
+          agent.role === "admissionAdmin"
+      );
+
+      // Filter status counts to only include stages in the admissionAdmin's access
+      const filteredStatusCounts = { ...data.overview?.statusCounts };
+      if (filteredStatusCounts) {
+        // Clear stages that shouldn't be visible
+        if (filteredStatusCounts.CONTACTED !== undefined)
+          delete filteredStatusCounts.CONTACTED;
+        if (filteredStatusCounts.PRE_QUALIFIED !== undefined)
+          delete filteredStatusCounts.PRE_QUALIFIED;
+      }
+
+      // Only keep conversion rates relevant to admission admin
+      const filteredConversionRates = {
+        rates: {
+          appliedToQualified:
+            data.conversionRates?.rates?.appliedToQualified || 0,
+          qualifiedToEnrolled:
+            data.conversionRates?.rates?.qualifiedToEnrolled || 0,
+          overallConversion:
+            data.conversionRates?.rates?.overallConversion || 0,
+        },
+      };
+
+      return {
+        ...data,
+        progression: filteredProgression,
+        agentPerformance: filteredAgentPerformance,
+        overview: {
+          ...data.overview,
+          statusCounts: filteredStatusCounts,
+        },
+        conversionRates: filteredConversionRates,
+      };
+    }
+
+    // For other roles, return filtered data according to their permissions
+    // (currently just returns unfiltered data - implement as needed)
+    return data;
+  };
+
   // Define colors for different statuses
   const statusColors = {
     CONTACTED: "#2196F3",
@@ -84,6 +179,14 @@ const Analytics = () => {
     QUALIFIED: "#4CAF50",
     ENROLLED: "#8BC34A",
   };
+
+  // Update the page title based on user role
+  useEffect(() => {
+    document.title =
+      role === "admissionAdmin"
+        ? "Admissions Analytics Dashboard"
+        : "Analytics Dashboard";
+  }, [role]);
 
   // Fetch analytics data
   const fetchAnalyticsData = async () => {
@@ -94,10 +197,13 @@ const Analytics = () => {
       // Fetch all analytics data from the API
       const allData = await analyticsService.getAllAnalytics(timeRange);
 
+      // Filter data based on user role permissions
+      const filteredData = filterAnalyticsDataByRole(allData);
+
       // Transform the data to match our component's expected format
       const transformedData = {
-        statusProgression: allData.progression || [],
-        agentPerformance: allData.agentPerformance || [],
+        statusProgression: filteredData.progression || [],
+        agentPerformance: filteredData.agentPerformance || [],
         leadsByStatus: allData.overview?.statusCounts || {
           CONTACTED: 0,
           PRE_QUALIFIED: 0,
@@ -136,7 +242,23 @@ const Analytics = () => {
   const handleExport = async () => {
     try {
       setExportLoading(true);
-      await analyticsService.exportAnalytics(timeRange, "csv");
+
+      // Check if user has export permission
+      if (!checkPermission(PERMISSIONS.EXPORT_DATA)) {
+        setError("You don't have permission to export data");
+        return;
+      }
+
+      // For admission admin, specify what data to export
+      const exportOptions =
+        role === "admissionAdmin"
+          ? {
+              role: "admissionAdmin",
+              stages: ["APPLIED", "QUALIFIED", "ENROLLED"],
+            }
+          : {};
+
+      await analyticsService.exportAnalytics(timeRange, "csv", exportOptions);
     } catch (error) {
       setError("Failed to export analytics data");
     } finally {
@@ -204,6 +326,17 @@ const Analytics = () => {
     );
   };
 
+  // If user doesn't have permission to view analytics, show error message
+  if (!hasAnalyticsPermission) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error" sx={{ mb: 3 }}>
+          You don't have permission to access the analytics dashboard.
+        </Alert>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
@@ -219,10 +352,14 @@ const Analytics = () => {
       >
         <Box>
           <Typography variant="h4" gutterBottom>
-            Analytics Dashboard
+            {role === "admissionAdmin"
+              ? "Admissions Analytics Dashboard"
+              : "Analytics Dashboard"}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Track lead progression and agent performance metrics
+            {role === "admissionAdmin"
+              ? "Track admission stage metrics and performance"
+              : "Track lead progression and agent performance metrics"}
           </Typography>
         </Box>
         <Box
@@ -255,21 +392,23 @@ const Analytics = () => {
           <IconButton onClick={fetchAnalyticsData} disabled={loading}>
             <RefreshIcon />
           </IconButton>
-          <Button
-            variant="outlined"
-            startIcon={exportLoading ? null : <DownloadIcon />}
-            onClick={handleExport}
-            disabled={loading || exportLoading}
-          >
-            {exportLoading ? (
-              <>
-                <CircularProgress size={20} sx={{ mr: 1 }} />
-                Exporting...
-              </>
-            ) : (
-              "Export"
-            )}
-          </Button>
+          {checkPermission(PERMISSIONS.EXPORT_DATA) && (
+            <Button
+              variant="outlined"
+              startIcon={exportLoading ? null : <DownloadIcon />}
+              onClick={handleExport}
+              disabled={loading || exportLoading}
+            >
+              {exportLoading ? (
+                <>
+                  <CircularProgress size={20} sx={{ mr: 1 }} />
+                  Exporting...
+                </>
+              ) : (
+                "Export"
+              )}
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -436,25 +575,41 @@ const Analytics = () => {
         <>
           {/* Status Overview Cards */}
           <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <StatusCard
-                title="Contacted"
-                value={analyticsData.leadsByStatus.CONTACTED || 0}
-                icon={WhatsAppIcon}
-                color="info"
-                subtitle={`vs last ${timeRange}`}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <StatusCard
-                title="Interested"
-                value={analyticsData.leadsByStatus.PRE_QUALIFIED || 0}
-                icon={AssessmentIcon}
-                color="warning"
-                subtitle={`vs last ${timeRange}`}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
+            {/* Only show Contacted and Interested cards if not admission admin */}
+            {role !== "admissionAdmin" && (
+              <>
+                <Grid
+                  item
+                  xs={12}
+                  sm={6}
+                  md={role === "admissionAdmin" ? 4 : 2.4}
+                >
+                  <StatusCard
+                    title="Contacted"
+                    value={analyticsData.leadsByStatus.CONTACTED || 0}
+                    icon={WhatsAppIcon}
+                    color="info"
+                    subtitle={`vs last ${timeRange}`}
+                  />
+                </Grid>
+                <Grid
+                  item
+                  xs={12}
+                  sm={6}
+                  md={role === "admissionAdmin" ? 4 : 2.4}
+                >
+                  <StatusCard
+                    title="Interested"
+                    value={analyticsData.leadsByStatus.PRE_QUALIFIED || 0}
+                    icon={AssessmentIcon}
+                    color="warning"
+                    subtitle={`vs last ${timeRange}`}
+                  />
+                </Grid>
+              </>
+            )}
+            {/* All roles see Applied, Qualified and Enrolled */}
+            <Grid item xs={12} sm={6} md={role === "admissionAdmin" ? 4 : 2.4}>
               <StatusCard
                 title="Applied"
                 value={analyticsData.leadsByStatus.APPLIED || 0}
@@ -463,7 +618,7 @@ const Analytics = () => {
                 subtitle={`vs last ${timeRange}`}
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
+            <Grid item xs={12} sm={6} md={role === "admissionAdmin" ? 4 : 2.4}>
               <StatusCard
                 title="Qualified"
                 value={analyticsData.leadsByStatus.QUALIFIED || 0}
@@ -472,7 +627,7 @@ const Analytics = () => {
                 subtitle={`vs last ${timeRange}`}
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
+            <Grid item xs={12} sm={6} md={role === "admissionAdmin" ? 4 : 2.4}>
               <StatusCard
                 title="Enrolled"
                 value={analyticsData.leadsByStatus.ENROLLED || 0}
@@ -504,20 +659,26 @@ const Analytics = () => {
                     <YAxis />
                     <RechartsTooltip />
                     <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="contacted"
-                      stroke={statusColors.CONTACTED}
-                      name="Contacted"
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="preQualified"
-                      stroke={statusColors.PRE_QUALIFIED}
-                      name="Interested"
-                      strokeWidth={2}
-                    />
+                    {/* Only show marketing stages if not admission admin */}
+                    {role !== "admissionAdmin" && (
+                      <>
+                        <Line
+                          type="monotone"
+                          dataKey="contacted"
+                          stroke={statusColors.CONTACTED}
+                          name="Contacted"
+                          strokeWidth={2}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="preQualified"
+                          stroke={statusColors.PRE_QUALIFIED}
+                          name="Interested"
+                          strokeWidth={2}
+                        />
+                      </>
+                    )}
+                    {/* Always show admission stages */}
                     <Line
                       type="monotone"
                       dataKey="applied"
@@ -559,55 +720,71 @@ const Analytics = () => {
                 </Typography>
 
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <Box>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        mb: 1,
-                      }}
-                    >
-                      <Typography variant="body2">
-                        Contacted → Interested
-                      </Typography>
-                      <Typography variant="body2" fontWeight="bold">
-                        {analyticsData.conversionRates.contactedToPreQualified}%
-                      </Typography>
-                    </Box>
-                    <LinearProgress
-                      variant="determinate"
-                      value={parseFloat(
-                        analyticsData.conversionRates.contactedToPreQualified
-                      )}
-                      sx={{ height: 8, borderRadius: 4 }}
-                    />
-                  </Box>
+                  {/* Only show marketing related conversions if not admission admin */}
+                  {role !== "admissionAdmin" && (
+                    <>
+                      <Box>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            mb: 1,
+                          }}
+                        >
+                          <Typography variant="body2">
+                            Contacted → Interested
+                          </Typography>
+                          <Typography variant="body2" fontWeight="bold">
+                            {
+                              analyticsData.conversionRates
+                                .contactedToPreQualified
+                            }
+                            %
+                          </Typography>
+                        </Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={parseFloat(
+                            analyticsData.conversionRates
+                              .contactedToPreQualified || 0
+                          )}
+                          sx={{ height: 8, borderRadius: 4 }}
+                        />
+                      </Box>
 
-                  <Box>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        mb: 1,
-                      }}
-                    >
-                      <Typography variant="body2">
-                        Interested → Applied
-                      </Typography>
-                      <Typography variant="body2" fontWeight="bold">
-                        {analyticsData.conversionRates.preQualifiedToApplied}%
-                      </Typography>
-                    </Box>
-                    <LinearProgress
-                      variant="determinate"
-                      value={parseFloat(
-                        analyticsData.conversionRates.preQualifiedToApplied
-                      )}
-                      sx={{ height: 8, borderRadius: 4 }}
-                      color="warning"
-                    />
-                  </Box>
+                      <Box>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            mb: 1,
+                          }}
+                        >
+                          <Typography variant="body2">
+                            Interested → Applied
+                          </Typography>
+                          <Typography variant="body2" fontWeight="bold">
+                            {
+                              analyticsData.conversionRates
+                                .preQualifiedToApplied
+                            }
+                            %
+                          </Typography>
+                        </Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={parseFloat(
+                            analyticsData.conversionRates
+                              .preQualifiedToApplied || 0
+                          )}
+                          sx={{ height: 8, borderRadius: 4 }}
+                          color="warning"
+                        />
+                      </Box>
+                    </>
+                  )}
 
+                  {/* Always show admission related conversions */}
                   <Box>
                     <Box
                       sx={{
@@ -626,7 +803,7 @@ const Analytics = () => {
                     <LinearProgress
                       variant="determinate"
                       value={parseFloat(
-                        analyticsData.conversionRates.appliedToQualified
+                        analyticsData.conversionRates.appliedToQualified || 0
                       )}
                       sx={{ height: 8, borderRadius: 4 }}
                       color="info"
@@ -651,7 +828,7 @@ const Analytics = () => {
                     <LinearProgress
                       variant="determinate"
                       value={parseFloat(
-                        analyticsData.conversionRates.qualifiedToEnrolled
+                        analyticsData.conversionRates.qualifiedToEnrolled || 0
                       )}
                       sx={{ height: 8, borderRadius: 4 }}
                       color="success"
@@ -695,8 +872,8 @@ const Analytics = () => {
               Agent Performance Report
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Individual performance metrics for marketing managers and
-              admissions officers
+              Individual performance metrics for marketing agents and admission
+              agents
             </Typography>
 
             <TableContainer>
@@ -706,8 +883,12 @@ const Analytics = () => {
                     <TableCell>Agent</TableCell>
                     <TableCell>Role</TableCell>
                     <TableCell align="center">Leads Submitted</TableCell>
-                    <TableCell align="center">Contacted</TableCell>
-                    <TableCell align="center">Interested</TableCell>
+                    {role !== "admissionAdmin" && (
+                      <>
+                        <TableCell align="center">Contacted</TableCell>
+                        <TableCell align="center">Interested</TableCell>
+                      </>
+                    )}
                     <TableCell align="center">Applied</TableCell>
                     <TableCell align="center">Qualified</TableCell>
                     <TableCell align="center">Enrolled</TableCell>
@@ -762,13 +943,9 @@ const Analytics = () => {
                         </TableCell>
                         <TableCell>
                           <Chip
-                            label={agent.role}
+                            label={formatRoleName(agent.role)}
                             size="small"
-                            color={
-                              agent.role === "Marketing Manager"
-                                ? "primary"
-                                : "secondary"
-                            }
+                            color={getRoleColor(agent.role)}
                             variant="outlined"
                           />
                         </TableCell>
@@ -777,12 +954,18 @@ const Analytics = () => {
                             {agent.leadsSubmitted}
                           </Typography>
                         </TableCell>
-                        <TableCell align="center">
-                          {agent.contacted > 0 ? agent.contacted : "-"}
-                        </TableCell>
-                        <TableCell align="center">
-                          {agent.preQualified > 0 ? agent.preQualified : "-"}
-                        </TableCell>
+                        {role !== "admissionAdmin" && (
+                          <>
+                            <TableCell align="center">
+                              {agent.contacted > 0 ? agent.contacted : "-"}
+                            </TableCell>
+                            <TableCell align="center">
+                              {agent.preQualified > 0
+                                ? agent.preQualified
+                                : "-"}
+                            </TableCell>
+                          </>
+                        )}
                         <TableCell align="center">
                           {agent.applied > 0 ? agent.applied : "-"}
                         </TableCell>

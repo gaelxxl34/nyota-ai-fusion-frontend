@@ -88,6 +88,75 @@ const Layout = ({ children }) => {
       ];
     }
 
+    // Admission Admin menu
+    if (role === "admissionAdmin") {
+      const admissionAdminItems = [
+        {
+          text: "Dashboard",
+          icon: <DashboardIcon />,
+          path: "/admission-admin/dashboard",
+        },
+      ];
+
+      // Add admin-level items for admission admin
+      if (checkPermission(role, PERMISSIONS.LEADS_OVERVIEW)) {
+        admissionAdminItems.push({
+          text: "Leads Overview",
+          icon: <InsightsIcon />,
+          path: "/admin/leads",
+        });
+      }
+
+      if (checkPermission(role, PERMISSIONS.CHAT_CONFIG)) {
+        admissionAdminItems.push({
+          text: "Chat Configuration",
+          icon: <ChatIcon />,
+          path: "/admin/chat-config",
+        });
+      }
+
+      // Knowledge Base is available to all admin roles
+      admissionAdminItems.push({
+        text: "Knowledge Base",
+        icon: <KnowledgeBaseIcon />,
+        path: "/admin/knowledge-base",
+      });
+
+      if (checkPermission(role, PERMISSIONS.DATA_CENTER)) {
+        admissionAdminItems.push({
+          text: "Data Center",
+          icon: <DataCenterIcon />,
+          path: "/admin/data-center",
+        });
+      }
+
+      if (checkPermission(role, PERMISSIONS.ANALYTICS)) {
+        admissionAdminItems.push({
+          text: "Analytics",
+          icon: <InsightsIcon />,
+          path: "/admin/analytics",
+        });
+      }
+
+      if (checkPermission(role, PERMISSIONS.TEAM)) {
+        admissionAdminItems.push({
+          text: "Team",
+          icon: <PeopleIcon />,
+          path: "/admin/team",
+        });
+      }
+
+      if (checkPermission(role, PERMISSIONS.SETTINGS)) {
+        admissionAdminItems.push({
+          text: "Settings",
+          icon: <SettingsIcon />,
+          path: "/admin/settings",
+        });
+      }
+
+      return admissionAdminItems;
+    }
+
     // Admin level menu based on permissions (for IUEA admins and staff)
     const adminMenuItems = [];
 
@@ -131,7 +200,10 @@ const Layout = ({ children }) => {
       });
     }
 
-    if (checkPermission(role, PERMISSIONS.TEAM) && role === "admin") {
+    if (
+      checkPermission(role, PERMISSIONS.TEAM) &&
+      (role === "admin" || role === "admissionAdmin")
+    ) {
       adminMenuItems.push({
         text: "Team",
         icon: <PeopleIcon />,
@@ -184,7 +256,7 @@ const Layout = ({ children }) => {
         <Typography variant="body2" color="primary.contrastText" align="center">
           {getUserRole()}
         </Typography>
-        {getUserRole() === "admin" && (
+        {(getUserRole() === "admin" || getUserRole() === "admissionAdmin") && (
           <Typography
             variant="caption"
             color="primary.contrastText"

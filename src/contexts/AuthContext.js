@@ -134,6 +134,8 @@ export const AuthProvider = ({ children }) => {
         return "/super-admin/dashboard";
       case "admin":
         return "/admin/leads";
+      case "admissionAdmin":
+        return "/admission-admin/dashboard";
       case "marketingAgent":
         return "/admin/chat-config";
       case "admissionAgent":
@@ -150,6 +152,8 @@ export const AuthProvider = ({ children }) => {
         return "/super-admin/dashboard";
       case "admin":
         return "/admin/leads";
+      case "admissionAdmin":
+        return "/admission-admin/dashboard";
       case "marketingAgent":
         return "/admin/chat-config";
       case "admissionAgent":
@@ -189,7 +193,8 @@ export const AuthProvider = ({ children }) => {
       login,
       logout,
       isSuperAdmin: () => getUserRole() === "superAdmin",
-      isAdmin: () => getUserRole() === "admin",
+      isAdmin: () =>
+        getUserRole() === "admin" || getUserRole() === "admissionAdmin",
       hasPermission,
       getUserRole,
       getRedirectPath,

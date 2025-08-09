@@ -184,7 +184,12 @@ export const useLeadManagement = ({
           lead.name?.toLowerCase().includes(searchTerm) ||
           lead.email?.toLowerCase().includes(searchTerm) ||
           lead.phone?.includes(searchTerm) ||
-          lead.program?.toLowerCase().includes(searchTerm) ||
+          (typeof lead.program === "string" &&
+            lead.program?.toLowerCase().includes(searchTerm)) ||
+          (typeof lead.program === "object" &&
+            lead.program !== null &&
+            (lead.program.name?.toLowerCase().includes(searchTerm) ||
+              lead.program.code?.toLowerCase().includes(searchTerm))) ||
           lead.id?.toLowerCase().includes(searchTerm)
       );
     }

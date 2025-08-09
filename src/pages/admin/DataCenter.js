@@ -29,6 +29,7 @@ import {
   Search as SearchIcon,
   Download as DownloadIcon,
   PersonAdd as PersonAddIcon,
+  Person as PersonIcon,
   School as SchoolIcon,
   ContactMail as ContactMailIcon,
   Assessment as AssessmentIcon,
@@ -44,6 +45,7 @@ import { useRolePermissions } from "../../hooks/useRolePermissions";
 import { PERMISSIONS } from "../../config/roles.config";
 import InquiryContactDialog from "../../components/InquiryContactDialog";
 import ApplicationFormDialog from "../../components/applications/ApplicationFormDialog";
+import ApplicationDetailsDialog from "../../components/applications/ApplicationDetailsDialog";
 import LeadActionMenu from "../../components/leads/LeadActionMenu";
 import LeadEditDialog from "../../components/leads/LeadEditDialog";
 import LeadDeleteDialog from "../../components/leads/LeadDeleteDialog";
@@ -57,9 +59,16 @@ const DataCenter = () => {
   const [currentTab, setCurrentTab] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [leads, setLeads] = useState([]);
+  const [personalLeads, setPersonalLeads] = useState([]); // State for "For You" tab
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+
+  // Helper function to check if user role is restricted for applied leads
+  const isRestrictedRole = (role) => {
+    const restrictedRoles = ["marketingAgent", "admin"];
+    return restrictedRoles.includes(role);
+  };
   const [tabSwitching, setTabSwitching] = useState(false);
   const [error, setError] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Add refresh trigger
@@ -81,6 +90,8 @@ const DataCenter = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [conversationDialogOpen, setConversationDialogOpen] = useState(false);
+  const [viewApplicationDialogOpen, setViewApplicationDialogOpen] =
+    useState(false);
   // const { } = useAuth(); // Keep for future use
 
   // Define lead status categories for tabs
@@ -101,6 +112,13 @@ const DataCenter = () => {
         ],
         icon: ContactMailIcon,
         color: "primary",
+      },
+      {
+        label: "For You",
+        statuses: [], // Will be filtered by submittedBy instead of status
+        icon: PersonIcon,
+        color: "secondary",
+        isPersonal: true, // Special flag to indicate this shows personal submissions
       },
       {
         label: "Contacted",
@@ -153,6 +171,35 @@ const DataCenter = () => {
 
     const filtered = leadStatusTabs
       .filter((tab) => {
+        // "For You" tab - only show to agents (not admins)
+        if (tab.label === "For You") {
+          const agentRoles = ["marketingAgent", "admissionAgent"];
+          return agentRoles.includes(userRole);
+        }
+
+        // Admission Admin restrictions - only show Applied, Qualified, Admitted, Enrolled
+        if (userRole === "admissionAdmin") {
+          const allowedStatuses = [
+            "APPLIED",
+            "QUALIFIED",
+            "ADMITTED",
+            "ENROLLED",
+          ];
+
+          if (tab.label === "All Leads") {
+            const accessibleStatuses = tab.statuses.filter((status) =>
+              allowedStatuses.includes(status)
+            );
+            return accessibleStatuses.length > 0;
+          }
+
+          // For other tabs, check if they contain allowed statuses
+          const hasAllowedStatus = tab.statuses.some((status) =>
+            allowedStatuses.includes(status)
+          );
+          return hasAllowedStatus;
+        }
+
         // All Leads tab - filter statuses based on access
         if (tab.label === "All Leads") {
           const accessibleStatuses = tab.statuses.filter((status) => {
@@ -172,6 +219,22 @@ const DataCenter = () => {
         return hasAccess;
       })
       .map((tab) => {
+        // For Admission Admin, filter All Leads statuses to only show allowed ones
+        if (userRole === "admissionAdmin" && tab.label === "All Leads") {
+          const allowedStatuses = [
+            "APPLIED",
+            "QUALIFIED",
+            "ADMITTED",
+            "ENROLLED",
+          ];
+          return {
+            ...tab,
+            statuses: tab.statuses.filter((status) =>
+              allowedStatuses.includes(status)
+            ),
+          };
+        }
+
         // For All Leads tab, filter the statuses
         if (tab.label === "All Leads") {
           return {
@@ -235,7 +298,15 @@ const DataCenter = () => {
 
       let leadsResponse;
 
-      if (currentTabConfig.label === "All Leads") {
+      if (currentTabConfig.label === "For You") {
+        // Special handling for "For You" tab - fetch personal submissions
+        leadsResponse = await leadService.getMySubmittedLeads({
+          page: Math.floor(currentOffset / limit) + 1,
+          limit,
+          sortBy: "createdAt",
+          sortOrder: "desc",
+        });
+      } else if (currentTabConfig.label === "All Leads") {
         leadsResponse = await leadService.getAllLeads({
           limit,
           offset: currentOffset,
@@ -259,7 +330,12 @@ const DataCenter = () => {
         if (currentTabConfig.statuses.length === 1) {
           leadsResponse = await leadService.getLeadsByStatus(
             currentTabConfig.statuses[0],
-            { limit, offset: currentOffset }
+            {
+              limit,
+              offset: currentOffset,
+              sortBy: "createdAt",
+              sortOrder: "desc",
+            }
           );
         } else {
           leadsResponse = await leadService.getAllLeads({
@@ -420,7 +496,16 @@ const DataCenter = () => {
 
         let leadsResponse;
 
-        if (currentTabConfig.label === "All Leads") {
+        if (currentTabConfig.label === "For You") {
+          // Special handling for "For You" tab - fetch personal submissions
+          leadsResponse = await leadService.getMySubmittedLeads({
+            limit,
+            page: 1,
+            sortBy: "createdAt",
+            sortOrder: "desc",
+          });
+          setPersonalLeads(leadsResponse.data || []);
+        } else if (currentTabConfig.label === "All Leads") {
           leadsResponse = await leadService.getAllLeads({
             limit,
             offset: 0,
@@ -444,7 +529,12 @@ const DataCenter = () => {
           if (currentTabConfig.statuses.length === 1) {
             leadsResponse = await leadService.getLeadsByStatus(
               currentTabConfig.statuses[0],
-              { limit, offset: 0 }
+              {
+                limit,
+                offset: 0,
+                sortBy: "createdAt",
+                sortOrder: "desc",
+              }
             );
           } else {
             // For tabs with multiple statuses, get all leads and filter
@@ -514,21 +604,44 @@ const DataCenter = () => {
     const currentTabConfig = filteredTabs[currentTab];
     if (!currentTabConfig) return [];
 
+    // Special handling for "For You" tab
+    if (currentTabConfig.label === "For You") {
+      return personalLeads;
+    }
+
     // Since we're already filtering in the API calls, we should return all leads
     // The leads state already contains the filtered data for the current tab
     return leads;
-  }, [leads, currentTab, filteredTabs]);
+  }, [leads, personalLeads, currentTab, filteredTabs]);
 
   // Get tab count for badge display
   const getTabCount = useCallback(
-    (statuses) => {
+    (statuses, tabLabel) => {
+      // Special handling for "For You" tab
+      if (tabLabel === "For You") {
+        return personalLeads.length;
+      }
+
       // Use stats data for accurate counts
       return statuses.reduce((total, status) => {
         return total + (leadStats.byStatus[status] || 0);
       }, 0);
     },
-    [leadStats]
+    [leadStats, personalLeads]
   );
+
+  // Get visible total count based on user role
+  const getVisibleTotal = useMemo(() => {
+    if (userRole === "admissionAdmin") {
+      // Only count Applied, Qualified, Admitted, Enrolled
+      const allowedStatuses = ["APPLIED", "QUALIFIED", "ADMITTED", "ENROLLED"];
+      return allowedStatuses.reduce((total, status) => {
+        return total + (leadStats.byStatus[status] || 0);
+      }, 0);
+    }
+    // For other roles, return the full total
+    return leadStats.total || 0;
+  }, [userRole, leadStats]);
 
   // Get stats cards based on user role
   const getVisibleStatsCards = () => {
@@ -584,20 +697,24 @@ const DataCenter = () => {
       },
     ];
 
-    switch (userRole) {
-      case "marketingAgent":
-        // Marketing agents don't see admitted/enrolled stats
-        return allCards.filter(
-          (card) => !["admitted", "enrolled"].includes(card.key)
-        );
-      case "admissionAgent":
-        // Admission agents don't see interested/contacted stats
-        return allCards.filter(
-          (card) => !["interested", "contacted"].includes(card.key)
-        );
-      case "organizationAdmin":
-      default:
-        return allCards;
+    if (userRole === "admissionAdmin") {
+      // Admission admins only see Applied, Qualified, Admitted, Enrolled
+      return allCards.filter((card) =>
+        ["applied", "qualified", "admitted", "enrolled"].includes(card.key)
+      );
+    } else if (userRole === "marketingAgent") {
+      // Marketing agents don't see admitted/enrolled stats
+      return allCards.filter(
+        (card) => !["admitted", "enrolled"].includes(card.key)
+      );
+    } else if (userRole === "admissionAgent") {
+      // Admission agents don't see interested/contacted stats
+      return allCards.filter(
+        (card) => !["interested", "contacted"].includes(card.key)
+      );
+    } else {
+      // Default: admin and others see all cards
+      return allCards;
     }
   };
 
@@ -648,20 +765,24 @@ const DataCenter = () => {
       },
     ];
 
-    switch (userRole) {
-      case "marketingAgent":
-        // Marketing agents see up to qualified
-        return allStages.filter(
-          (stage) => !["admitted", "enrolled"].includes(stage.key)
-        );
-      case "admissionAgent":
-        // Admission agents see from applied onwards
-        return allStages.filter(
-          (stage) => !["contacted", "interested"].includes(stage.key)
-        );
-      case "organizationAdmin":
-      default:
-        return allStages;
+    if (userRole === "admissionAdmin") {
+      // Admission admins only see Applied, Qualified, Admitted, Enrolled
+      return allStages.filter((stage) =>
+        ["applied", "qualified", "admitted", "enrolled"].includes(stage.key)
+      );
+    } else if (userRole === "marketingAgent") {
+      // Marketing agents see up to qualified
+      return allStages.filter(
+        (stage) => !["admitted", "enrolled"].includes(stage.key)
+      );
+    } else if (userRole === "admissionAgent") {
+      // Admission agents see from applied onwards
+      return allStages.filter(
+        (stage) => !["contacted", "interested"].includes(stage.key)
+      );
+    } else {
+      // Default: admin and others see all stages
+      return allStages;
     }
   };
 
@@ -676,7 +797,12 @@ const DataCenter = () => {
         lead.name?.toLowerCase().includes(lowerSearchTerm) ||
         lead.email?.toLowerCase().includes(lowerSearchTerm) ||
         lead.phone?.toLowerCase().includes(lowerSearchTerm) ||
-        lead.program?.toLowerCase().includes(lowerSearchTerm) ||
+        (typeof lead.program === "string" &&
+          lead.program?.toLowerCase().includes(lowerSearchTerm)) ||
+        (typeof lead.program === "object" &&
+          lead.program !== null &&
+          (lead.program.name?.toLowerCase().includes(lowerSearchTerm) ||
+            lead.program.code?.toLowerCase().includes(lowerSearchTerm))) ||
         lead.source?.toLowerCase().includes(lowerSearchTerm)
     );
   }, [getCurrentTabLeads, searchTerm]);
@@ -722,28 +848,73 @@ const DataCenter = () => {
       minute: "2-digit",
     };
 
-    if (dateValue instanceof Date) {
-      return dateValue.toLocaleString(undefined, dateTimeOptions);
+    try {
+      // Handle Date objects
+      if (dateValue instanceof Date) {
+        return dateValue.toLocaleString("en-US", dateTimeOptions);
+      }
+
+      // Handle Firestore Timestamps or similar objects with seconds
+      if (typeof dateValue === "object" && dateValue.seconds) {
+        return new Date(dateValue.seconds * 1000).toLocaleString(
+          "en-US",
+          dateTimeOptions
+        );
+      }
+
+      // Handle string dates and ISO format
+      if (typeof dateValue === "string") {
+        // Try to handle different string formats
+        const date = new Date(dateValue);
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleString("en-US", dateTimeOptions);
+        }
+
+        // If the standard parsing fails, try different formats:
+        // Try to parse date format like "DD/MM/YYYY" or "DD-MM-YYYY"
+        const parts = dateValue.split(/[\/\-\.]/);
+        if (parts.length === 3) {
+          // Try different date arrangements (US, European, etc)
+          const potentialDates = [
+            new Date(parts[2], parts[1] - 1, parts[0]), // DD/MM/YYYY
+            new Date(parts[2], parts[0] - 1, parts[1]), // MM/DD/YYYY
+            new Date(`${parts[2]}-${parts[1]}-${parts[0]}`), // Try ISO format YYYY-MM-DD
+          ];
+
+          for (const potentialDate of potentialDates) {
+            if (!isNaN(potentialDate.getTime())) {
+              return potentialDate.toLocaleString("en-US", dateTimeOptions);
+            }
+          }
+        }
+
+        // If we can't parse it, return the original string
+        return dateValue;
+      }
+
+      // Handle timestamp numbers
+      if (typeof dateValue === "number") {
+        return new Date(dateValue).toLocaleString("en-US", dateTimeOptions);
+      }
+    } catch (error) {
+      console.error("Error formatting date:", error, dateValue);
     }
 
-    if (typeof dateValue === "object" && dateValue.seconds) {
-      return new Date(dateValue.seconds * 1000).toLocaleString(
-        undefined,
-        dateTimeOptions
-      );
-    }
-
-    if (typeof dateValue === "string") {
-      return new Date(dateValue).toLocaleString(undefined, dateTimeOptions);
-    }
-
-    return "N/A";
+    return typeof dateValue === "string" ? dateValue : "N/A";
   };
 
   // Action handlers
   const handleEditLead = (lead) => {
     setSelectedLead(lead);
-    setEditDialogOpen(true);
+
+    // For APPLIED leads, always show the application details dialog
+    // We'll fetch by leadId if applicationId isn't available
+    if (lead.status === "APPLIED") {
+      setViewApplicationDialogOpen(true);
+    } else {
+      // For all other leads, show the edit dialog
+      setEditDialogOpen(true);
+    }
   };
 
   const handleConvertLead = (lead) => {
@@ -935,7 +1106,7 @@ const DataCenter = () => {
                   >
                     {card.status
                       ? leadStats.byStatus[card.status] || 0
-                      : leadStats.total}
+                      : getVisibleTotal}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {card.key === "total" && "All prospects in system"}
@@ -1014,9 +1185,9 @@ const DataCenter = () => {
                   color="primary.contrastText"
                   sx={{ fontWeight: "bold" }}
                 >
-                  {leadStats.total > 0
+                  {getVisibleTotal > 0
                     ? Math.round(
-                        ((leadStats.byStatus.ENROLLED || 0) / leadStats.total) *
+                        ((leadStats.byStatus.ENROLLED || 0) / getVisibleTotal) *
                           100
                       )
                     : 0}
@@ -1118,7 +1289,7 @@ const DataCenter = () => {
                     <Typography variant="h6">Contact Forms</Typography>
                   </Box>
                   <Typography variant="h4" color="primary">
-                    {leadStats.total || 0}
+                    {getVisibleTotal}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Total leads
@@ -1166,9 +1337,9 @@ const DataCenter = () => {
                     <Typography variant="h6">Conversion Rate</Typography>
                   </Box>
                   <Typography variant="h4" color="info.main">
-                    {leadStats.total > 0
+                    {getVisibleTotal > 0
                       ? Math.round(
-                          (applications.length / leadStats.total) * 100
+                          (applications.length / getVisibleTotal) * 100
                         )
                       : 0}
                     %
@@ -1194,7 +1365,7 @@ const DataCenter = () => {
               >
                 {filteredTabs.map((tab, index) => {
                   const TabIcon = tab.icon;
-                  const count = getTabCount(tab.statuses);
+                  const count = getTabCount(tab.statuses, tab.label);
                   const isCurrentTab = currentTab === index;
                   const showLoading = isCurrentTab && (loading || tabSwitching);
 
@@ -1233,7 +1404,7 @@ const DataCenter = () => {
                     sx={{ display: "flex", alignItems: "center", gap: 1 }}
                   >
                     <tab.icon />
-                    {tab.label} ({getTabCount(tab.statuses)})
+                    {tab.label} ({getTabCount(tab.statuses, tab.label)})
                   </Typography>
                   <Typography
                     variant="body2"
@@ -1241,7 +1412,13 @@ const DataCenter = () => {
                     sx={{ mb: 2 }}
                   >
                     {tab.label === "All Leads" &&
+                      userRole === "admissionAdmin" &&
+                      "Overview of admission-stage leads (Applied, Qualified, Admitted, Enrolled)"}
+                    {tab.label === "All Leads" &&
+                      userRole !== "admissionAdmin" &&
                       "Overview of all leads in the system across all stages"}
+                    {tab.label === "For You" &&
+                      "Leads that you personally submitted and are responsible for"}
                     {tab.label === "Interested" &&
                       "Leads that have shown interest and are ready for further engagement"}
                     {tab.label === "Applied" &&
@@ -1293,22 +1470,28 @@ const DataCenter = () => {
                       }}
                     />
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                      <Button
-                        variant="contained"
-                        startIcon={<WhatsAppIcon />}
-                        onClick={() => setInquiryDialogOpen(true)}
-                        color="success"
-                      >
-                        Add New Lead
-                      </Button>
-                      <Button
-                        variant="contained"
-                        startIcon={<AssignmentIcon />}
-                        onClick={() => setApplicationDialogOpen(true)}
-                        color="primary"
-                      >
-                        Add Applicant
-                      </Button>
+                      {userRole !== "admissionAdmin" &&
+                        userRole !== "admissionAgent" && (
+                          <Button
+                            variant="contained"
+                            startIcon={<WhatsAppIcon />}
+                            onClick={() => setInquiryDialogOpen(true)}
+                            color="success"
+                          >
+                            Add New Lead
+                          </Button>
+                        )}
+                      {(userRole === "admissionAdmin" ||
+                        userRole === "admissionAgent") && (
+                        <Button
+                          variant="contained"
+                          startIcon={<AssignmentIcon />}
+                          onClick={() => setApplicationDialogOpen(true)}
+                          color="primary"
+                        >
+                          Add Applicant
+                        </Button>
+                      )}
                       <IconButton
                         onClick={() => {
                           console.log("Manual refresh triggered");
@@ -1364,6 +1547,8 @@ const DataCenter = () => {
                               >
                                 {searchTerm
                                   ? "No leads found matching your search."
+                                  : tab.label === "For You"
+                                  ? "You haven't submitted any leads yet. Start by creating your first lead!"
                                   : `No leads found in ${tab.label} category.`}
                               </Typography>
                             </TableCell>
@@ -1396,7 +1581,12 @@ const DataCenter = () => {
                               </TableCell>
                               <TableCell>
                                 <Typography variant="body2">
-                                  {lead.program || "Not specified"}
+                                  {typeof lead.program === "object" &&
+                                  lead.program !== null
+                                    ? lead.program.name ||
+                                      lead.program.code ||
+                                      "Not specified"
+                                    : lead.program || "Not specified"}
                                 </Typography>
                               </TableCell>
                               <TableCell>
@@ -1420,38 +1610,82 @@ const DataCenter = () => {
                                     alignItems: "center",
                                   }}
                                 >
-                                  <Tooltip title="Edit Lead">
-                                    <IconButton
-                                      size="small"
-                                      color="primary"
-                                      onClick={() => handleEditLead(lead)}
-                                    >
-                                      <EditIcon />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip title="Start WhatsApp Conversation">
-                                    <IconButton
-                                      size="small"
-                                      color="success"
-                                      onClick={() =>
-                                        handleStartConversation(lead)
+                                  {/* View/Edit button - Marketing agents and admins can only view applied leads */}
+                                  {lead.status === "APPLIED" &&
+                                  isRestrictedRole(userRole) ? (
+                                    // Marketing agents and admins can only view applied leads
+                                    <Tooltip title="View Application">
+                                      <IconButton
+                                        size="small"
+                                        color="info"
+                                        onClick={() => handleEditLead(lead)}
+                                      >
+                                        <AssignmentIcon />
+                                      </IconButton>
+                                    </Tooltip>
+                                  ) : (
+                                    // Other users or non-applied leads can edit
+                                    <Tooltip
+                                      title={
+                                        lead.status === "APPLIED"
+                                          ? "View Application"
+                                          : "Edit Lead"
                                       }
-                                      disabled={
-                                        !lead.phone && !lead.phoneNumber
-                                      }
                                     >
-                                      <WhatsAppIcon />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip title="Delete Lead">
-                                    <IconButton
-                                      size="small"
-                                      color="error"
-                                      onClick={() => handleDeleteLead(lead)}
-                                    >
-                                      <DeleteIcon />
-                                    </IconButton>
-                                  </Tooltip>
+                                      <IconButton
+                                        size="small"
+                                        color={
+                                          lead.status === "APPLIED"
+                                            ? "info"
+                                            : "primary"
+                                        }
+                                        onClick={() => handleEditLead(lead)}
+                                      >
+                                        {lead.status === "APPLIED" ? (
+                                          <AssignmentIcon />
+                                        ) : (
+                                          <EditIcon />
+                                        )}
+                                      </IconButton>
+                                    </Tooltip>
+                                  )}
+
+                                  {/* WhatsApp button - Hidden for marketing agents and admins viewing applied leads */}
+                                  {!(
+                                    lead.status === "APPLIED" &&
+                                    isRestrictedRole(userRole)
+                                  ) && (
+                                    <Tooltip title="Start WhatsApp Conversation">
+                                      <IconButton
+                                        size="small"
+                                        color="success"
+                                        onClick={() =>
+                                          handleStartConversation(lead)
+                                        }
+                                        disabled={
+                                          !lead.phone && !lead.phoneNumber
+                                        }
+                                      >
+                                        <WhatsAppIcon />
+                                      </IconButton>
+                                    </Tooltip>
+                                  )}
+
+                                  {/* Delete button - Hidden for marketing agents and admins viewing applied leads */}
+                                  {!(
+                                    lead.status === "APPLIED" &&
+                                    isRestrictedRole(userRole)
+                                  ) && (
+                                    <Tooltip title="Delete Lead">
+                                      <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={() => handleDeleteLead(lead)}
+                                      >
+                                        <DeleteIcon />
+                                      </IconButton>
+                                    </Tooltip>
+                                  )}
                                 </Box>
                               </TableCell>
                             </TableRow>
@@ -1560,6 +1794,20 @@ const DataCenter = () => {
           setSelectedLead(null);
         }}
         lead={selectedLead}
+      />
+
+      {/* Application Details Dialog */}
+      <ApplicationDetailsDialog
+        open={viewApplicationDialogOpen}
+        onClose={() => {
+          setViewApplicationDialogOpen(false);
+          setSelectedLead(null);
+        }}
+        applicationId={selectedLead?.applicationId}
+        leadId={selectedLead?.id}
+        key={
+          selectedLead?.id
+        } /* Add key to force re-mount when different lead is selected */
       />
     </Box>
   );

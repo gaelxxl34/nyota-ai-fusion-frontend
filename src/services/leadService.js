@@ -367,4 +367,25 @@ export const leadService = {
       );
     }
   },
+
+  // Get leads submitted by current user (for "For You" tab)
+  async getMySubmittedLeads(options = {}) {
+    try {
+      const { page = 1, limit = 50, status } = options;
+      const params = { page, limit };
+
+      if (status) {
+        params.status = status;
+      }
+
+      const response = await axiosInstance.get("/api/leads/my-submissions", {
+        params,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch your submitted leads"
+      );
+    }
+  },
 };

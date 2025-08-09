@@ -26,11 +26,9 @@ import ChatMessageHandler from "../../services/chatMessageHandler";
 import ConversationService from "../../services/conversationService";
 import { useRolePermissions } from "../../hooks/useRolePermissions";
 import { useAuth } from "../../contexts/AuthContext";
-import { PERMISSIONS, LEAD_STAGES } from "../../config/roles.config";
 
 const ChatConfig = () => {
-  const { checkPermission, filterLeadsByRole, checkLeadStageAccess } =
-    useRolePermissions();
+  const { checkLeadStageAccess } = useRolePermissions();
   const { getUserRole } = useAuth();
   const userRole = getUserRole();
 
@@ -72,11 +70,11 @@ const ChatConfig = () => {
   // Define main tabs for each lead status plus Knowledge Base
   const allTabs = [
     {
-      label: "New Contacts",
-      type: "non_leads", // Special type for non-lead conversations
+      label: "New Contact",
+      statuses: ["NO_LEAD"],
       color: "warning.main",
-      icon: "📞",
-      tabId: "new-contacts-tab",
+      icon: "👋",
+      tabId: "new-contact-tab",
     },
     {
       label: "Contacted",
@@ -113,13 +111,7 @@ const ChatConfig = () => {
     console.log("🔑 ChatConfig permission check for user:", userRole);
 
     return allTabs.filter((tab) => {
-      // Always show New Contacts tab
-      if (tab.type === "non_leads") {
-        console.log(`  - Tab ${tab.label}: Always visible`);
-        return true;
-      }
-
-      // For other tabs, check if user has access to at least one status
+      // For tabs with statuses, check if user has access to at least one status
       if (tab.statuses && tab.statuses.length > 0) {
         const hasAccess = tab.statuses.some((status) => {
           const access = checkLeadStageAccess(status);
@@ -141,21 +133,34 @@ const ChatConfig = () => {
     return phoneNumber.toString().replace(/\D/g, "").replace(/^0+/, "");
   }, []);
 
-  // Get filtered conversations based on current tab - now using API filtering
+  // Get filtered conversations based on current tab - client-side filtering
   const getFilteredConversations = useCallback(() => {
     try {
-      // Convert conversations Map to array for display
-      // Filtering is now done at API level, so we just return all conversations
+      if (tabValue >= mainTabs.length) {
+        return [];
+      }
+
+      const currentTab = mainTabs[tabValue];
       const conversationsArray = Array.from(conversations.entries());
 
-      return conversationsArray;
+      // If no statuses defined for tab, return all conversations
+      if (!currentTab.statuses || currentTab.statuses.length === 0) {
+        return conversationsArray;
+      }
+
+      // Filter conversations by lead status for current tab
+      return conversationsArray.filter(([phoneNumber, messages]) => {
+        const metadata = conversationMetadata.get(phoneNumber);
+        const leadStatus = metadata?.leadStatus || "NO_LEAD";
+        return currentTab.statuses.includes(leadStatus);
+      });
     } catch (error) {
       console.error("❌ Error filtering conversations:", error);
       return [];
     }
-  }, [conversations]);
+  }, [conversations, conversationMetadata, tabValue, mainTabs]);
 
-  // Get count of conversations for each tab - now using conversation counts
+  // Get count of conversations for each tab
   const getTabCount = useCallback(
     (tabIndex) => {
       try {
@@ -167,13 +172,17 @@ const ChatConfig = () => {
           const conversationData = conversationMetadata.get(phoneNumber);
           const leadStatus = conversationData?.leadStatus || "NO_LEAD";
 
-          if (tab.type === "non_leads") {
-            if (leadStatus === "NO_LEAD") count++;
-          } else if (tab.statuses && tab.statuses.includes(leadStatus)) {
+          // Check if the conversation's lead status is included in the tab's statuses
+          if (tab.statuses && tab.statuses.includes(leadStatus)) {
             count++;
           }
         });
 
+        console.log(
+          `📊 Tab "${
+            tab.label
+          }" count: ${count} (statuses: ${tab.statuses?.join(", ")})`
+        );
         return count;
       } catch (error) {
         console.error("❌ Error getting tab count:", error);
@@ -223,9 +232,9 @@ const ChatConfig = () => {
     });
   }, []);
 
-  // Optimized conversation fetching with pagination and filtering
+  // Optimized conversation fetching - fetch all conversations without status filtering
   const fetchConversations = useCallback(
-    async (loadMore = false, specificLeadStatus = null) => {
+    async (loadMore = false) => {
       try {
         if (!loadMore) {
           setConversationsLoading(true);
@@ -239,27 +248,8 @@ const ChatConfig = () => {
         const currentOffset = loadMore ? conversations.size : 0;
         const limit = 25;
 
-        // Determine which lead status to filter by based on current tab
-        let leadStatusFilter = specificLeadStatus;
-        if (!leadStatusFilter && tabValue < mainTabs.length - 1) {
-          const currentTab = mainTabs[tabValue];
-          if (currentTab.type === "non_leads") {
-            leadStatusFilter = "NO_LEAD";
-          } else if (currentTab.statuses && currentTab.statuses.length > 0) {
-            // For status-based tabs, we'll make separate calls for each status
-            // For now, let's use the first status as primary filter
-            leadStatusFilter = currentTab.statuses[0];
-          }
-        }
-
+        // Fetch all conversations without lead status filtering - we'll filter client-side
         let apiUrl = `/api/whatsapp/conversations?limit=${limit}&offset=${currentOffset}&status=active&includeClosed=false`;
-
-        // Add lead status filter if specified
-        if (leadStatusFilter && leadStatusFilter !== "NO_LEAD") {
-          apiUrl += `&leadStatus=${leadStatusFilter}`;
-        } else if (leadStatusFilter === "NO_LEAD") {
-          apiUrl += `&leadStatus=NO_LEAD`;
-        }
 
         console.log(`🔄 Fetching conversations: ${apiUrl}`);
 
@@ -353,62 +343,16 @@ const ChatConfig = () => {
         }
       }
     },
-    [
-      conversations,
-      unreadCounts,
-      conversationMetadata,
-      normalizePhoneNumber,
-      tabValue,
-      mainTabs,
-    ]
+    [conversations, unreadCounts, conversationMetadata, normalizePhoneNumber]
   );
 
-  // Fetch conversations for specific lead status (used when tab changes)
-  const fetchConversationsForTab = useCallback(
-    async (tabIndex) => {
-      if (tabIndex >= mainTabs.length - 1) return; // Skip Knowledge Base tab
-
-      const tab = mainTabs[tabIndex];
-      let leadStatusFilter = null;
-
-      if (tab.type === "non_leads") {
-        leadStatusFilter = "NO_LEAD";
-      } else if (tab.statuses && tab.statuses.length > 0) {
-        // For tabs with multiple statuses, we'll need to make separate calls
-        // For now, let's fetch all and filter client-side, or you can modify API to accept array
-        leadStatusFilter = tab.statuses[0]; // Use first status for now
-      }
-
-      await fetchConversations(false, leadStatusFilter);
-    },
-    [mainTabs, fetchConversations]
-  );
-
-  // Load more conversations for current tab
+  // Load more conversations
   const loadMoreConversations = useCallback(async () => {
     if (!hasMoreConversations || loadingMoreConversations) return;
 
     setLoadingMoreConversations(true);
-
-    // Determine current lead status filter based on active tab
-    let leadStatusFilter = null;
-    if (tabValue < mainTabs.length - 1) {
-      const currentTab = mainTabs[tabValue];
-      if (currentTab.type === "non_leads") {
-        leadStatusFilter = "NO_LEAD";
-      } else if (currentTab.statuses && currentTab.statuses.length > 0) {
-        leadStatusFilter = currentTab.statuses[0];
-      }
-    }
-
-    await fetchConversations(true, leadStatusFilter);
-  }, [
-    hasMoreConversations,
-    loadingMoreConversations,
-    tabValue,
-    mainTabs,
-    fetchConversations,
-  ]);
+    await fetchConversations(true);
+  }, [hasMoreConversations, loadingMoreConversations, fetchConversations]);
 
   // Remove old fetchLeadStatuses since lead status now comes from API
   // const fetchLeadStatuses = useCallback(async () => { ... }, []);
@@ -416,7 +360,27 @@ const ChatConfig = () => {
   const getConversationsList = () => {
     try {
       const filteredConversations = getFilteredConversations();
-      return filteredConversations
+
+      // Apply search filter if search term exists
+      let finalConversations = filteredConversations;
+      if (searchTerm && searchTerm.trim()) {
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        finalConversations = filteredConversations.filter(
+          ([phoneNumber, messages]) => {
+            const metadata = conversationMetadata.get(phoneNumber);
+            const contactName = metadata?.contactName || "";
+            const lastMessage = metadata?.lastMessage || "";
+
+            return (
+              phoneNumber.includes(searchTerm) ||
+              contactName.toLowerCase().includes(lowerSearchTerm) ||
+              lastMessage.toLowerCase().includes(lowerSearchTerm)
+            );
+          }
+        );
+      }
+
+      return finalConversations
         .filter(([phoneNumber, messages]) => phoneNumber && phoneNumber.trim())
         .map(([phoneNumber, messages]) => {
           const metadata = conversationMetadata.get(phoneNumber);
@@ -430,6 +394,10 @@ const ChatConfig = () => {
             contactName:
               metadata?.contactName || `Contact ${phoneNumber.slice(-4)}`,
           };
+        })
+        .sort((a, b) => {
+          // Sort by last message time, most recent first
+          return new Date(b.lastMessageTime) - new Date(a.lastMessageTime);
         });
     } catch (error) {
       console.error("❌ Error in getConversationsList:", error);
@@ -532,78 +500,6 @@ const ChatConfig = () => {
         message: "Failed to send message",
         severity: "error",
       });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Internal function without confirmation dialog
-  const clearConversationInternal = async (phoneNumber) => {
-    try {
-      setLoading(true);
-      await ConversationService.clearConversationMessages(phoneNumber);
-      await fetchConversations();
-      if (activeConversation === phoneNumber) {
-        setChatMessages([]);
-      }
-      setSnackbar({
-        open: true,
-        message: `Chat history cleared for ${
-          conversationMetadata.get(phoneNumber)?.contactName || phoneNumber
-        }`,
-        severity: "success",
-      });
-    } catch (error) {
-      console.error("❌ Error clearing conversation:", error);
-      setSnackbar({
-        open: true,
-        message: "Failed to clear chat history",
-        severity: "error",
-      });
-      throw error; // Re-throw so calling function can handle it
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Internal function without confirmation dialog
-  const deleteConversationInternal = async (identifier) => {
-    try {
-      setLoading(true);
-      let phoneNumber = identifier;
-      if (
-        typeof identifier === "string" &&
-        identifier.length > 15 &&
-        !identifier.startsWith("+")
-      ) {
-        await ConversationService.deleteConversation(identifier);
-        for (const [phone, metadata] of conversationMetadata.entries()) {
-          if (metadata?.id === identifier) {
-            phoneNumber = phone;
-            break;
-          }
-        }
-      } else {
-        await ConversationService.deleteConversationByPhone(identifier);
-        phoneNumber = identifier;
-      }
-      await fetchConversations();
-      if (activeConversation === phoneNumber) {
-        switchConversation(null);
-      }
-      setSnackbar({
-        open: true,
-        message: `Conversation deleted successfully`,
-        severity: "success",
-      });
-    } catch (error) {
-      console.error("❌ Error deleting conversation:", error);
-      setSnackbar({
-        open: true,
-        message: "Failed to delete conversation",
-        severity: "error",
-      });
-      throw error; // Re-throw so calling function can handle it
     } finally {
       setLoading(false);
     }
@@ -804,14 +700,31 @@ const ChatConfig = () => {
     if (newValue === tabValue) return;
 
     try {
-      const newTab = mainTabs[newValue];
       setTabValue(newValue);
       if (searchTerm) {
         setSearchTerm("");
       }
 
-      // Fetch conversations for the new tab
-      fetchConversationsForTab(newValue);
+      // Select first conversation from the new tab if none is selected or current is not visible
+      setTimeout(() => {
+        const conversationsList = getConversationsList();
+        if (conversationsList.length > 0) {
+          // Check if current conversation is still visible in new tab
+          const currentConversationVisible = conversationsList.some(
+            (conv) => conv.phoneNumber === activeConversation
+          );
+
+          // If current conversation is not visible in new tab, select the first one
+          if (!currentConversationVisible) {
+            switchConversation(conversationsList[0].phoneNumber);
+          }
+        } else {
+          // No conversations in this tab, clear selection
+          switchConversation(null);
+        }
+      }, 100); // Small delay to ensure filtering is complete
+
+      console.log(`📊 Switched to tab: ${mainTabs[newValue]?.label}`);
     } catch (error) {
       console.error("❌ Error in handleTabChange:", error);
     }
@@ -835,13 +748,29 @@ const ChatConfig = () => {
     }
   };
 
-  const refreshConversations = () => {
-    fetchConversations();
-    setSnackbar({
-      open: true,
-      message: "Refreshing conversations...",
-      severity: "info",
-    });
+  const refreshConversations = async () => {
+    try {
+      setSnackbar({
+        open: true,
+        message: "Refreshing conversations...",
+        severity: "info",
+      });
+
+      await fetchConversations();
+
+      setSnackbar({
+        open: true,
+        message: "Conversations refreshed successfully",
+        severity: "success",
+      });
+    } catch (error) {
+      console.error("❌ Error refreshing conversations:", error);
+      setSnackbar({
+        open: true,
+        message: "Failed to refresh conversations",
+        severity: "error",
+      });
+    }
   };
 
   const handleCloseSnackbar = () => {
@@ -919,7 +848,7 @@ const ChatConfig = () => {
                 break;
               case "lead_status_update":
                 // Refresh conversations to get updated lead status
-                fetchConversationsForTab(tabValue);
+                fetchConversations(false);
                 break;
               default:
                 break;
@@ -953,12 +882,12 @@ const ChatConfig = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       if (conversationMetadata.size > 0) {
-        fetchConversationsForTab(tabValue);
+        fetchConversations(false);
       }
     }, 60000); // Refresh every minute
 
     return () => clearInterval(interval);
-  }, [conversationMetadata, fetchConversationsForTab, tabValue]);
+  }, [conversationMetadata, fetchConversations]);
 
   return (
     <Box

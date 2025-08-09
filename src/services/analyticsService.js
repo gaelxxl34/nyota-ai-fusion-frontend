@@ -132,11 +132,16 @@ const analyticsService = {
    * Export analytics data
    * @param {string} timeRange - 'daily', 'weekly', or 'monthly'
    * @param {string} format - 'csv' or 'json'
+   * @param {Object} options - Additional export options (role, stages, etc.)
    */
-  async exportAnalytics(timeRange = "daily", format = "csv") {
+  async exportAnalytics(timeRange = "daily", format = "csv", options = {}) {
     try {
       const response = await axiosInstance.get("/api/analytics/export", {
-        params: { timeRange, format },
+        params: {
+          timeRange,
+          format,
+          ...options,
+        },
         responseType: format === "csv" ? "blob" : "json",
       });
 

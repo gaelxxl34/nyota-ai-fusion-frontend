@@ -39,7 +39,9 @@ const LeadsCardView = ({ leads, getStatusColor, formatDate, onViewLead }) => {
                     {lead.name || "N/A"}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {lead.program || "No program"}
+                    {typeof lead.program === "object" && lead.program !== null
+                      ? lead.program.name || lead.program.code || "No program"
+                      : lead.program || "No program"}
                   </Typography>
                 </Box>
                 <Chip

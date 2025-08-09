@@ -16,7 +16,6 @@ import {
   Snackbar,
   Skeleton,
   TextField,
-  MenuItem,
   InputAdornment,
 } from "@mui/material";
 import {
@@ -35,9 +34,11 @@ import { useRolePermissions } from "../../hooks/useRolePermissions";
 import { useAuth } from "../../contexts/AuthContext";
 
 const TeamManagement = () => {
-  const { checkPermission } = useRolePermissions();
+  const { checkPermission, role } = useRolePermissions();
   const { user } = useAuth();
   const canManageTeam = checkPermission(PERMISSIONS.MANAGE_TEAM);
+  const isAdmissionAdmin = role === "admissionAdmin";
+  const isAdmin = role === "admin";
 
   const [teamMembers, setTeamMembers] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -48,7 +49,6 @@ const TeamManagement = () => {
   const [savingMember, setSavingMember] = useState(false);
   const [deletingMember, setDeletingMember] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
   const [notification, setNotification] = useState({
     open: false,
     message: "",
@@ -75,7 +75,24 @@ const TeamManagement = () => {
       console.log("Team members response:", response);
 
       // Initialize teamMembers as an empty array if response or members is undefined
-      setTeamMembers(response?.members || []);
+      let members = response?.members || [];
+
+      // Filter team members based on role restrictions
+      if (isAdmissionAdmin) {
+        // Admission admins can only see admission agents and themselves
+        members = members.filter(
+          (member) =>
+            member.role === "admissionAgent" || member.id === user?.uid
+        );
+      } else if (isAdmin) {
+        // Regular admins can only see marketing agents and themselves
+        members = members.filter(
+          (member) =>
+            member.role === "marketingAgent" || member.id === user?.uid
+        );
+      }
+
+      setTeamMembers(members);
 
       if (!response.success) {
         showNotification(
@@ -93,11 +110,19 @@ const TeamManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAdmissionAdmin, isAdmin, user]);
 
   useEffect(() => {
     fetchTeamMembers();
-  }, [fetchTeamMembers]);
+    // Update page title based on role
+    if (isAdmissionAdmin) {
+      document.title = "Admission Team Management";
+    } else if (isAdmin) {
+      document.title = "Marketing Team Management";
+    } else {
+      document.title = "Team Management";
+    }
+  }, [fetchTeamMembers, isAdmissionAdmin, isAdmin]);
 
   const handleAddMember = () => {
     setSelectedMember(null);
@@ -194,13 +219,13 @@ const TeamManagement = () => {
   };
 
   const getRoleIcon = (roleValue) => {
-    if (roleValue === "admin") {
+    if (roleValue === "admin" || roleValue === "admissionAdmin") {
       return <ShieldIcon fontSize="small" color="primary" />;
     }
     return <PersonIcon fontSize="small" />;
   };
 
-  // Filter team members based on search and role
+  // Filter team members based on search
   const filteredMembers = teamMembers.filter((member) => {
     // Filter by search term
     const matchesSearch = searchTerm
@@ -208,10 +233,7 @@ const TeamManagement = () => {
         member.email.toLowerCase().includes(searchTerm.toLowerCase())
       : true;
 
-    // Filter by role
-    const matchesRole = roleFilter === "all" || member.role === roleFilter;
-
-    return matchesSearch && matchesRole;
+    return matchesSearch;
   });
 
   // Skeleton loading component for table rows
@@ -320,21 +342,31 @@ const TeamManagement = () => {
           </>
         ) : (
           <>
-            <Typography variant="h4">Team Management</Typography>
+            <Typography variant="h4">
+              {isAdmissionAdmin
+                ? "Admission Team Management"
+                : isAdmin
+                ? "Marketing Team Management"
+                : "Team Management"}
+            </Typography>
             {canManageTeam && (
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={handleAddMember}
               >
-                Add Team Member
+                {isAdmissionAdmin
+                  ? "Add Admission Agent"
+                  : isAdmin
+                  ? "Add Marketing Agent"
+                  : "Add Team Member"}
               </Button>
             )}
           </>
         )}
       </Box>
 
-      {/* Search and Filter */}
+      {/* Search */}
       <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
         <TextField
           placeholder="Search by name or email..."
@@ -350,23 +382,6 @@ const TeamManagement = () => {
             ),
           }}
         />
-        <TextField
-          select
-          label="Filter by Role"
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          size="small"
-          sx={{ minWidth: 200 }}
-        >
-          <MenuItem value="all">All Roles</MenuItem>
-          {Object.entries(ROLES)
-            .filter(([key]) => key !== "superAdmin")
-            .map(([key, role]) => (
-              <MenuItem key={key} value={key}>
-                {role.name}
-              </MenuItem>
-            ))}
-        </TextField>
       </Box>
 
       <TableContainer component={Paper}>
@@ -393,18 +408,22 @@ const TeamManagement = () => {
                       color="text.secondary"
                       gutterBottom
                     >
-                      {searchTerm || roleFilter !== "all"
-                        ? "No team members match your filters"
+                      {searchTerm
+                        ? "No team members match your search"
                         : "No team members found"}
                     </Typography>
-                    {!searchTerm && roleFilter === "all" && canManageTeam && (
+                    {!searchTerm && canManageTeam && (
                       <Button
                         variant="contained"
                         startIcon={<AddIcon />}
                         onClick={handleAddMember}
                         sx={{ mt: 1 }}
                       >
-                        Add Your First Team Member
+                        {isAdmissionAdmin
+                          ? "Add Your First Admission Agent"
+                          : isAdmin
+                          ? "Add Your First Marketing Agent"
+                          : "Add Your First Team Member"}
                       </Button>
                     )}
                   </Box>

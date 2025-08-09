@@ -116,7 +116,11 @@ const LeadsTable = ({
 
                 <TableCell>
                   <Typography variant="body2">
-                    {lead.program || "Not specified"}
+                    {typeof lead.program === "object" && lead.program !== null
+                      ? lead.program.name ||
+                        lead.program.code ||
+                        "Not specified"
+                      : lead.program || "Not specified"}
                   </Typography>
                 </TableCell>
 

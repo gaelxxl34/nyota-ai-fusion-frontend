@@ -64,6 +64,7 @@ const UserManagement = () => {
   const ROLES = [
     { value: "superAdmin", label: "Super Admin", color: "error" },
     { value: "admin", label: "Admin", color: "primary" },
+    { value: "admissionAdmin", label: "Admission Admin", color: "secondary" },
     { value: "marketingAgent", label: "Marketing Agent", color: "info" },
     {
       value: "admissionAgent",
@@ -78,8 +79,8 @@ const UserManagement = () => {
     email: "",
     phone: "",
     role: "admin",
-    password: "",
-    confirmPassword: "",
+    password: "000000",
+    confirmPassword: "000000",
   });
 
   // Fetch all users
@@ -168,8 +169,8 @@ const UserManagement = () => {
         email: "",
         phone: "",
         role: "admin",
-        password: "",
-        confirmPassword: "",
+        password: "000000",
+        confirmPassword: "000000",
       });
     }
     setOpenDialog(true);
@@ -185,8 +186,8 @@ const UserManagement = () => {
       email: "",
       phone: "",
       role: "admin",
-      password: "",
-      confirmPassword: "",
+      password: "000000",
+      confirmPassword: "000000",
     });
   };
 
@@ -201,14 +202,6 @@ const UserManagement = () => {
         return;
       }
 
-      if (
-        !editingUser &&
-        (!formData.password || formData.password !== formData.confirmPassword)
-      ) {
-        setError("Passwords do not match");
-        return;
-      }
-
       const dataToSend = {
         name: formData.name,
         email: formData.email,
@@ -217,7 +210,7 @@ const UserManagement = () => {
       };
 
       if (!editingUser) {
-        dataToSend.password = formData.password;
+        dataToSend.password = "000000";
       }
 
       if (editingUser) {
@@ -618,13 +611,6 @@ This action cannot be undone!`;
               required
               disabled={editingUser !== null}
             />
-            <TextField
-              label="Phone Number"
-              name="phone"
-              value={formData.phone}
-              onChange={handleFormChange}
-              fullWidth
-            />
             <FormControl fullWidth required>
               <InputLabel>Role</InputLabel>
               <Select
@@ -644,26 +630,22 @@ This action cannot be undone!`;
               </Select>
             </FormControl>
             {!editingUser && (
-              <>
-                <TextField
-                  label="Password"
-                  name="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleFormChange}
-                  fullWidth
-                  required
-                />
-                <TextField
-                  label="Confirm Password"
-                  name="confirmPassword"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={handleFormChange}
-                  fullWidth
-                  required
-                />
-              </>
+              <Box sx={{ mt: 2, p: 2, bgcolor: "info.main", borderRadius: 1 }}>
+                <Typography
+                  variant="body2"
+                  color="white"
+                  sx={{ fontWeight: "medium" }}
+                >
+                  📝 Default Password: 000000
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="white"
+                  sx={{ opacity: 0.8 }}
+                >
+                  Users can change their password after first login
+                </Typography>
+              </Box>
             )}
             {error && (
               <Alert severity="error" sx={{ mt: 1 }}>
