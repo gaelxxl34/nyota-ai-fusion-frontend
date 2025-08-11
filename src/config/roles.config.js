@@ -4,12 +4,14 @@
  */
 
 export const LEAD_STAGES = {
-  NEW_CONTACT: "new_contact",
-  CONTACTED: "contacted",
-  QUALIFIED: "qualified",
-  APPLIED: "applied",
-  ADMITTED: "admitted",
-  ENROLLED: "enrolled",
+  INTERESTED: "INTERESTED",
+  APPLIED: "APPLIED",
+  IN_REVIEW: "IN_REVIEW",
+  QUALIFIED: "QUALIFIED",
+  ADMITTED: "ADMITTED",
+  ENROLLED: "ENROLLED",
+  DEFERRED: "DEFERRED",
+  EXPIRED: "EXPIRED",
 };
 
 export const PERMISSIONS = {
@@ -45,8 +47,8 @@ export const ROLES = {
     description: "Full access to IUEA features",
     permissions: Object.values(PERMISSIONS),
     leadStageAccess: {
-      from: LEAD_STAGES.NEW_CONTACT,
-      to: LEAD_STAGES.ENROLLED,
+      from: LEAD_STAGES.INTERESTED,
+      to: LEAD_STAGES.EXPIRED,
     },
   },
 
@@ -68,14 +70,14 @@ export const ROLES = {
     ],
     leadStageAccess: {
       from: LEAD_STAGES.APPLIED,
-      to: LEAD_STAGES.ENROLLED,
+      to: LEAD_STAGES.EXPIRED,
     },
   },
 
   marketingAgent: {
     name: "Marketing Agent",
     description:
-      "Access to marketing-related features (new contact to applied)",
+      "Access to marketing-related features (Interested to Admitted)",
     permissions: [
       PERMISSIONS.CHAT_CONFIG,
       PERMISSIONS.DATA_CENTER,
@@ -83,14 +85,15 @@ export const ROLES = {
       PERMISSIONS.VIEW_MARKETING_LEADS,
     ],
     leadStageAccess: {
-      from: LEAD_STAGES.NEW_CONTACT,
-      to: LEAD_STAGES.APPLIED,
+      from: LEAD_STAGES.INTERESTED,
+      to: LEAD_STAGES.ADMITTED,
     },
   },
 
   admissionAgent: {
     name: "Admission Agent",
-    description: "Access to admissions-related features (applied to enrolled)",
+    description:
+      "Access to admissions-related features (Applied to the very end)",
     permissions: [
       PERMISSIONS.CHAT_CONFIG,
       PERMISSIONS.DATA_CENTER,
@@ -99,7 +102,7 @@ export const ROLES = {
     ],
     leadStageAccess: {
       from: LEAD_STAGES.APPLIED,
-      to: LEAD_STAGES.ENROLLED,
+      to: LEAD_STAGES.EXPIRED,
     },
   },
 };
@@ -124,19 +127,24 @@ export const canViewLeadStage = (role, stage) => {
 
   // Map database status values to our LEAD_STAGES
   const statusToStageMap = {
-    NO_LEAD: LEAD_STAGES.NEW_CONTACT, // Conversations not linked to leads
-    INQUIRY: LEAD_STAGES.NEW_CONTACT,
-    CONTACTED: LEAD_STAGES.CONTACTED,
-    PRE_QUALIFIED: LEAD_STAGES.QUALIFIED,
-    QUALIFIED: LEAD_STAGES.QUALIFIED,
+    INTERESTED: LEAD_STAGES.INTERESTED,
     APPLIED: LEAD_STAGES.APPLIED,
+    IN_REVIEW: LEAD_STAGES.IN_REVIEW,
+    QUALIFIED: LEAD_STAGES.QUALIFIED,
     ADMITTED: LEAD_STAGES.ADMITTED,
     ENROLLED: LEAD_STAGES.ENROLLED,
-    REJECTED: LEAD_STAGES.NEW_CONTACT,
-    NURTURE: LEAD_STAGES.CONTACTED,
+    DEFERRED: LEAD_STAGES.DEFERRED,
+    EXPIRED: LEAD_STAGES.EXPIRED,
+    // Legacy status mappings for backward compatibility
+    NO_LEAD: LEAD_STAGES.INTERESTED,
+    INQUIRY: LEAD_STAGES.INTERESTED,
+    CONTACTED: LEAD_STAGES.INTERESTED,
+    PRE_QUALIFIED: LEAD_STAGES.QUALIFIED,
+    REJECTED: LEAD_STAGES.EXPIRED,
+    NURTURE: LEAD_STAGES.INTERESTED,
     FOLLOW_UP: LEAD_STAGES.QUALIFIED,
-    REVIEW: LEAD_STAGES.APPLIED,
-    PENDING_DOCS: LEAD_STAGES.APPLIED,
+    REVIEW: LEAD_STAGES.IN_REVIEW,
+    PENDING_DOCS: LEAD_STAGES.IN_REVIEW,
     SUCCESS: LEAD_STAGES.ENROLLED,
   };
 

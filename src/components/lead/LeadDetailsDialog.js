@@ -1019,6 +1019,7 @@ const LeadDetailsDialog = ({
           open={showApplicationDialog}
           onClose={handleApplicationDialogClose}
           applicationId={applicationId}
+          email={lead?.email}
         />
       )}
 

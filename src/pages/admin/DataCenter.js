@@ -38,6 +38,8 @@ import {
   Assignment as AssignmentIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Pause as PauseIcon,
+  Block as BlockIcon,
 } from "@mui/icons-material";
 import { leadService } from "../../services/leadService";
 import { useAuth } from "../../contexts/AuthContext";
@@ -94,21 +96,20 @@ const DataCenter = () => {
     useState(false);
   // const { } = useAuth(); // Keep for future use
 
-  // Define lead status categories for tabs
+  // Define lead status categories for tabs - Updated for new funnel
   const leadStatusTabs = useMemo(
     () => [
       {
         label: "All Leads",
         statuses: [
-          "INQUIRY",
-          "CONTACTED",
-          "PRE_QUALIFIED",
-          "QUALIFIED",
+          "INTERESTED",
           "APPLIED",
+          "IN_REVIEW",
+          "QUALIFIED",
           "ADMITTED",
           "ENROLLED",
-          "REJECTED",
-          "NURTURE",
+          "DEFERRED",
+          "EXPIRED",
         ],
         icon: ContactMailIcon,
         color: "primary",
@@ -121,21 +122,21 @@ const DataCenter = () => {
         isPersonal: true, // Special flag to indicate this shows personal submissions
       },
       {
-        label: "Contacted",
-        statuses: ["CONTACTED", "NURTURE"],
-        icon: WhatsAppIcon,
-        color: "info",
-      },
-      {
         label: "Interested",
-        statuses: ["PRE_QUALIFIED"],
+        statuses: ["INTERESTED"],
         icon: AssessmentIcon,
-        color: "warning",
+        color: "info",
       },
       {
         label: "Applied",
         statuses: ["APPLIED"],
         icon: AssignmentIcon,
+        color: "warning",
+      },
+      {
+        label: "In Review",
+        statuses: ["IN_REVIEW"],
+        icon: SchoolIcon,
         color: "info",
       },
       {
@@ -155,6 +156,18 @@ const DataCenter = () => {
         statuses: ["ENROLLED"],
         icon: SchoolIcon,
         color: "success",
+      },
+      {
+        label: "Deferred",
+        statuses: ["DEFERRED"],
+        icon: AssessmentIcon,
+        color: "warning",
+      },
+      {
+        label: "Expired",
+        statuses: ["EXPIRED"],
+        icon: AssessmentIcon,
+        color: "error",
       },
     ],
     []
@@ -177,72 +190,75 @@ const DataCenter = () => {
           return agentRoles.includes(userRole);
         }
 
-        // Admission Admin restrictions - only show Applied, Qualified, Admitted, Enrolled
-        if (userRole === "admissionAdmin") {
-          const allowedStatuses = [
-            "APPLIED",
-            "QUALIFIED",
-            "ADMITTED",
-            "ENROLLED",
+        // Admin sees all tabs
+        if (userRole === "admin" || userRole === "superAdmin") {
+          return true;
+        }
+
+        // Marketing Agent: Interested to Admitted
+        if (userRole === "marketingAgent") {
+          const allowedTabs = [
+            "All Leads",
+            "Interested",
+            "Applied",
+            "In Review",
+            "Qualified",
+            "Admitted",
           ];
-
-          if (tab.label === "All Leads") {
-            const accessibleStatuses = tab.statuses.filter((status) =>
-              allowedStatuses.includes(status)
-            );
-            return accessibleStatuses.length > 0;
-          }
-
-          // For other tabs, check if they contain allowed statuses
-          const hasAllowedStatus = tab.statuses.some((status) =>
-            allowedStatuses.includes(status)
-          );
-          return hasAllowedStatus;
+          return allowedTabs.includes(tab.label);
         }
 
-        // All Leads tab - filter statuses based on access
-        if (tab.label === "All Leads") {
-          const accessibleStatuses = tab.statuses.filter((status) => {
-            const hasAccess = checkLeadStageAccess(status);
-            console.log(`  - Checking ${status}: ${hasAccess}`);
-            return hasAccess;
-          });
-          return accessibleStatuses.length > 0;
+        // Admission Admin & Admission Agent: Applied to the very end
+        if (userRole === "admissionAdmin" || userRole === "admissionAgent") {
+          const allowedTabs = [
+            "All Leads",
+            "Applied",
+            "In Review",
+            "Qualified",
+            "Admitted",
+            "Enrolled",
+            "Deferred",
+            "Expired",
+          ];
+          return allowedTabs.includes(tab.label);
         }
 
-        // Other tabs - check if user has access to any of the statuses
-        const hasAccess = tab.statuses.some((status) => {
-          const access = checkLeadStageAccess(status);
-          console.log(`  - Tab ${tab.label}, Status ${status}: ${access}`);
-          return access;
-        });
-        return hasAccess;
+        // Default: show all tabs
+        return true;
       })
       .map((tab) => {
-        // For Admission Admin, filter All Leads statuses to only show allowed ones
-        if (userRole === "admissionAdmin" && tab.label === "All Leads") {
-          const allowedStatuses = [
-            "APPLIED",
-            "QUALIFIED",
-            "ADMITTED",
-            "ENROLLED",
-          ];
-          return {
-            ...tab,
-            statuses: tab.statuses.filter((status) =>
-              allowedStatuses.includes(status)
-            ),
-          };
-        }
-
-        // For All Leads tab, filter the statuses
+        // For "All Leads" tab, filter statuses based on role
         if (tab.label === "All Leads") {
-          return {
-            ...tab,
-            statuses: tab.statuses.filter((status) =>
-              checkLeadStageAccess(status)
-            ),
-          };
+          let allowedStatuses = tab.statuses;
+
+          if (userRole === "marketingAgent") {
+            allowedStatuses = tab.statuses.filter((status) =>
+              [
+                "INTERESTED",
+                "APPLIED",
+                "IN_REVIEW",
+                "QUALIFIED",
+                "ADMITTED",
+              ].includes(status)
+            );
+          } else if (
+            userRole === "admissionAdmin" ||
+            userRole === "admissionAgent"
+          ) {
+            allowedStatuses = tab.statuses.filter((status) =>
+              [
+                "APPLIED",
+                "IN_REVIEW",
+                "QUALIFIED",
+                "ADMITTED",
+                "ENROLLED",
+                "DEFERRED",
+                "EXPIRED",
+              ].includes(status)
+            );
+          }
+
+          return { ...tab, statuses: allowedStatuses };
         }
         return tab;
       });
@@ -655,7 +671,7 @@ const DataCenter = () => {
       },
       {
         key: "interested",
-        status: "PRE_QUALIFIED",
+        status: "INTERESTED",
         label: "Interested",
         icon: ContactMailIcon,
         color: "warning",
@@ -675,10 +691,10 @@ const DataCenter = () => {
         color: "info",
       },
       {
-        key: "contacted",
-        status: "CONTACTED",
-        label: "Contacted",
-        icon: WhatsAppIcon,
+        key: "in_review",
+        status: "IN_REVIEW",
+        label: "In Review",
+        icon: AssessmentIcon,
         color: "info",
       },
       {
@@ -695,25 +711,50 @@ const DataCenter = () => {
         icon: SchoolIcon,
         color: "primary",
       },
+      {
+        key: "deferred",
+        status: "DEFERRED",
+        label: "Deferred",
+        icon: PauseIcon,
+        color: "warning",
+      },
+      {
+        key: "expired",
+        status: "EXPIRED",
+        label: "Expired",
+        icon: BlockIcon,
+        color: "error",
+      },
     ];
 
-    if (userRole === "admissionAdmin") {
-      // Admission admins only see Applied, Qualified, Admitted, Enrolled
+    if (userRole === "admissionAdmin" || userRole === "admissionAgent") {
+      // Admission admins and agents see Applied to the very end
       return allCards.filter((card) =>
-        ["applied", "qualified", "admitted", "enrolled"].includes(card.key)
+        [
+          "total",
+          "applied",
+          "in_review",
+          "qualified",
+          "admitted",
+          "enrolled",
+          "deferred",
+          "expired",
+        ].includes(card.key)
       );
     } else if (userRole === "marketingAgent") {
-      // Marketing agents don't see admitted/enrolled stats
-      return allCards.filter(
-        (card) => !["admitted", "enrolled"].includes(card.key)
-      );
-    } else if (userRole === "admissionAgent") {
-      // Admission agents don't see interested/contacted stats
-      return allCards.filter(
-        (card) => !["interested", "contacted"].includes(card.key)
+      // Marketing agents see Interested to Admitted
+      return allCards.filter((card) =>
+        [
+          "total",
+          "interested",
+          "applied",
+          "in_review",
+          "qualified",
+          "admitted",
+        ].includes(card.key)
       );
     } else {
-      // Default: admin and others see all cards
+      // Admin sees all cards
       return allCards;
     }
   };
@@ -722,15 +763,8 @@ const DataCenter = () => {
   const getVisibleFunnelStages = () => {
     const allStages = [
       {
-        key: "contacted",
-        status: "CONTACTED",
-        label: "Contacted",
-        color: "info",
-        subtitle: "Initial Contact",
-      },
-      {
         key: "interested",
-        status: "PRE_QUALIFIED",
+        status: "INTERESTED",
         label: "Interested",
         color: "warning",
         subtitle: "Shows Interest",
@@ -741,6 +775,13 @@ const DataCenter = () => {
         label: "Applied",
         color: "info",
         subtitle: "Submitted App",
+      },
+      {
+        key: "in_review",
+        status: "IN_REVIEW",
+        label: "In Review",
+        color: "primary",
+        subtitle: "Under Review",
       },
       {
         key: "qualified",
@@ -765,20 +806,23 @@ const DataCenter = () => {
       },
     ];
 
-    if (userRole === "admissionAdmin") {
-      // Admission admins only see Applied, Qualified, Admitted, Enrolled
+    if (userRole === "admissionAdmin" || userRole === "admissionAgent") {
+      // Admission admins and agents see Applied to the very end
       return allStages.filter((stage) =>
-        ["applied", "qualified", "admitted", "enrolled"].includes(stage.key)
+        ["applied", "in_review", "qualified", "admitted", "enrolled"].includes(
+          stage.key
+        )
       );
     } else if (userRole === "marketingAgent") {
-      // Marketing agents see up to qualified
-      return allStages.filter(
-        (stage) => !["admitted", "enrolled"].includes(stage.key)
-      );
-    } else if (userRole === "admissionAgent") {
-      // Admission agents see from applied onwards
-      return allStages.filter(
-        (stage) => !["contacted", "interested"].includes(stage.key)
+      // Marketing agents see Interested to Admitted
+      return allStages.filter((stage) =>
+        [
+          "interested",
+          "applied",
+          "in_review",
+          "qualified",
+          "admitted",
+        ].includes(stage.key)
       );
     } else {
       // Default: admin and others see all stages
@@ -818,19 +862,21 @@ const DataCenter = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "CONTACTED":
-        return "primary";
-      case "PRE_QUALIFIED":
+      case "INTERESTED":
         return "warning";
       case "APPLIED":
         return "info";
+      case "IN_REVIEW":
+        return "primary";
       case "QUALIFIED":
         return "success";
       case "ADMITTED":
         return "secondary";
       case "ENROLLED":
         return "success";
-      case "REJECTED":
+      case "DEFERRED":
+        return "warning";
+      case "EXPIRED":
         return "error";
       default:
         return "default";
@@ -907,13 +953,15 @@ const DataCenter = () => {
   const handleEditLead = (lead) => {
     setSelectedLead(lead);
 
-    // For APPLIED leads, always show the application details dialog
-    // We'll fetch by leadId if applicationId isn't available
-    if (lead.status === "APPLIED") {
-      setViewApplicationDialogOpen(true);
-    } else {
-      // For all other leads, show the edit dialog
+    // Only INTERESTED leads should have edit functionality
+    // All other statuses (APPLIED and beyond) should view the application
+    if (lead.status === "INTERESTED") {
+      // For INTERESTED leads, show the edit dialog
       setEditDialogOpen(true);
+    } else {
+      // For all other statuses (APPLIED, IN_REVIEW, QUALIFIED, ADMITTED, ENROLLED, DEFERRED, EXPIRED)
+      // always show the application details dialog
+      setViewApplicationDialogOpen(true);
     }
   };
 
@@ -1113,9 +1161,11 @@ const DataCenter = () => {
                     {card.key === "interested" && "Showing interest"}
                     {card.key === "qualified" && "Ready for admission"}
                     {card.key === "applied" && "Submitted applications"}
-                    {card.key === "contacted" && "Initial contact made"}
+                    {card.key === "in_review" && "Under review"}
                     {card.key === "admitted" && "Accepted for admission"}
                     {card.key === "enrolled" && "Successfully enrolled"}
+                    {card.key === "deferred" && "Deferred to later intake"}
+                    {card.key === "expired" && "No longer viable"}
                   </Typography>
                 </CardContent>
               </Card>
@@ -1321,7 +1371,7 @@ const DataCenter = () => {
                     <Typography variant="h6">New Contacts</Typography>
                   </Box>
                   <Typography variant="h4" color="warning.main">
-                    {leadStats.byStatus.CONTACTED || 0}
+                    {leadStats.byStatus.INTERESTED || 0}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Recent form submissions
@@ -1423,14 +1473,18 @@ const DataCenter = () => {
                       "Leads that have shown interest and are ready for further engagement"}
                     {tab.label === "Applied" &&
                       "Leads who have submitted formal applications"}
+                    {tab.label === "In Review" &&
+                      "Applications currently under review by the admissions team"}
                     {tab.label === "Qualified" &&
                       "Leads who have met all qualification requirements"}
                     {tab.label === "Admitted" &&
                       "Students who have been officially admitted to programs"}
                     {tab.label === "Enrolled" &&
                       "Students who have completed enrollment and are active"}
-                    {tab.label === "Contacted" &&
-                      "Leads that have been contacted and are in nurturing process"}
+                    {tab.label === "Deferred" &&
+                      "Applications deferred to a later intake or semester"}
+                    {tab.label === "Expired" &&
+                      "Applications that have expired and are no longer viable"}
                   </Typography>
 
                   {/* Search and Actions */}
@@ -1610,10 +1664,20 @@ const DataCenter = () => {
                                     alignItems: "center",
                                   }}
                                 >
-                                  {/* View/Edit button - Marketing agents and admins can only view applied leads */}
-                                  {lead.status === "APPLIED" &&
-                                  isRestrictedRole(userRole) ? (
-                                    // Marketing agents and admins can only view applied leads
+                                  {/* View/Edit button based on lead status */}
+                                  {lead.status === "INTERESTED" ? (
+                                    // INTERESTED leads can be edited
+                                    <Tooltip title="Edit Lead">
+                                      <IconButton
+                                        size="small"
+                                        color="primary"
+                                        onClick={() => handleEditLead(lead)}
+                                      >
+                                        <EditIcon />
+                                      </IconButton>
+                                    </Tooltip>
+                                  ) : (
+                                    // All other statuses (APPLIED and beyond) should view application
                                     <Tooltip title="View Application">
                                       <IconButton
                                         size="small"
@@ -1623,53 +1687,23 @@ const DataCenter = () => {
                                         <AssignmentIcon />
                                       </IconButton>
                                     </Tooltip>
-                                  ) : (
-                                    // Other users or non-applied leads can edit
-                                    <Tooltip
-                                      title={
-                                        lead.status === "APPLIED"
-                                          ? "View Application"
-                                          : "Edit Lead"
-                                      }
-                                    >
-                                      <IconButton
-                                        size="small"
-                                        color={
-                                          lead.status === "APPLIED"
-                                            ? "info"
-                                            : "primary"
-                                        }
-                                        onClick={() => handleEditLead(lead)}
-                                      >
-                                        {lead.status === "APPLIED" ? (
-                                          <AssignmentIcon />
-                                        ) : (
-                                          <EditIcon />
-                                        )}
-                                      </IconButton>
-                                    </Tooltip>
                                   )}
 
-                                  {/* WhatsApp button - Hidden for marketing agents and admins viewing applied leads */}
-                                  {!(
-                                    lead.status === "APPLIED" &&
-                                    isRestrictedRole(userRole)
-                                  ) && (
-                                    <Tooltip title="Start WhatsApp Conversation">
-                                      <IconButton
-                                        size="small"
-                                        color="success"
-                                        onClick={() =>
-                                          handleStartConversation(lead)
-                                        }
-                                        disabled={
-                                          !lead.phone && !lead.phoneNumber
-                                        }
-                                      >
-                                        <WhatsAppIcon />
-                                      </IconButton>
-                                    </Tooltip>
-                                  )}
+                                  {/* WhatsApp button - Available for all lead statuses */}
+                                  <Tooltip title="Start WhatsApp Conversation">
+                                    <IconButton
+                                      size="small"
+                                      color="success"
+                                      onClick={() =>
+                                        handleStartConversation(lead)
+                                      }
+                                      disabled={
+                                        !lead.phone && !lead.phoneNumber
+                                      }
+                                    >
+                                      <WhatsAppIcon />
+                                    </IconButton>
+                                  </Tooltip>
 
                                   {/* Delete button - Hidden for marketing agents and admins viewing applied leads */}
                                   {!(
@@ -1805,6 +1839,7 @@ const DataCenter = () => {
         }}
         applicationId={selectedLead?.applicationId}
         leadId={selectedLead?.id}
+        email={selectedLead?.email}
         key={
           selectedLead?.id
         } /* Add key to force re-mount when different lead is selected */

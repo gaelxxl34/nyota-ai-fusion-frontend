@@ -36,6 +36,11 @@ const LeadActionMenu = ({
     onClose();
   };
 
+  // Determine if this lead should show "Edit Lead" or "View Application"
+  const isInterested = selectedLead?.status === "INTERESTED";
+  const actionLabel = isInterested ? "Edit Lead" : "View Application";
+  const ActionIcon = isInterested ? EditIcon : AssignmentIcon;
+
   return (
     <Menu
       anchorEl={anchorEl}
@@ -53,9 +58,12 @@ const LeadActionMenu = ({
     >
       <MenuItem onClick={handleEdit}>
         <ListItemIcon>
-          <EditIcon fontSize="small" color="primary" />
+          <ActionIcon
+            fontSize="small"
+            color={isInterested ? "primary" : "info"}
+          />
         </ListItemIcon>
-        <Typography variant="body2">Edit Lead</Typography>
+        <Typography variant="body2">{actionLabel}</Typography>
       </MenuItem>
 
       <MenuItem onClick={handleConvert}>

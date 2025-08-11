@@ -33,13 +33,21 @@ import {
 } from "@mui/icons-material";
 import applicationService from "../../services/applicationService";
 import { useAuth } from "../../contexts/AuthContext";
+import CountrySelect, { COUNTRIES } from "../common/CountrySelect";
 
-const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
+const ApplicationDetailsDialog = ({
+  open,
+  onClose,
+  leadId,
+  applicationId,
+  email,
+}) => {
   const { getUserRole, user } = useAuth();
   const userRole = getUserRole();
 
   console.log("ApplicationDetailsDialog - User role:", userRole);
   console.log("ApplicationDetailsDialog - Open:", open);
+  console.log("ApplicationDetailsDialog - Email:", email);
 
   const [application, setApplication] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -96,9 +104,14 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
 
   // Handler for opening documents in a new window or in a dialog
   const handleViewDocument = async (documentUrl, displayName) => {
-    if (!applicationId) {
-      console.error("Cannot view document: No application ID available");
-      setError(`Unable to view ${displayName}: No application ID available.`);
+    // Use email to fetch application if applicationId is not available
+    if (!applicationId && !email) {
+      console.error(
+        "Cannot view document: No application ID or email available"
+      );
+      setError(
+        `Unable to view ${displayName}: No application reference available.`
+      );
       return;
     }
 
@@ -124,19 +137,27 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
         throw new Error(`Unknown document type: ${displayName}`);
       }
 
-      console.log(
-        `Fetching document from backend for application ${applicationId}, type: ${documentType}`
-      );
+      let response;
 
-      // Log the full URL for debugging
-      const apiUrl = `/applications/${applicationId}/document/${documentType}`;
-      console.log(`API Request URL: ${apiUrl}`);
-
-      // Fetch document URL from the new endpoint
-      const response = await applicationService.getApplicationDocument(
-        applicationId,
-        documentType
-      );
+      if (applicationId) {
+        console.log(
+          `Fetching document from backend for application ${applicationId}, type: ${documentType}`
+        );
+        // Fetch document URL from the new endpoint using applicationId
+        response = await applicationService.getApplicationDocument(
+          applicationId,
+          documentType
+        );
+      } else if (email) {
+        console.log(
+          `Fetching document using email ${email} for type: ${documentType}`
+        );
+        // Use the new email-based document fetching method
+        response = await applicationService.getApplicationDocumentByEmail(
+          email,
+          documentType
+        );
+      }
 
       console.log(`Document response for ${displayName}:`, response);
 
@@ -207,9 +228,27 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
 
         const apiBaseUrl =
           process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
-        const directUrl = `${apiBaseUrl}/api/applications/${applicationId}/document/${fallbackDocumentTypeMap[displayName]}`;
-        console.log(`Direct URL: ${directUrl}`);
 
+        let directUrl;
+        if (applicationId) {
+          directUrl = `${apiBaseUrl}/api/applications/${applicationId}/document/${fallbackDocumentTypeMap[displayName]}`;
+        } else if (email) {
+          // For email-based approach, we need to get the application first
+          const applicationsResponse =
+            await applicationService.getApplicationsByEmail(email);
+          if (
+            applicationsResponse.success &&
+            applicationsResponse.data &&
+            applicationsResponse.data.length > 0
+          ) {
+            const latestApplication = applicationsResponse.data[0];
+            directUrl = `${apiBaseUrl}/api/applications/${latestApplication.id}/document/${fallbackDocumentTypeMap[displayName]}`;
+          } else {
+            throw new Error("No applications found for email in fallback");
+          }
+        }
+
+        console.log(`Direct URL: ${directUrl}`);
         const fetchResponse = await fetch(directUrl);
         console.log(`Direct fetch status: ${fetchResponse.status}`);
 
@@ -351,21 +390,48 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
   // Helper function to fetch application data
   const fetchApplicationData = useCallback(async () => {
     if (!open) return;
-    if (!applicationId && !leadId) return;
+    if (!applicationId && !leadId && !email) return;
 
     setLoading(true);
     setError("");
 
     try {
       let response;
-      console.log("Fetching application data:", { applicationId, leadId });
+      console.log("Fetching application data:", {
+        applicationId,
+        leadId,
+        email,
+      });
 
-      // First try to fetch by applicationId if available
+      // Priority order: 1. applicationId, 2. email, 3. leadId
       if (applicationId) {
         console.log("Fetching by applicationId:", applicationId);
         response = await applicationService.getApplication(applicationId);
+      } else if (email) {
+        console.log("Fetching by email:", email);
+        const emailResponse = await applicationService.getApplicationsByEmail(
+          email
+        );
+        if (
+          emailResponse &&
+          emailResponse.success &&
+          emailResponse.data &&
+          emailResponse.data.length > 0
+        ) {
+          // Use the most recent application
+          const latestApplication = emailResponse.data[0];
+          response = {
+            success: true,
+            data: latestApplication,
+          };
+        } else {
+          response = {
+            success: false,
+            message: "No applications found for this email",
+          };
+        }
       }
-      // If no applicationId but leadId is available, fetch by leadId
+      // If no applicationId or email but leadId is available, fetch by leadId
       else if (leadId) {
         console.log("Fetching by leadId:", leadId);
         response = await applicationService.getApplicationByLeadId(leadId);
@@ -386,14 +452,40 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
         // Initialize form data with a deep copy of application data to avoid reference issues
         const initialFormData = JSON.parse(JSON.stringify(applicationData));
 
-        // Make sure to map any fields that might have different names
-        if (applicationData.intake && !applicationData.preferredIntake) {
-          initialFormData.preferredIntake = applicationData.intake;
-        }
+        // Enhanced field mapping to handle different field names between frontend and backend
+        const fieldMappings = {
+          // Program mappings
+          intake: "preferredIntake",
+          program: "preferredProgram",
 
-        if (applicationData.program && !applicationData.preferredProgram) {
-          initialFormData.preferredProgram = applicationData.program;
-        }
+          // Personal info mappings
+          countryOfBirth: "countryOfBirth",
+          gender: "gender",
+          modeOfStudy: "modeOfStudy",
+          postalAddress: "postalAddress",
+
+          // Document mappings
+          passportPhoto: "passportPhoto",
+          academicDocuments: "academicDocuments",
+          identificationDocument: "identificationDocument",
+
+          // Sponsor info mappings
+          sponsorEmail: "sponsorEmail",
+          sponsorTelephone: "sponsorTelephone",
+          sponsorPhone: "sponsorTelephone", // Alternative field name
+
+          // Additional info
+          howDidYouHear: "howDidYouHear",
+          additionalNotes: "additionalNotes",
+        };
+
+        // Apply field mappings to ensure all data is available
+        Object.keys(fieldMappings).forEach((sourceField) => {
+          const targetField = fieldMappings[sourceField];
+          if (applicationData[sourceField] && !initialFormData[targetField]) {
+            initialFormData[targetField] = applicationData[sourceField];
+          }
+        });
 
         console.log("Setting initial form data:", initialFormData);
         setFormData(initialFormData);
@@ -407,14 +499,12 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
     } finally {
       setLoading(false);
     }
-  }, [open, applicationId, leadId]);
+  }, [open, applicationId, leadId, email]);
 
   useEffect(() => {
     // Use the fetchApplicationData function that's defined above
-    // We don't need to redefine it here anymore
-
     fetchApplicationData();
-  }, [fetchApplicationData, open, applicationId, leadId]);
+  }, [fetchApplicationData, open, applicationId, leadId, email]);
 
   const handleEditApplication = () => {
     // Initialize form data with current application data
@@ -504,12 +594,10 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
   };
 
   // Maximum file size limits in bytes for each document type
-  // Total document size in Firestore must be under 1,048,487 bytes (1MB)
-  // Base64 encoding increases size by ~33%, so we need to account for that
-  const MAX_PASSPORT_PHOTO_SIZE = 200 * 1024; // 200KB for passport photo
-  const MAX_ACADEMIC_DOCS_SIZE = 350 * 1024; // 350KB for academic documents
-  const MAX_ID_DOC_SIZE = 300 * 1024; // 300KB for identification document
-  // These limits total to 850KB, leaving buffer for other application data
+  // Updated to 10MB limit for all document types since we're using Firebase Storage
+  const MAX_PASSPORT_PHOTO_SIZE = 10 * 1024 * 1024; // 10MB for passport photo
+  const MAX_ACADEMIC_DOCS_SIZE = 10 * 1024 * 1024; // 10MB for academic documents
+  const MAX_ID_DOC_SIZE = 10 * 1024 * 1024; // 10MB for identification document
 
   // Helper function to check file size against appropriate limit based on file type
   const isFileTooLarge = (file, fileType) => {
@@ -808,11 +896,74 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
     setError("");
 
     try {
-      // Create data to send
-      const dataToSend = { ...formData };
+      // Check if only status/management fields changed for optimized update
+      const statusOnlyChange =
+        formData.status !== application.status &&
+        formData.name === application.name &&
+        formData.email === application.email &&
+        formData.phoneNumber === application.phoneNumber &&
+        formData.preferredProgram === application.preferredProgram;
+
+      // If only status changed, use the dedicated status update endpoint
+      if (statusOnlyChange && applicationId) {
+        console.log("Status-only update detected, using dedicated endpoint...");
+
+        // Prepare updatedBy information
+        const updatedBy = {
+          email: user?.email || "unknown@system.com",
+          name:
+            user?.displayName || user?.name || user?.email || "Unknown User",
+          role: userRole || "unknown",
+          timestamp: new Date().toISOString(),
+          uid: user?.uid || null,
+        };
+
+        const statusUpdateResponse =
+          await applicationService.updateApplicationStatus(
+            applicationId,
+            formData.status,
+            formData.statusNote || `Status updated to ${formData.status}`,
+            updatedBy
+          );
+
+        if (statusUpdateResponse && statusUpdateResponse.success) {
+          console.log(
+            "Application status updated successfully:",
+            statusUpdateResponse.data
+          );
+          setEditMode(false);
+          // Re-fetch application data to ensure we have the most up-to-date information
+          await fetchApplicationData();
+          return;
+        } else {
+          throw new Error(
+            "Status update failed: " +
+              (statusUpdateResponse.message || "Unknown error")
+          );
+        }
+      }
+
+      // Create data to send for full update - filter out undefined values
+      const dataToSend = {};
+
+      // Only include defined values to avoid backend Firestore errors
+      Object.keys(formData).forEach((key) => {
+        if (formData[key] !== undefined) {
+          dataToSend[key] = formData[key];
+        }
+      });
 
       // Use ISO format for consistency with the backend and lead documents
       dataToSend.updatedAt = new Date().toISOString();
+
+      // Add updatedBy information for audit trail
+      dataToSend.updatedBy = {
+        email: user?.email || "unknown@system.com",
+        name: user?.displayName || user?.name || user?.email || "Unknown User",
+        role: userRole || "unknown",
+        timestamp: new Date().toISOString(),
+        uid: user?.uid || null,
+      };
 
       // Remove preview URL
       delete dataToSend.passportPhotoPreview;
@@ -862,11 +1013,25 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
         },
       };
 
-      const response = await applicationService.updateApplication(
-        applicationId,
-        dataToSend,
-        config
-      );
+      let response;
+
+      // Determine which identifier to use for update
+      if (applicationId) {
+        response = await applicationService.updateApplication(
+          applicationId,
+          dataToSend,
+          config
+        );
+      } else if (email) {
+        // Use the new email-based update method
+        response = await applicationService.updateApplicationByEmail(
+          email,
+          dataToSend,
+          config
+        );
+      } else {
+        throw new Error("Cannot update: No application identifier available");
+      }
 
       if (response && response.success) {
         console.log("Application updated successfully:", response.data);
@@ -1091,14 +1256,17 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
                   </Typography>
                 </Grid>
 
-                {application.stage && (
+                {application.status && (
                   <Grid item>
                     <Chip
-                      label={`Stage: ${application.stage}`}
+                      label={`Status: ${application.status
+                        .replace(/_/g, " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())}`}
                       sx={{
-                        bgcolor: "success.main",
+                        bgcolor: "warning.main",
                         color: "white",
                         fontWeight: "bold",
+                        mr: 1,
                       }}
                     />
                   </Grid>
@@ -1161,24 +1329,33 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
                           onChange={handleInputChange}
                           label="Gender"
                         >
-                          <MenuItem value="male">Male</MenuItem>
-                          <MenuItem value="female">Female</MenuItem>
-                          <MenuItem value="other">Other</MenuItem>
-                          <MenuItem value="prefer_not_to_say">
-                            Prefer not to say
-                          </MenuItem>
+                          <MenuItem value="Male">Male</MenuItem>
+                          <MenuItem value="Female">Female</MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Country of Birth"
-                        name="countryOfBirth"
-                        value={formData.countryOfBirth || ""}
-                        onChange={handleInputChange}
-                        margin="normal"
-                      />
+                      <FormControl fullWidth margin="normal">
+                        <InputLabel id="country-of-birth-label">
+                          Country of Birth
+                        </InputLabel>
+                        <Select
+                          labelId="country-of-birth-label"
+                          name="countryOfBirth"
+                          value={formData.countryOfBirth || ""}
+                          onChange={handleInputChange}
+                          label="Country of Birth"
+                        >
+                          <MenuItem value="">
+                            <em>Select Country</em>
+                          </MenuItem>
+                          {COUNTRIES.map((country) => (
+                            <MenuItem key={country} value={country}>
+                              {country}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     </Grid>
                     <Grid item xs={12}>
                       <TextField
@@ -1277,99 +1454,99 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
                           label="Preferred Program"
                         >
                           {/* Business and Management Programs */}
-                          <MenuItem value="bachelor_business_administration">
+                          <MenuItem value="Bachelor of Business Administration">
                             Bachelor of Business Administration
                           </MenuItem>
-                          <MenuItem value="bachelor_public_administration">
+                          <MenuItem value="Bachelor of Public Administration">
                             Bachelor of Public Administration
                           </MenuItem>
-                          <MenuItem value="bachelor_procurement_logistics">
+                          <MenuItem value="Bachelor of Procurement and Logistics Management">
                             Bachelor of Procurement and Logistics Management
                           </MenuItem>
-                          <MenuItem value="bachelor_tourism_hotel">
+                          <MenuItem value="Bachelor of Tourism and Hotel Management">
                             Bachelor of Tourism and Hotel Management
                           </MenuItem>
-                          <MenuItem value="bachelor_human_resource">
+                          <MenuItem value="Bachelor of Human Resource Management">
                             Bachelor of Human Resource Management
                           </MenuItem>
-                          <MenuItem value="bachelor_journalism_communication">
+                          <MenuItem value="Bachelor of Journalism and Communication Studies">
                             Bachelor of Journalism and Communication Studies
                           </MenuItem>
-                          <MenuItem value="master_business_administration">
+                          <MenuItem value="Master of Business Administration (MBA)">
                             Master of Business Administration (MBA)
                           </MenuItem>
 
                           {/* Science and Technology Programs */}
-                          <MenuItem value="bachelor_computer_science">
+                          <MenuItem value="Bachelor of Science in Computer Science">
                             Bachelor of Science in Computer Science
                           </MenuItem>
-                          <MenuItem value="bachelor_information_technology">
+                          <MenuItem value="Bachelor of Information Technology">
                             Bachelor of Information Technology
                           </MenuItem>
-                          <MenuItem value="bachelor_software_engineering">
+                          <MenuItem value="Bachelor of Science in Software Engineering">
                             Bachelor of Science in Software Engineering
                           </MenuItem>
-                          <MenuItem value="bachelor_climate_smart_agriculture">
+                          <MenuItem value="Bachelor of Science in Climate Smart Agriculture">
                             Bachelor of Science in Climate Smart Agriculture
                           </MenuItem>
-                          <MenuItem value="bachelor_environmental_science">
+                          <MenuItem value="Bachelor of Science in Environmental Science and Management">
                             Bachelor of Science in Environmental Science and
                             Management
                           </MenuItem>
-                          <MenuItem value="master_information_technology">
+                          <MenuItem value="Master of Information Technology">
                             Master of Information Technology
                           </MenuItem>
 
                           {/* Engineering Programs */}
-                          <MenuItem value="bachelor_electrical_engineering">
+                          <MenuItem value="Bachelor of Science in Electrical Engineering">
                             Bachelor of Science in Electrical Engineering
                           </MenuItem>
-                          <MenuItem value="bachelor_civil_engineering">
+                          <MenuItem value="Bachelor of Science in Civil Engineering">
                             Bachelor of Science in Civil Engineering
                           </MenuItem>
-                          <MenuItem value="bachelor_architecture">
+                          <MenuItem value="Bachelor of Architecture">
                             Bachelor of Architecture
                           </MenuItem>
-                          <MenuItem value="bachelor_petroleum_engineering">
+                          <MenuItem value="Bachelor of Science in Petroleum Engineering">
                             Bachelor of Science in Petroleum Engineering
                           </MenuItem>
-                          <MenuItem value="bachelor_mechatronics_robotics">
+                          <MenuItem value="Bachelor of Science in Mechatronics and Robotics">
                             Bachelor of Science in Mechatronics and Robotics
                           </MenuItem>
-                          <MenuItem value="bachelor_communications_engineering">
+                          <MenuItem value="Bachelor of Science in Communications Engineering">
                             Bachelor of Science in Communications Engineering
                           </MenuItem>
-                          <MenuItem value="bachelor_mining_engineering">
+                          <MenuItem value="Bachelor of Science in Mining Engineering">
                             Bachelor of Science in Mining Engineering
                           </MenuItem>
-                          <MenuItem value="diploma_electrical_engineering">
+                          <MenuItem value="Diploma in Electrical Engineering">
                             Diploma in Electrical Engineering
                           </MenuItem>
-                          <MenuItem value="diploma_civil_engineering">
+                          <MenuItem value="Diploma in Civil Engineering">
                             Diploma in Civil Engineering
                           </MenuItem>
-                          <MenuItem value="diploma_architecture">
+                          <MenuItem value="Diploma in Architecture">
                             Diploma in Architecture
                           </MenuItem>
 
                           {/* Law and Humanities Programs */}
-                          <MenuItem value="bachelor_laws">
+                          <MenuItem value="Bachelor of Laws (LLB)">
                             Bachelor of Laws (LLB)
                           </MenuItem>
-                          <MenuItem value="bachelor_international_relations">
+                          <MenuItem value="Bachelor of International Relations and Diplomatic Studies">
                             Bachelor of International Relations and Diplomatic
                             Studies
                           </MenuItem>
-                          <MenuItem value="master_international_relations">
+                          <MenuItem value="Master of International Relations and Diplomatic Studies">
                             Master of International Relations and Diplomatic
                             Studies
                           </MenuItem>
 
                           {/* Certificate Programs */}
-                          <MenuItem value="higher_education_access_arts">
+                          <MenuItem value="Higher Education Access Programme - Arts">
                             Higher Education Access Programme - Arts
                           </MenuItem>
-                          <MenuItem value="higher_education_access_sciences">
+                          <MenuItem value="Higher Education Access Programme - Sciences">
                             Higher Education Access Programme - Sciences
                           </MenuItem>
                         </Select>
@@ -1506,8 +1683,8 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
                           onChange={handleInputChange}
                           label="Mode of Study"
                         >
-                          <MenuItem value="on_campus">On Campus</MenuItem>
-                          <MenuItem value="online">Online</MenuItem>
+                          <MenuItem value="On Campus">On Campus</MenuItem>
+                          <MenuItem value="Online">Online</MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>
@@ -1523,9 +1700,9 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
                           onChange={handleInputChange}
                           label="Preferred Intake"
                         >
-                          <MenuItem value="january">January</MenuItem>
-                          <MenuItem value="may">May</MenuItem>
-                          <MenuItem value="august">August</MenuItem>
+                          <MenuItem value="January">January</MenuItem>
+                          <MenuItem value="May">May</MenuItem>
+                          <MenuItem value="August">August</MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>
@@ -1556,11 +1733,11 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
                         Mode of Study
                       </Typography>
                       <Typography variant="body1">
-                        {application.modeOfStudy === "on_campus"
+                        {application.modeOfStudy === "On Campus"
                           ? "On Campus"
-                          : application.modeOfStudy === "online"
+                          : application.modeOfStudy === "Online"
                           ? "Online"
-                          : application.modeOfStudy === "hybrid"
+                          : application.modeOfStudy === "Hybrid"
                           ? "Hybrid"
                           : application.modeOfStudy || "Not specified"}
                       </Typography>
@@ -1580,6 +1757,72 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
                 )}
               </Grid>
             </Paper>
+
+            {/* Application Management Section - Only in Edit Mode for Admin Users */}
+            {editMode && canEditApplication() && (
+              <>
+                <Typography variant="h6" gutterBottom>
+                  Application Management
+                </Typography>
+                <Paper sx={{ p: 2, mb: 3 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth margin="normal">
+                        <InputLabel id="application-status-label">
+                          Application Status
+                        </InputLabel>
+                        <Select
+                          labelId="application-status-label"
+                          name="status"
+                          value={formData.status || ""}
+                          onChange={handleInputChange}
+                          label="Application Status"
+                        >
+                          <MenuItem value="INTERESTED">Interested</MenuItem>
+                          <MenuItem value="APPLIED">Applied</MenuItem>
+                          <MenuItem value="IN_REVIEW">In Review</MenuItem>
+                          <MenuItem value="QUALIFIED">Qualified</MenuItem>
+                          <MenuItem value="ADMITTED">Admitted</MenuItem>
+                          <MenuItem value="ENROLLED">Enrolled</MenuItem>
+                          <MenuItem value="DEFERRED">Deferred</MenuItem>
+                          <MenuItem value="EXPIRED">Expired</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        label="Status Notes"
+                        name="statusNote"
+                        value={formData.statusNote || ""}
+                        onChange={handleInputChange}
+                        margin="normal"
+                        placeholder="Add any notes about the status or stage change..."
+                      />
+                    </Grid>
+                    {formData.status !== application.status && (
+                      <Grid item xs={12}>
+                        <Alert severity="info" sx={{ mt: 1 }}>
+                          <Typography variant="body2">
+                            <strong>Status Change Detected:</strong>{" "}
+                            {application.status || "Unknown"} →{" "}
+                            {formData.status}
+                            <br />
+                            <em>
+                              This will also update the corresponding lead
+                              status automatically.
+                            </em>
+                          </Typography>
+                        </Alert>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Paper>
+              </>
+            )}
 
             {/* Sponsor Information (if available) */}
             {(application.sponsorEmail ||
@@ -2088,6 +2331,28 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="subtitle2" color="text.secondary">
+                        Current Status
+                      </Typography>
+                      <Typography variant="body1" fontWeight="medium">
+                        {application.status
+                          ? application.status
+                              .replace(/_/g, " ")
+                              .replace(/\b\w/g, (l) => l.toUpperCase())
+                          : "Not Set"}
+                      </Typography>
+                    </Grid>
+                    {application.statusNote && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="subtitle2" color="text.secondary">
+                          Status Notes
+                        </Typography>
+                        <Typography variant="body1">
+                          {application.statusNote}
+                        </Typography>
+                      </Grid>
+                    )}
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">
                         Submitted On
                       </Typography>
                       <Typography variant="body1" fontWeight="medium">
@@ -2102,8 +2367,20 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
                         {formatDate(application.updatedAt)}
                       </Typography>
                     </Grid>
+                    {application.lastUpdatedBy && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="subtitle2" color="text.secondary">
+                          Last Updated By
+                        </Typography>
+                        <Typography variant="body1">
+                          {application.lastUpdatedBy.name || "Unknown"}
+                          {application.lastUpdatedBy.role &&
+                            ` (${application.lastUpdatedBy.role})`}
+                        </Typography>
+                      </Grid>
+                    )}
                     {application.submittedBy && (
-                      <Grid item xs={12}>
+                      <Grid item xs={12} sm={6}>
                         <Typography variant="subtitle2" color="text.secondary">
                           Submitted By
                         </Typography>
@@ -2118,6 +2395,122 @@ const ApplicationDetailsDialog = ({ open, onClose, leadId, applicationId }) => {
                         </Typography>
                       </Grid>
                     )}
+
+                    {/* Timeline History */}
+                    {application.timeline &&
+                      application.timeline.length > 0 && (
+                        <Grid item xs={12}>
+                          <Typography
+                            variant="subtitle2"
+                            color="text.secondary"
+                            sx={{ mb: 2 }}
+                          >
+                            Update History
+                          </Typography>
+                          <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
+                            {application.timeline
+                              .sort(
+                                (a, b) => new Date(b.date) - new Date(a.date)
+                              )
+                              .map((entry, index) => (
+                                <Box
+                                  key={index}
+                                  sx={{
+                                    p: 2,
+                                    mb: 1,
+                                    backgroundColor:
+                                      index === 0
+                                        ? "action.hover"
+                                        : "background.paper",
+                                    border: "1px solid",
+                                    borderColor: "divider",
+                                    borderRadius: 1,
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "flex-start",
+                                      mb: 1,
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="body2"
+                                      fontWeight="medium"
+                                    >
+                                      {entry.action ===
+                                        "APPLICATION_SUBMITTED" &&
+                                        "📝 Application Submitted"}
+                                      {entry.action === "STATUS_UPDATED" &&
+                                        "🔄 Status Updated"}
+                                      {entry.action === "APPLICATION_UPDATED" &&
+                                        "✏️ Information Updated"}
+                                      {![
+                                        "APPLICATION_SUBMITTED",
+                                        "STATUS_UPDATED",
+                                        "APPLICATION_UPDATED",
+                                      ].includes(entry.action) &&
+                                        `📋 ${entry.action
+                                          .replace(/_/g, " ")
+                                          .replace(/\b\w/g, (l) =>
+                                            l.toUpperCase()
+                                          )}`}
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      {formatDate(entry.date)}
+                                    </Typography>
+                                  </Box>
+
+                                  {entry.action === "STATUS_UPDATED" &&
+                                    entry.previousStatus && (
+                                      <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mb: 1 }}
+                                      >
+                                        Status:{" "}
+                                        {entry.previousStatus
+                                          .replace(/_/g, " ")
+                                          .replace(/\b\w/g, (l) =>
+                                            l.toUpperCase()
+                                          )}
+                                        →{" "}
+                                        {entry.status
+                                          .replace(/_/g, " ")
+                                          .replace(/\b\w/g, (l) =>
+                                            l.toUpperCase()
+                                          )}
+                                      </Typography>
+                                    )}
+
+                                  {entry.notes && (
+                                    <Typography variant="body2" sx={{ mb: 1 }}>
+                                      {entry.notes}
+                                    </Typography>
+                                  )}
+
+                                  {entry.updatedBy && (
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      By:{" "}
+                                      {entry.updatedBy.name ||
+                                        entry.updatedBy.email ||
+                                        "Unknown"}
+                                      {entry.updatedBy.role &&
+                                        ` (${entry.updatedBy.role})`}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              ))}
+                          </Box>
+                        </Grid>
+                      )}
                   </Grid>
                 </Paper>
               </>

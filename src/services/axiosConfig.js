@@ -1,6 +1,6 @@
 import axios from "axios";
 
-// Create axios instance with the correct base URL (no /api in the path)
+// Create axios instance with the correct base URL (services will include /api in their paths)
 export const axiosInstance = axios.create({
   baseURL: process.env.REACT_APP_API_BASE_URL || "http://localhost:3000",
   headers: {

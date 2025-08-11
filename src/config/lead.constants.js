@@ -5,17 +5,14 @@
 
 export const LEAD_STATUSES = {
   // Main funnel stages
-  INQUIRY: "INQUIRY", // Initial inquiry/lead capture
-  CONTACTED: "CONTACTED", // First contact made
-  PRE_QUALIFIED: "PRE_QUALIFIED", // Interested/Pre-qualified
+  INTERESTED: "INTERESTED", // Initial inquiry/lead capture
   APPLIED: "APPLIED", // Application submitted
+  IN_REVIEW: "IN_REVIEW", // Application being reviewed
   QUALIFIED: "QUALIFIED", // Meets all requirements
   ADMITTED: "ADMITTED", // Officially admitted
   ENROLLED: "ENROLLED", // Successfully enrolled
-
-  // Additional statuses for lead management
-  NURTURE: "NURTURE", // In nurturing process
-  REJECTED: "REJECTED", // Application rejected
+  DEFERRED: "DEFERRED", // Application deferred
+  EXPIRED: "EXPIRED", // Application expired
 };
 
 export const LEAD_SOURCES = {
@@ -38,25 +35,20 @@ export const LEAD_SOURCES = {
 
 // Status configuration with display labels and colors
 export const STATUS_CONFIG = {
-  [LEAD_STATUSES.INQUIRY]: {
-    label: "Inquiry",
-    color: "info",
-    description: "Initial contact or inquiry",
-  },
-  [LEAD_STATUSES.CONTACTED]: {
-    label: "Contacted",
-    color: "info",
-    description: "First contact made",
-  },
-  [LEAD_STATUSES.PRE_QUALIFIED]: {
+  [LEAD_STATUSES.INTERESTED]: {
     label: "Interested",
-    color: "warning",
-    description: "Shows interest and pre-qualified",
+    color: "info",
+    description: "Initial interest expressed",
   },
   [LEAD_STATUSES.APPLIED]: {
     label: "Applied",
-    color: "info",
+    color: "warning",
     description: "Application submitted",
+  },
+  [LEAD_STATUSES.IN_REVIEW]: {
+    label: "In Review",
+    color: "info",
+    description: "Application being reviewed",
   },
   [LEAD_STATUSES.QUALIFIED]: {
     label: "Qualified",
@@ -73,15 +65,15 @@ export const STATUS_CONFIG = {
     color: "primary",
     description: "Successfully enrolled - final goal",
   },
-  [LEAD_STATUSES.NURTURE]: {
-    label: "Nurture",
+  [LEAD_STATUSES.DEFERRED]: {
+    label: "Deferred",
     color: "warning",
-    description: "Lead is being nurtured",
+    description: "Application deferred to next intake",
   },
-  [LEAD_STATUSES.REJECTED]: {
-    label: "Rejected",
+  [LEAD_STATUSES.EXPIRED]: {
+    label: "Expired",
     color: "error",
-    description: "Application rejected",
+    description: "Application expired",
   },
 };
 

@@ -8,7 +8,7 @@ import { axiosInstance } from "./axiosConfig";
 
 class ApplicationService {
   constructor() {
-    this.apiUrl = "/api/applications";
+    this.apiUrl = "/applications"; // Since baseURL already includes /api
   }
 
   /**
@@ -269,12 +269,13 @@ class ApplicationService {
   async getApplicationsByEmail(email) {
     try {
       const response = await axiosInstance.get(
-        `${this.apiUrl}/email/${encodeURIComponent(email)}`
+        `/api/applications/email/${encodeURIComponent(email)}`
       );
-      return {
-        success: true,
-        data: response.data,
-      };
+      console.log("Raw backend response:", response.data);
+
+      // Backend already returns { success: true, data: [...] }
+      // So we return the backend response directly
+      return response.data;
     } catch (error) {
       console.error("Get applications by email error:", error);
       return {
@@ -318,15 +319,22 @@ class ApplicationService {
    * @param {string} applicationId - Application ID
    * @param {string} status - New status
    * @param {string} notes - Optional notes
+   * @param {Object} updatedBy - User who made the update
    * @returns {Promise} API response
    */
-  async updateApplicationStatus(applicationId, status, notes = "") {
+  async updateApplicationStatus(
+    applicationId,
+    status,
+    notes = "",
+    updatedBy = null
+  ) {
     try {
       const response = await axiosInstance.put(
         `${this.apiUrl}/${applicationId}/status`,
         {
           status,
           notes,
+          updatedBy,
         }
       );
       return {
@@ -416,7 +424,7 @@ class ApplicationService {
    */
   async getApplicationStats() {
     try {
-      const response = await axiosInstance.get("/applications/stats");
+      const response = await axiosInstance.get("/api/applications/stats");
       return {
         success: true,
         data: response.data,
@@ -428,6 +436,77 @@ class ApplicationService {
           error.response?.data?.message ||
           error.message ||
           "Failed to fetch application stats",
+      };
+    }
+  }
+
+  /**
+   * Get application document URL for viewing by email
+   * @param {string} email - The email of the applicant
+   * @param {string} documentType - The type of document to view (academicDocuments, identificationDocument, passportPhoto)
+   * @returns {Promise<{success: boolean, url: string|null, error: string|null}>}
+   */
+  async getApplicationDocumentByEmail(email, documentType) {
+    try {
+      console.log(
+        `ApplicationService: Fetching document for email ${email}, type: ${documentType}`
+      );
+
+      const requestUrl = `/api/applications/email/${encodeURIComponent(
+        email
+      )}/document/${documentType}`;
+      console.log(`ApplicationService: Request URL: ${requestUrl}`);
+
+      // Try with the standard axios instance
+      const response = await axiosInstance.get(requestUrl);
+      console.log(
+        `ApplicationService: Document fetch successful:`,
+        response.data
+      );
+
+      // Backend returns { success: true, url: "...", documentType: "...", applicationId: "..." }
+      // Return the backend response directly
+      return response.data;
+    } catch (error) {
+      console.error(
+        `ApplicationService: Error fetching document by email:`,
+        error.response || error
+      );
+
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to retrieve document",
+      };
+    }
+  }
+
+  /**
+   * Update application by email
+   * @param {string} email - Email of the applicant
+   * @param {object|FormData} applicationData - Updated application data, can be JSON or FormData for file uploads
+   * @param {object} config - Optional axios config for FormData requests
+   * @returns {Promise} API response
+   */
+  async updateApplicationByEmail(email, applicationData, config = {}) {
+    try {
+      const response = await axiosInstance.put(
+        `/api/applications/email/${encodeURIComponent(email)}`,
+        applicationData,
+        config
+      );
+      // Backend returns { success: true, data: {...}, message: "..." }
+      return response.data;
+    } catch (error) {
+      console.error("Update application by email error:", error);
+      return {
+        success: false,
+        message:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to update application",
       };
     }
   }
@@ -514,8 +593,8 @@ class ApplicationService {
       console.log(
         `ApplicationService: Fetching document for application ${applicationId}, type: ${documentType}`
       );
-      // The axiosInstance has baseURL = baseUrl + '/api', so we don't add '/api' here
-      const requestUrl = `/applications/${applicationId}/document/${documentType}`;
+      // The axiosInstance has baseURL = baseUrl, so we use full API path
+      const requestUrl = `/api/applications/${applicationId}/document/${documentType}`;
       console.log(`ApplicationService: Request URL: ${requestUrl}`);
       console.log(
         `ApplicationService: Full URL: ${axiosInstance.defaults.baseURL}${requestUrl}`
