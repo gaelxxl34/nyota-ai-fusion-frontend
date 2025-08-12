@@ -108,11 +108,7 @@ const ApplicationFormDialog = ({
           message:
             mode === "edit"
               ? "Application updated successfully!"
-              : "Application submitted successfully! Your application ID is: " +
-                (result.application?.id ||
-                  result.application?.applicationNumber ||
-                  "Generated") +
-                ". A confirmation email has been sent to the applicant.",
+              : "Application submitted successfully! A confirmation email has been sent to the applicant.",
         });
 
         // Process immediately but keep success message visible
@@ -465,11 +461,7 @@ const ApplicationFormDialog = ({
                   setSubmissionMessage({
                     type: "success",
                     message:
-                      "Application submitted successfully! Your application ID is: " +
-                      (result.application?.id ||
-                        result.application?.applicationNumber ||
-                        "Generated") +
-                      ". A confirmation email has been sent to the applicant.",
+                      "Application submitted successfully! A confirmation email has been sent to the applicant.",
                   });
 
                   // Process immediately but keep success message visible

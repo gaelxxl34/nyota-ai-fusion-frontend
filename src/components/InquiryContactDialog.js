@@ -122,7 +122,7 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
         email: formData.email || null,
         source: formData.source,
         program: formData.program || null,
-        status: "CONTACTED", // Explicitly set status for manually created leads
+        status: "INTERESTED", // Set status to INTERESTED for new leads to follow proper funnel
         notes:
           formData.notes ||
           `Manual inquiry created. Interested in: ${

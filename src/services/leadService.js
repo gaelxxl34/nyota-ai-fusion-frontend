@@ -251,15 +251,8 @@ export const leadService = {
         }
       );
 
-      // Only update lead status to CONTACTED if message was actually delivered
+      // Only add interaction record for successful delivery - don't change status
       if (messageResult.success && messageResult.delivered) {
-        await this.updateLeadStatus(
-          lead.id,
-          "CONTACTED",
-          `WhatsApp message sent: "${message}"`,
-          "inquiry_form"
-        );
-
         // Add interaction record for successful delivery
         await this.addInteraction(lead.id, {
           type: "WHATSAPP",
