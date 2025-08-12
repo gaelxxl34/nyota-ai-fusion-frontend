@@ -22,6 +22,8 @@ import {
   MenuItem,
   FormHelperText,
 } from "@mui/material";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import {
   Close as CloseIcon,
   Edit as EditIcon,
@@ -1308,16 +1310,87 @@ const ApplicationDetailsDialog = ({
                       />
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Phone Number"
-                        name="phoneNumber"
-                        value={formData.phoneNumber || ""}
-                        onChange={handleInputChange}
-                        error={!!formErrors.phoneNumber}
-                        helperText={formErrors.phoneNumber}
-                        margin="normal"
-                      />
+                      <Box>
+                        <PhoneInput
+                          international
+                          defaultCountry="UG"
+                          value={formData.phoneNumber || ""}
+                          onChange={(value) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              phoneNumber: value,
+                            }))
+                          }
+                          placeholder="Enter phone number"
+                          style={{
+                            "--PhoneInputCountrySelectArrow-color": "#666",
+                            "--PhoneInputCountrySelectArrow-opacity": "0.8",
+                          }}
+                          className={`phone-input-custom ${
+                            formErrors.phoneNumber ? "error" : ""
+                          }`}
+                        />
+                        {formErrors.phoneNumber && (
+                          <Typography
+                            variant="caption"
+                            color="error"
+                            sx={{ mt: 0.5, display: "block" }}
+                          >
+                            {formErrors.phoneNumber}
+                          </Typography>
+                        )}
+                        <style jsx>{`
+                          .phone-input-custom {
+                            width: 100%;
+                            border: 1px solid #c4c4c4;
+                            border-radius: 4px;
+                            padding: 16.5px 14px;
+                            font-size: 16px;
+                            font-family: "Roboto", "Helvetica", "Arial",
+                              sans-serif;
+                            background-color: #fff;
+                            transition: border-color 0.15s ease-in-out;
+                          }
+                          .phone-input-custom:hover {
+                            border-color: #000;
+                          }
+                          .phone-input-custom:focus-within {
+                            border-color: #1976d2;
+                            border-width: 2px;
+                            outline: none;
+                          }
+                          .phone-input-custom.error {
+                            border-color: #d32f2f;
+                          }
+                          .phone-input-custom .PhoneInputInput {
+                            border: none;
+                            outline: none;
+                            font-size: 16px;
+                            font-family: "Roboto", "Helvetica", "Arial",
+                              sans-serif;
+                            background: transparent;
+                            flex: 1;
+                            margin-left: 8px;
+                          }
+                          .phone-input-custom .PhoneInputCountrySelect {
+                            border: none;
+                            background: transparent;
+                            margin-right: 8px;
+                          }
+                          .phone-input-custom .PhoneInputCountrySelectArrow {
+                            border-top-color: var(
+                              --PhoneInputCountrySelectArrow-color
+                            );
+                            opacity: var(
+                              --PhoneInputCountrySelectArrow-opacity
+                            );
+                          }
+                          .phone-input-custom .PhoneInputCountryIcon {
+                            width: 24px;
+                            height: 18px;
+                          }
+                        `}</style>
+                      </Box>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <FormControl fullWidth margin="normal">

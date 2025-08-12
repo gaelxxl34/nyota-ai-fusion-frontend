@@ -12,6 +12,8 @@ import {
   Typography,
 } from "@mui/material";
 import { PhotoCamera } from "@mui/icons-material";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import { COUNTRIES } from "../common/CountrySelect";
 
 export const PersonalDetailsStep = ({
@@ -75,18 +77,74 @@ export const PersonalDetailsStep = ({
         </Grid>
 
         <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Phone Number"
-            value={formData.phone || ""}
-            onChange={handleInputChange("phone")}
-            error={!!errors.phone}
-            helperText={
-              errors.phone || "Format: +256XXXXXXXXX (include country code)"
-            }
-            placeholder="+256XXXXXXXXX"
-            required
-          />
+          <Box>
+            <PhoneInput
+              international
+              defaultCountry="UG"
+              value={formData.phone || ""}
+              onChange={(value) => updateFormData({ phone: value })}
+              placeholder="Enter phone number"
+              style={{
+                "--PhoneInputCountrySelectArrow-color": "#666",
+                "--PhoneInputCountrySelectArrow-opacity": "0.8",
+              }}
+              className={`phone-input-custom ${errors.phone ? "error" : ""}`}
+            />
+            {errors.phone && (
+              <Typography
+                variant="caption"
+                color="error"
+                sx={{ mt: 0.5, display: "block" }}
+              >
+                {errors.phone}
+              </Typography>
+            )}
+            <style jsx>{`
+              .phone-input-custom {
+                width: 100%;
+                border: 1px solid #c4c4c4;
+                border-radius: 4px;
+                padding: 16.5px 14px;
+                font-size: 16px;
+                font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+                background-color: #fff;
+                transition: border-color 0.15s ease-in-out;
+              }
+              .phone-input-custom:hover {
+                border-color: #000;
+              }
+              .phone-input-custom:focus-within {
+                border-color: #1976d2;
+                border-width: 2px;
+                outline: none;
+              }
+              .phone-input-custom.error {
+                border-color: #d32f2f;
+              }
+              .phone-input-custom .PhoneInputInput {
+                border: none;
+                outline: none;
+                font-size: 16px;
+                font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+                background: transparent;
+                flex: 1;
+                margin-left: 8px;
+              }
+              .phone-input-custom .PhoneInputCountrySelect {
+                border: none;
+                background: transparent;
+                margin-right: 8px;
+              }
+              .phone-input-custom .PhoneInputCountrySelectArrow {
+                border-top-color: var(--PhoneInputCountrySelectArrow-color);
+                opacity: var(--PhoneInputCountrySelectArrow-opacity);
+              }
+              .phone-input-custom .PhoneInputCountryIcon {
+                width: 24px;
+                height: 18px;
+              }
+            `}</style>
+          </Box>
         </Grid>
 
         <Grid item xs={12} sm={6}>

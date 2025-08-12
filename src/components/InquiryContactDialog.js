@@ -22,15 +22,19 @@ import {
   Phone as PhoneIcon,
   Send as SendIcon,
 } from "@mui/icons-material";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
+import { isValidPhoneNumber } from "react-phone-number-input";
 import { leadService } from "../services/leadService";
 import { useAuth } from "../contexts/AuthContext";
 import { SOURCE_CONFIG } from "../config/lead.constants";
+import { PROGRAM_OPTIONS } from "../config/program.constants";
 
 const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
-    phone: "",
+    phone: "", // Will store the formatted international phone number
     email: "",
     source: "MANUAL",
     program: "",
@@ -43,16 +47,8 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
   const [success, setSuccess] = useState("");
   const [contactMethod, setContactMethod] = useState("whatsapp");
 
-  const programOptions = [
-    "Bachelor of Information Technology (BIT)",
-    "Bachelor of Business Administration (BBA)",
-    "Bachelor of Commerce (BCOM)",
-    "Master of Information Technology (MIT)",
-    "Master of Business Administration (MBA)",
-    "Diploma in Information Technology",
-    "Diploma in Business Administration",
-    "Certificate Programs",
-  ];
+  // Use the standardized program options from constants
+  const programOptions = PROGRAM_OPTIONS;
 
   // Use the same source configuration from constants
   const sourceOptions = Object.entries(SOURCE_CONFIG).map(
@@ -65,6 +61,12 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
 
   const handleInputChange = (field) => (event) => {
     setFormData({ ...formData, [field]: event.target.value });
+    setError("");
+    setSuccess("");
+  };
+
+  const handlePhoneChange = (value) => {
+    setFormData({ ...formData, phone: value || "" });
     setError("");
     setSuccess("");
   };
@@ -90,15 +92,26 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
       return false;
     }
 
-    if (!formData.phone.trim()) {
+    if (!formData.phone) {
       setError("Phone number is required");
       return false;
     }
 
-    // Basic phone validation
-    const phoneRegex = /^\+?[\d\s\-()]{10,}$/;
-    if (!phoneRegex.test(formData.phone)) {
+    // Use the package's built-in validation
+    if (!isValidPhoneNumber(formData.phone)) {
       setError("Please enter a valid phone number");
+      return false;
+    }
+
+    if (!formData.email.trim()) {
+      setError("Email address is required");
+      return false;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError("Please enter a valid email address");
       return false;
     }
 
@@ -118,8 +131,8 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
       // Prepare contact info
       const contactInfo = {
         name: formData.name,
-        phone: formData.phone,
-        email: formData.email || null,
+        phone: formData.phone, // Already in international format from PhoneInput
+        email: formData.email,
         source: formData.source,
         program: formData.program || null,
         status: "INTERESTED", // Set status to INTERESTED for new leads to follow proper funnel
@@ -259,24 +272,66 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
           </Grid>
 
           <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Phone Number"
-              value={formData.phone}
-              onChange={handleInputChange("phone")}
-              required
-              placeholder="+256 700 123 456"
-              variant="outlined"
-            />
+            <Box>
+              <PhoneInput
+                international
+                countryCallingCodeEditable={false}
+                defaultCountry="UG"
+                value={formData.phone}
+                onChange={handlePhoneChange}
+                className="phone-input-material-ui"
+                placeholder="Enter phone number"
+                style={{
+                  "--PhoneInputCountryFlag-height": "1.2em",
+                  "--PhoneInputCountryFlag-width": "1.5em",
+                  "--PhoneInputCountrySelectArrow-color": "#666666",
+                  "--PhoneInputCountrySelectArrow-opacity": "0.8",
+                }}
+              />
+              <style>{`
+                .phone-input-material-ui {
+                  width: 100%;
+                  padding: 14px;
+                  border: 1px solid #c4c4c4;
+                  border-radius: 4px;
+                  font-size: 16px;
+                  font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+                  transition: border-color 200ms cubic-bezier(0.0, 0, 0.2, 1) 0ms;
+                }
+                
+                .phone-input-material-ui:focus-within {
+                  border-color: #1976d2;
+                  border-width: 2px;
+                  outline: none;
+                }
+                
+                .phone-input-material-ui .PhoneInputInput {
+                  border: none;
+                  outline: none;
+                  background: transparent;
+                  font-size: inherit;
+                  font-family: inherit;
+                  width: 100%;
+                  margin-left: 8px;
+                }
+                
+                .phone-input-material-ui .PhoneInputCountrySelect {
+                  border: none;
+                  outline: none;
+                  background: transparent;
+                }
+              `}</style>
+            </Box>
           </Grid>
 
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Email (Optional)"
+              label="Email"
               type="email"
               value={formData.email}
               onChange={handleInputChange("email")}
+              required
               variant="outlined"
             />
           </Grid>
@@ -311,8 +366,8 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
                   <em>Not specified</em>
                 </MenuItem>
                 {programOptions.map((program) => (
-                  <MenuItem key={program} value={program}>
-                    {program}
+                  <MenuItem key={program.value} value={program.value}>
+                    {program.label}
                   </MenuItem>
                 ))}
               </Select>

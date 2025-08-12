@@ -17,8 +17,10 @@ import {
   Typography,
   Chip,
 } from "@mui/material";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import { leadService } from "../../services/leadService";
-import { STATUS_CONFIG, SOURCE_CONFIG } from "../../config/lead.constants";
+import { SOURCE_CONFIG } from "../../config/lead.constants";
 
 const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
   const [formData, setFormData] = useState({
@@ -28,8 +30,6 @@ const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
     phone: "",
     program: "",
     source: "",
-    status: "",
-    notes: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -53,8 +53,6 @@ const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
         phone: lead.phone || lead.phoneNumber || "",
         program: lead.program || "",
         source: lead.source || "",
-        status: lead.status || "",
-        notes: "",
       });
     }
   }, [lead]);
@@ -81,21 +79,8 @@ const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
         source: formData.source,
       };
 
-      // Handle status update separately if changed
-      let updatedLead;
-      if (formData.status !== lead.status) {
-        // Update status with notes
-        updatedLead = await leadService.updateLeadStatus(
-          lead.id,
-          formData.status,
-          formData.notes ||
-            `Status changed from ${lead.status} to ${formData.status}`,
-          "admin_user"
-        );
-      } else {
-        // Update lead information
-        updatedLead = await leadService.updateLead(lead.id, updateData);
-      }
+      // Update lead information
+      const updatedLead = await leadService.updateLead(lead.id, updateData);
 
       onUpdate(updatedLead.data);
       onClose();
@@ -161,14 +146,65 @@ const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
           </Grid>
 
           <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              disabled={loading}
-            />
+            <Box>
+              <PhoneInput
+                international
+                defaultCountry="UG"
+                value={formData.phone || ""}
+                onChange={(value) =>
+                  setFormData((prev) => ({ ...prev, phone: value }))
+                }
+                placeholder="Enter phone number"
+                disabled={loading}
+                style={{
+                  "--PhoneInputCountrySelectArrow-color": "#666",
+                  "--PhoneInputCountrySelectArrow-opacity": "0.8",
+                }}
+                className="phone-input-custom"
+              />
+              <style jsx>{`
+                .phone-input-custom {
+                  width: 100%;
+                  border: 1px solid #c4c4c4;
+                  border-radius: 4px;
+                  padding: 16.5px 14px;
+                  font-size: 16px;
+                  font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+                  background-color: #fff;
+                  transition: border-color 0.15s ease-in-out;
+                }
+                .phone-input-custom:hover {
+                  border-color: #000;
+                }
+                .phone-input-custom:focus-within {
+                  border-color: #1976d2;
+                  border-width: 2px;
+                  outline: none;
+                }
+                .phone-input-custom .PhoneInputInput {
+                  border: none;
+                  outline: none;
+                  font-size: 16px;
+                  font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+                  background: transparent;
+                  flex: 1;
+                  margin-left: 8px;
+                }
+                .phone-input-custom .PhoneInputCountrySelect {
+                  border: none;
+                  background: transparent;
+                  margin-right: 8px;
+                }
+                .phone-input-custom .PhoneInputCountrySelectArrow {
+                  border-top-color: var(--PhoneInputCountrySelectArrow-color);
+                  opacity: var(--PhoneInputCountrySelectArrow-opacity);
+                }
+                .phone-input-custom .PhoneInputCountryIcon {
+                  width: 24px;
+                  height: 18px;
+                }
+              `}</style>
+            </Box>
           </Grid>
 
           <Grid item xs={12}>
@@ -199,46 +235,6 @@ const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
               </Select>
             </FormControl>
           </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth disabled={loading}>
-              <InputLabel>Status</InputLabel>
-              <Select
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                label="Status"
-              >
-                {Object.entries(STATUS_CONFIG).map(([value, config]) => (
-                  <MenuItem key={value} value={value}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Chip
-                        label={config.label}
-                        color={config.color}
-                        size="small"
-                      />
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {formData.status !== lead?.status && (
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Notes (for status change)"
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                multiline
-                rows={3}
-                placeholder="Add notes about this status change..."
-                disabled={loading}
-              />
-            </Grid>
-          )}
         </Grid>
       </DialogContent>
 
