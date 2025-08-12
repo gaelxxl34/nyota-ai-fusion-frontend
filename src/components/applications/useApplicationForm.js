@@ -223,88 +223,12 @@ export const useApplicationForm = () => {
           throw new Error("Please fix validation errors before submitting");
         }
 
-        // Convert all file objects to base64 before submission
+        // For manual applications, keep files as File objects for FormData upload
+        // Do NOT convert to base64 - let the backend handle Firebase Storage upload
         const processedFormData = { ...formData };
 
-        // Convert passport photo to base64 if it exists
-        if (formData.passportPhoto && formData.passportPhoto instanceof File) {
-          try {
-            console.log("Converting passport photo to base64...");
-            processedFormData.passportPhoto = await fileToBase64(
-              formData.passportPhoto
-            );
-          } catch (error) {
-            console.error("Failed to convert passport photo to base64:", error);
-            setErrors((prev) => ({ ...prev, passportPhoto: error.message }));
-            throw new Error(`File error: ${error.message}`);
-          }
-        }
-
-        // Convert academic documents to base64 if they exist
-        if (formData.academicDocuments) {
-          try {
-            console.log("Converting academic documents to base64...");
-            if (Array.isArray(formData.academicDocuments)) {
-              // For multiple files, just get the first one or null
-              const file = formData.academicDocuments[0] || null;
-              if (file) {
-                // Convert directly to base64 string
-                processedFormData.academicDocuments = await fileToBase64(file);
-              } else {
-                processedFormData.academicDocuments = null;
-              }
-            } else {
-              // Handle single file - direct base64 string
-              processedFormData.academicDocuments = await fileToBase64(
-                formData.academicDocuments
-              );
-            }
-          } catch (error) {
-            console.error(
-              "Failed to convert academic documents to base64:",
-              error
-            );
-            setErrors((prev) => ({
-              ...prev,
-              academicDocuments: error.message,
-            }));
-            throw new Error(`File error: ${error.message}`);
-          }
-        }
-
-        // Convert identification documents to base64 if they exist
-        if (formData.identificationDocuments) {
-          try {
-            console.log("Converting identification documents to base64...");
-            if (Array.isArray(formData.identificationDocuments)) {
-              // For multiple files, just get the first one or null
-              const file = formData.identificationDocuments[0] || null;
-              if (file) {
-                // Convert directly to base64 string
-                processedFormData.identificationDocuments = await fileToBase64(
-                  file
-                );
-              } else {
-                processedFormData.identificationDocuments = null;
-              }
-            } else {
-              // Handle single file - direct base64 string
-              processedFormData.identificationDocuments = await fileToBase64(
-                formData.identificationDocuments
-              );
-            }
-          } catch (error) {
-            console.error(
-              "Failed to convert identification documents to base64:",
-              error
-            );
-            setErrors((prev) => ({
-              ...prev,
-              identificationDocuments: error.message,
-            }));
-            throw new Error(`File error: ${error.message}`);
-          }
-        }
+        // Keep files as File objects (do not convert to base64)
+        // The backend will handle uploading to Firebase Storage
 
         // Format data to match backend expectations
         const formattedData = {
@@ -315,14 +239,14 @@ export const useApplicationForm = () => {
           countryOfBirth: processedFormData.countryOfBirth,
           gender: processedFormData.gender.toLowerCase(), // Ensure lowercase for gender
           postalAddress: processedFormData.postalAddress,
-          passportPhoto: processedFormData.passportPhoto,
+          passportPhoto: processedFormData.passportPhoto, // Keep as File object
 
           // Program details
           preferredProgram: convertProgramFormat(processedFormData.program),
           modeOfStudy: convertModeOfStudy(processedFormData.modeOfStudy),
           preferredIntake: processedFormData.intake,
-          academicDocuments: processedFormData.academicDocuments, // Now just base64 string
-          identificationDocument: processedFormData.identificationDocuments, // Now just base64 string
+          academicDocuments: processedFormData.academicDocuments, // Keep as File object
+          identificationDocuments: processedFormData.identificationDocuments, // Keep as File object
 
           // Sponsor info - explicitly add these even if empty
           sponsor: null, // No sponsor name field in form, but expected by backend
@@ -348,6 +272,25 @@ export const useApplicationForm = () => {
           formattedData
         );
 
+        // Add comprehensive debugging
+        console.log("=== DEBUGGING FORM SUBMISSION ===");
+        console.log("Original form data:", formData);
+        console.log("Processed form data:", processedFormData);
+        console.log(
+          "Final formatted data:",
+          JSON.stringify(formattedData, null, 2)
+        );
+        console.log("Required fields check:");
+        console.log("- name:", formattedData.name);
+        console.log("- email:", formattedData.email);
+        console.log("- phoneNumber:", formattedData.phoneNumber);
+        console.log("- countryOfBirth:", formattedData.countryOfBirth);
+        console.log("- gender:", formattedData.gender);
+        console.log("- preferredProgram:", formattedData.preferredProgram);
+        console.log("- modeOfStudy:", formattedData.modeOfStudy);
+        console.log("- preferredIntake:", formattedData.preferredIntake);
+        console.log("=== END DEBUGGING ===");
+
         // Check if we have an applicationId for editing
         if (formData.applicationId) {
           console.log("Updating existing application:", formData.applicationId);
@@ -365,8 +308,8 @@ export const useApplicationForm = () => {
 
           return result;
         } else {
-          // Submit new application through service
-          const result = await applicationService.submitApplication(
+          // Submit new manual application through service (for manual data entry)
+          const result = await applicationService.submitManualApplication(
             formattedData,
             user,
             forceSubmit

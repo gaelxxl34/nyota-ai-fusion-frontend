@@ -111,7 +111,8 @@ const ApplicationFormDialog = ({
               : "Application submitted successfully! Your application ID is: " +
                 (result.application?.id ||
                   result.application?.applicationNumber ||
-                  "Generated"),
+                  "Generated") +
+                ". A confirmation email has been sent to the applicant.",
         });
 
         // Process immediately but keep success message visible
@@ -467,7 +468,8 @@ const ApplicationFormDialog = ({
                       "Application submitted successfully! Your application ID is: " +
                       (result.application?.id ||
                         result.application?.applicationNumber ||
-                        "Generated"),
+                        "Generated") +
+                      ". A confirmation email has been sent to the applicant.",
                   });
 
                   // Process immediately but keep success message visible

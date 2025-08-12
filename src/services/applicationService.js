@@ -8,7 +8,7 @@ import { axiosInstance } from "./axiosConfig";
 
 class ApplicationService {
   constructor() {
-    this.apiUrl = "/applications"; // Since baseURL already includes /api
+    this.apiUrl = "/api/applications"; // Full API path since baseURL is just the host
   }
 
   /**
@@ -135,27 +135,116 @@ class ApplicationService {
         months[now.getMonth()]
       } ${now.getDate()}, ${now.getFullYear()}`;
 
-      // Include user info if provided
-      const requestData = {
-        ...applicationData,
-        forceSubmit, // Add forceSubmit flag
-        submittedAt: formattedDate, // Add submission date in simple format
-      };
+      // Check if we have files to upload
+      const hasFiles =
+        applicationData.passportPhoto instanceof File ||
+        applicationData.academicDocuments instanceof File ||
+        applicationData.identificationDocuments instanceof File ||
+        Array.isArray(applicationData.academicDocuments) ||
+        Array.isArray(applicationData.identificationDocuments);
 
-      if (userInfo) {
-        requestData.submittedBy = {
-          uid: userInfo.uid,
-          email: userInfo.email,
-          name: userInfo.displayName || userInfo.email,
-          role: userInfo.role,
+      let requestData;
+      let config = {};
+
+      if (hasFiles) {
+        // Use FormData for file uploads
+        const formData = new FormData();
+
+        // Add all non-file fields
+        Object.keys(applicationData).forEach((key) => {
+          const value = applicationData[key];
+          if (
+            value !== null &&
+            value !== undefined &&
+            !(value instanceof File) &&
+            !Array.isArray(value)
+          ) {
+            formData.append(key, value.toString());
+          }
+        });
+
+        // Add file fields
+        if (applicationData.passportPhoto instanceof File) {
+          formData.append("passportPhoto", applicationData.passportPhoto);
+        }
+
+        if (applicationData.academicDocuments instanceof File) {
+          formData.append(
+            "academicDocuments",
+            applicationData.academicDocuments
+          );
+        } else if (
+          Array.isArray(applicationData.academicDocuments) &&
+          applicationData.academicDocuments[0] instanceof File
+        ) {
+          formData.append(
+            "academicDocuments",
+            applicationData.academicDocuments[0]
+          );
+        }
+
+        if (applicationData.identificationDocuments instanceof File) {
+          formData.append(
+            "identificationDocument",
+            applicationData.identificationDocuments
+          );
+        } else if (
+          Array.isArray(applicationData.identificationDocuments) &&
+          applicationData.identificationDocuments[0] instanceof File
+        ) {
+          formData.append(
+            "identificationDocument",
+            applicationData.identificationDocuments[0]
+          );
+        }
+
+        // Add metadata
+        formData.append("forceSubmit", forceSubmit.toString());
+        formData.append("submittedAt", formattedDate);
+
+        if (userInfo) {
+          formData.append(
+            "submittedBy",
+            JSON.stringify({
+              uid: userInfo.uid,
+              email: userInfo.email,
+              name: userInfo.displayName || userInfo.email,
+              role: userInfo.role,
+              submittedAt: formattedDate,
+            })
+          );
+        }
+
+        requestData = formData;
+        config = {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        };
+      } else {
+        // Use JSON for submissions without files
+        requestData = {
+          ...applicationData,
+          forceSubmit,
           submittedAt: formattedDate,
         };
+
+        if (userInfo) {
+          requestData.submittedBy = {
+            uid: userInfo.uid,
+            email: userInfo.email,
+            name: userInfo.displayName || userInfo.email,
+            role: userInfo.role,
+            submittedAt: formattedDate,
+          };
+        }
       }
 
       // Use the manual application endpoint
       const response = await axiosInstance.post(
         `${this.apiUrl}/submit-manual`,
-        requestData
+        requestData,
+        config
       );
       return {
         success: true,
@@ -269,7 +358,7 @@ class ApplicationService {
   async getApplicationsByEmail(email) {
     try {
       const response = await axiosInstance.get(
-        `/api/applications/email/${encodeURIComponent(email)}`
+        `${this.apiUrl}/email/${encodeURIComponent(email)}`
       );
       console.log("Raw backend response:", response.data);
 
@@ -424,7 +513,7 @@ class ApplicationService {
    */
   async getApplicationStats() {
     try {
-      const response = await axiosInstance.get("/api/applications/stats");
+      const response = await axiosInstance.get(`${this.apiUrl}/stats`);
       return {
         success: true,
         data: response.data,
@@ -452,7 +541,7 @@ class ApplicationService {
         `ApplicationService: Fetching document for email ${email}, type: ${documentType}`
       );
 
-      const requestUrl = `/api/applications/email/${encodeURIComponent(
+      const requestUrl = `${this.apiUrl}/email/${encodeURIComponent(
         email
       )}/document/${documentType}`;
       console.log(`ApplicationService: Request URL: ${requestUrl}`);
@@ -493,7 +582,7 @@ class ApplicationService {
   async updateApplicationByEmail(email, applicationData, config = {}) {
     try {
       const response = await axiosInstance.put(
-        `/api/applications/email/${encodeURIComponent(email)}`,
+        `${this.apiUrl}/email/${encodeURIComponent(email)}`,
         applicationData,
         config
       );
@@ -594,7 +683,7 @@ class ApplicationService {
         `ApplicationService: Fetching document for application ${applicationId}, type: ${documentType}`
       );
       // The axiosInstance has baseURL = baseUrl, so we use full API path
-      const requestUrl = `/api/applications/${applicationId}/document/${documentType}`;
+      const requestUrl = `${this.apiUrl}/${applicationId}/document/${documentType}`;
       console.log(`ApplicationService: Request URL: ${requestUrl}`);
       console.log(
         `ApplicationService: Full URL: ${axiosInstance.defaults.baseURL}${requestUrl}`

@@ -74,8 +74,6 @@ const LeadEditDialog = ({ open, onClose, lead, onUpdate }) => {
 
       // Prepare update data
       const updateData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
         name: `${formData.firstName} ${formData.lastName}`.trim(),
         email: formData.email,
         phone: formData.phone,
