@@ -54,7 +54,7 @@ import LeadDeleteDialog from "../../components/leads/LeadDeleteDialog";
 import StartConversationDialog from "../../components/leads/StartConversationDialog";
 
 const DataCenter = () => {
-  const { checkPermission, checkLeadStageAccess } = useRolePermissions();
+  const { checkPermission } = useRolePermissions();
   const { getUserRole } = useAuth();
   const userRole = getUserRole();
 
@@ -268,7 +268,7 @@ const DataCenter = () => {
       filtered.map((t) => t.label)
     );
     return filtered;
-  }, [userRole, leadStatusTabs, checkLeadStageAccess]);
+  }, [userRole, leadStatusTabs]);
 
   // Debug logging
   console.log("🔍 DataCenter Debug:", {
@@ -851,14 +851,6 @@ const DataCenter = () => {
     );
   }, [getCurrentTabLeads, searchTerm]);
 
-  // Keep applications filtering for future use
-  // const filteredApplications = applications.filter(
-  //   (app) =>
-  //     app.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  //     app.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  //     app.phoneNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  //     app.program?.toLowerCase().includes(searchTerm.toLowerCase())
-  // );
 
   const getStatusColor = (status) => {
     switch (status) {

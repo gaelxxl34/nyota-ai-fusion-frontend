@@ -86,7 +86,15 @@ const PipelineItem = ({ item, type, onView, onEdit }) => {
       <ListItemText
         primary={
           <Box display="flex" alignItems="center" gap={1}>
-            <Typography variant="body1" fontWeight={500}>
+            <Typography 
+              variant="body1" 
+              fontWeight={500} 
+              sx={{ 
+                color: '#000000 !important',
+                '& *': { color: '#000000 !important' }
+              }}
+              style={{ color: '#000000' }}
+            >
               {item.name}
             </Typography>
             {type === "urgent" && (

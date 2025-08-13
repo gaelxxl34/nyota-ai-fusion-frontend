@@ -35,7 +35,7 @@ import {
 } from "@mui/icons-material";
 import applicationService from "../../services/applicationService";
 import { useAuth } from "../../contexts/AuthContext";
-import CountrySelect, { COUNTRIES } from "../common/CountrySelect";
+import { COUNTRIES } from "../common/CountrySelect";
 
 const ApplicationDetailsDialog = ({
   open,

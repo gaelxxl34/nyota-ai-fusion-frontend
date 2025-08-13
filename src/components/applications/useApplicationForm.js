@@ -35,28 +35,6 @@ const convertModeOfStudy = (mode) => {
   return mode;
 };
 
-// Helper function to convert file to base64
-const fileToBase64 = (file) => {
-  return new Promise((resolve, reject) => {
-    if (!file) {
-      resolve(null);
-      return;
-    }
-
-    // Check file size - limit to 5MB
-    const maxSizeInBytes = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSizeInBytes) {
-      reject(new Error(`File size exceeds 5MB limit: ${file.name}`));
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = (error) => reject(error);
-  });
-};
-
 const initialFormData = {
   // Personal Details
   firstName: "",
