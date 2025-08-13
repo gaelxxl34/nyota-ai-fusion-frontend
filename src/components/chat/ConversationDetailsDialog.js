@@ -95,8 +95,10 @@ const ConversationDetailsDialog = ({ open, onClose, conversation }) => {
               <PersonIcon />
             </Avatar>
             <Box>
-              <Typography variant="h6">{conversation.contactName}</Typography>
-              <Typography variant="body2" color="textSecondary">
+              <Typography variant="h6" color="text.primary">
+                {conversation.contactName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
                 {conversation.phoneNumber}
               </Typography>
             </Box>
@@ -116,10 +118,12 @@ const ConversationDetailsDialog = ({ open, onClose, conversation }) => {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <MessageIcon color="primary" />
                   <Box>
-                    <Typography variant="h6">
+                    <Typography variant="h6" color="text.primary">
                       {conversation.messageCount}
                     </Typography>
-                    <Typography variant="caption">Messages</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Messages
+                    </Typography>
                   </Box>
                 </Box>
               </CardContent>
@@ -132,10 +136,12 @@ const ConversationDetailsDialog = ({ open, onClose, conversation }) => {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <TrendingUpIcon color="warning" />
                   <Box>
-                    <Typography variant="h6">
+                    <Typography variant="h6" color="text.primary">
                       {conversation.unreadCount}
                     </Typography>
-                    <Typography variant="caption">Unread</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Unread
+                    </Typography>
                   </Box>
                 </Box>
               </CardContent>
@@ -148,10 +154,12 @@ const ConversationDetailsDialog = ({ open, onClose, conversation }) => {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <ScheduleIcon color="info" />
                   <Box>
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       {formatMessageTime(conversation.lastMessageTime)}
                     </Typography>
-                    <Typography variant="caption">Last Message</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Last Message
+                    </Typography>
                   </Box>
                 </Box>
               </CardContent>
@@ -196,7 +204,7 @@ const ConversationDetailsDialog = ({ open, onClose, conversation }) => {
                 <Typography variant="subtitle2" color="primary">
                   Connected Lead
                 </Typography>
-                <Typography variant="body2">
+                <Typography variant="body2" color="text.primary">
                   Lead ID: {conversation.leadId}
                 </Typography>
               </Box>
@@ -210,7 +218,12 @@ const ConversationDetailsDialog = ({ open, onClose, conversation }) => {
         )}
 
         {/* Messages List */}
-        <Typography variant="h6" gutterBottom>
+        <Typography
+          variant="h6"
+          gutterBottom
+          color="text.primary"
+          sx={{ fontWeight: 600 }}
+        >
           Recent Messages
         </Typography>
 
@@ -230,8 +243,16 @@ const ConversationDetailsDialog = ({ open, onClose, conversation }) => {
               {messages.length === 0 ? (
                 <ListItem>
                   <ListItemText
-                    primary="No messages found"
-                    secondary="This conversation appears to be empty"
+                    primary={
+                      <Typography variant="body2" color="text.primary">
+                        No messages found
+                      </Typography>
+                    }
+                    secondary={
+                      <Typography variant="caption" color="text.secondary">
+                        This conversation appears to be empty
+                      </Typography>
+                    }
                   />
                 </ListItem>
               ) : (
@@ -247,7 +268,11 @@ const ConversationDetailsDialog = ({ open, onClose, conversation }) => {
                               alignItems: "center",
                             }}
                           >
-                            <Typography variant="body2">
+                            <Typography
+                              variant="body2"
+                              color="text.primary"
+                              sx={{ fontWeight: 400 }}
+                            >
                               {message.content || "No content"}
                             </Typography>
                             <Chip
@@ -264,7 +289,10 @@ const ConversationDetailsDialog = ({ open, onClose, conversation }) => {
                         }
                         secondary={
                           <Box sx={{ mt: 1 }}>
-                            <Typography variant="caption" color="textSecondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               {formatMessageTime(message.timestamp)}
                             </Typography>
                             {message.messageType &&

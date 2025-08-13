@@ -30,6 +30,7 @@ import {
   FormControl,
   InputLabel,
   Select,
+  CircularProgress,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -59,6 +60,7 @@ const UserManagement = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   // Available roles for IUEA system
   const ROLES = [
@@ -77,7 +79,6 @@ const UserManagement = () => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    phone: "",
     role: "admin",
     password: "000000",
     confirmPassword: "000000",
@@ -157,7 +158,6 @@ const UserManagement = () => {
       setFormData({
         name: user.name || "",
         email: user.email || "",
-        phone: user.phone || "",
         role: user.role || "admin",
         password: "",
         confirmPassword: "",
@@ -167,7 +167,6 @@ const UserManagement = () => {
       setFormData({
         name: "",
         email: "",
-        phone: "",
         role: "admin",
         password: "000000",
         confirmPassword: "000000",
@@ -184,7 +183,6 @@ const UserManagement = () => {
     setFormData({
       name: "",
       email: "",
-      phone: "",
       role: "admin",
       password: "000000",
       confirmPassword: "000000",
@@ -195,21 +193,31 @@ const UserManagement = () => {
   const handleSave = async () => {
     try {
       setError("");
+      setSaving(true);
 
       // Validation
       if (!formData.name || !formData.email || !formData.role) {
         setError("Name, email, and role are required");
+        setSaving(false);
+        return;
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        setError("Please enter a valid email address");
+        setSaving(false);
         return;
       }
 
       const dataToSend = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
         role: formData.role,
       };
 
       if (!editingUser) {
+        // For new users, password is required by backend
         dataToSend.password = "000000";
       }
 
@@ -225,7 +233,17 @@ const UserManagement = () => {
       fetchUsers();
     } catch (error) {
       console.error("Error saving user:", error);
-      setError(error.response?.data?.error || "Failed to save user");
+      let errorMessage = "Failed to save user";
+
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      setError(errorMessage);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -239,24 +257,29 @@ const UserManagement = () => {
 
     const confirmMessage = `Are you sure you want to delete user "${userToDelete.name}" (${userToDelete.email})?
 
-This will permanently:
-• Remove their account from the system
-• Delete all their authentication data
-• Remove all their data from Firestore database
+This will permanently delete:
+• Their user account and authentication data
+• All leads they have submitted or are assigned to
+• All applications they have submitted or are assigned to  
+• All WhatsApp conversations and messages related to their leads
+• All files they have uploaded to Firebase Storage
+• Any assignments to leads/applications (these will be unassigned)
 
-This action cannot be undone!`;
+This comprehensive deletion cannot be undone!`;
 
     if (window.confirm(confirmMessage)) {
       try {
         setLoading(true);
         await superAdminService.deleteUser(userToDelete.id);
-        setSuccess(`User "${userToDelete.name}" has been successfully deleted`);
+        setSuccess(
+          `User "${userToDelete.name}" and all associated data have been successfully deleted`
+        );
         fetchUsers();
       } catch (error) {
         console.error("Error deleting user:", error);
         setError(
           error.response?.data?.message ||
-            "Failed to delete user. The user may have associated data that needs to be removed first."
+            "Failed to delete user and associated data. Please try again."
         );
       } finally {
         setLoading(false);
@@ -484,14 +507,6 @@ This action cannot be undone!`;
                               {tableUser.email}
                             </Typography>
                           </Box>
-                          {tableUser.phone && (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {tableUser.phone}
-                            </Typography>
-                          )}
                         </Box>
                       </TableCell>
                       <TableCell>
@@ -655,9 +670,22 @@ This action cannot be undone!`;
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained">
-            {editingUser ? "Update" : "Create"}
+          <Button onClick={handleCloseDialog} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            disabled={saving}
+            startIcon={saving ? <CircularProgress size={16} /> : null}
+          >
+            {saving
+              ? editingUser
+                ? "Updating..."
+                : "Creating..."
+              : editingUser
+              ? "Update"
+              : "Create"}
           </Button>
         </DialogActions>
       </Dialog>

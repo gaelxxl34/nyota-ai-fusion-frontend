@@ -51,6 +51,34 @@ const ApplicationDetailsDialog = ({
   console.log("ApplicationDetailsDialog - Open:", open);
   console.log("ApplicationDetailsDialog - Email:", email);
 
+  // Tag configuration
+  const AVAILABLE_TAGS = [
+    {
+      value: "no_proper_respond",
+      label: "No proper respond",
+      color: "#f5f5f5",
+      textColor: "#000",
+    },
+    { value: "paid", label: "Paid", color: "#4caf50", textColor: "#000" },
+    {
+      value: "going_to_pay",
+      label: "Going to pay",
+      color: "#e91e63",
+      textColor: "#000",
+    },
+    {
+      value: "scholarship_request",
+      label: "Scholarship request",
+      color: "#f44336",
+      textColor: "#000",
+    },
+  ];
+
+  // Helper function to get tag configuration by value
+  const getTagConfig = (tagValue) => {
+    return AVAILABLE_TAGS.find((tag) => tag.value === tagValue) || null;
+  };
+
   const [application, setApplication] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -562,6 +590,17 @@ const ApplicationDetailsDialog = ({
         [name]: "",
       });
     }
+  };
+
+  // Handler for tag selection - single select
+  const handleTagChange = (event) => {
+    const {
+      target: { value },
+    } = event;
+    setFormData({
+      ...formData,
+      tag: value, // Single tag instead of array
+    });
   };
 
   const validateForm = () => {
@@ -1256,6 +1295,30 @@ const ApplicationDetailsDialog = ({
                   <Typography variant="h6">
                     Application #{application.applicationNumber}
                   </Typography>
+                  {/* Display tag in view mode */}
+                  {!editMode && application.tag && (
+                    <Box sx={{ mt: 1 }}>
+                      {(() => {
+                        const tagConfig = getTagConfig(application.tag);
+                        return (
+                          <Chip
+                            label={
+                              tagConfig ? tagConfig.label : application.tag
+                            }
+                            size="small"
+                            sx={{
+                              backgroundColor: tagConfig
+                                ? tagConfig.color
+                                : "#f5f5f5",
+                              color: "#000 !important",
+                              fontWeight: "medium",
+                              border: "1px solid rgba(255,255,255,0.3)",
+                            }}
+                          />
+                        );
+                      })()}
+                    </Box>
+                  )}
                 </Grid>
 
                 {application.status && (
@@ -1863,6 +1926,56 @@ const ApplicationDetailsDialog = ({
                       </FormControl>
                     </Grid>
 
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth margin="normal">
+                        <InputLabel id="application-tags-label">Tag</InputLabel>
+                        <Select
+                          labelId="application-tags-label"
+                          value={formData.tag || ""}
+                          onChange={handleTagChange}
+                          label="Tag"
+                          sx={{
+                            "& .MuiMenuItem-root": {
+                              color: "#000 !important",
+                            },
+                          }}
+                        >
+                          <MenuItem value="">
+                            <em>No tag</em>
+                          </MenuItem>
+                          {AVAILABLE_TAGS.map((tag) => (
+                            <MenuItem
+                              key={tag.value}
+                              value={tag.value}
+                              sx={{ color: "#000 !important" }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                  color: "#000 !important",
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    width: 16,
+                                    height: 16,
+                                    backgroundColor: tag.color,
+                                    borderRadius: "50%",
+                                    border: "1px solid #ddd",
+                                  }}
+                                />
+                                <span style={{ color: "#000" }}>
+                                  {tag.label}
+                                </span>
+                              </Box>
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
                     <Grid item xs={12}>
                       <TextField
                         fullWidth
@@ -2414,6 +2527,34 @@ const ApplicationDetailsDialog = ({
                           : "Not Set"}
                       </Typography>
                     </Grid>
+                    {/* Display tag in timeline section */}
+                    {application.tag && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="subtitle2" color="text.secondary">
+                          Tag
+                        </Typography>
+                        <Box sx={{ mt: 0.5 }}>
+                          {(() => {
+                            const tagConfig = getTagConfig(application.tag);
+                            return (
+                              <Chip
+                                label={
+                                  tagConfig ? tagConfig.label : application.tag
+                                }
+                                size="small"
+                                sx={{
+                                  backgroundColor: tagConfig
+                                    ? tagConfig.color
+                                    : "#f5f5f5",
+                                  color: "#000 !important",
+                                  fontWeight: "medium",
+                                }}
+                              />
+                            );
+                          })()}
+                        </Box>
+                      </Grid>
+                    )}
                     {application.statusNote && (
                       <Grid item xs={12} sm={6}>
                         <Typography variant="subtitle2" color="text.secondary">

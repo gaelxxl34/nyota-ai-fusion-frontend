@@ -61,7 +61,11 @@ const ConversationItem = ({
       <ListItemText
         primary={
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="body1">
+            <Typography
+              variant="body1"
+              color="text.primary"
+              sx={{ fontWeight: 500 }}
+            >
               {conversation.leadName || conversation.contactName}
             </Typography>
             <Chip
@@ -101,7 +105,7 @@ const ConversationItem = ({
         }
         secondary={
           <Box sx={{ display: "flex", flex: 1, gap: 2, mt: 1 }}>
-            <Typography variant="caption">
+            <Typography variant="caption" color="text.secondary">
               Phone: {conversation.phoneNumber}
             </Typography>
             {conversation.leadName &&
@@ -110,14 +114,14 @@ const ConversationItem = ({
                   Contact: {conversation.contactName}
                 </Typography>
               )}
-            <Typography variant="caption">
+            <Typography variant="caption" color="text.secondary">
               Messages: {conversation.messageCount}
             </Typography>
-            <Typography variant="caption">
+            <Typography variant="caption" color="text.secondary">
               Last: {new Date(conversation.lastMessageTime).toLocaleString()}
             </Typography>
             {conversation.lastMessageFrom && (
-              <Typography variant="caption" color="textSecondary">
+              <Typography variant="caption" color="text.secondary">
                 From: {conversation.lastMessageFrom}
               </Typography>
             )}
