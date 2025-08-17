@@ -43,8 +43,8 @@ export const ProgramStep = ({ formData, updateFormData, errors = {} }) => {
               onChange={handleInputChange("modeOfStudy")}
               label="Mode of Study"
             >
-              <MenuItem value="on_campus">On Campus</MenuItem>
-              <MenuItem value="online">Online</MenuItem>
+              <MenuItem value="On Campus">On Campus</MenuItem>
+              <MenuItem value="Online">Online</MenuItem>
             </Select>
             {errors.modeOfStudy && (
               <FormHelperText>{errors.modeOfStudy}</FormHelperText>
@@ -60,9 +60,9 @@ export const ProgramStep = ({ formData, updateFormData, errors = {} }) => {
               onChange={handleInputChange("intake")}
               label="Intake"
             >
-              <MenuItem value="january">January</MenuItem>
-              <MenuItem value="may">May</MenuItem>
-              <MenuItem value="august">August</MenuItem>
+              <MenuItem value="January">January</MenuItem>
+              <MenuItem value="May">May</MenuItem>
+              <MenuItem value="August">August</MenuItem>
             </Select>
             {errors.intake && <FormHelperText>{errors.intake}</FormHelperText>}
           </FormControl>
@@ -78,94 +78,96 @@ export const ProgramStep = ({ formData, updateFormData, errors = {} }) => {
               label="Program"
             >
               {/* Business and Management Programs */}
-              <MenuItem value="bachelor_business_administration">
+              <MenuItem value="Bachelor of Business Administration">
                 Bachelor of Business Administration
               </MenuItem>
-              <MenuItem value="bachelor_public_administration">
+              <MenuItem value="Bachelor of Public Administration">
                 Bachelor of Public Administration
               </MenuItem>
-              <MenuItem value="bachelor_procurement_logistics">
+              <MenuItem value="Bachelor of Procurement and Logistics Management">
                 Bachelor of Procurement and Logistics Management
               </MenuItem>
-              <MenuItem value="bachelor_tourism_hotel">
+              <MenuItem value="Bachelor of Tourism and Hotel Management">
                 Bachelor of Tourism and Hotel Management
               </MenuItem>
-              <MenuItem value="bachelor_human_resource">
+              <MenuItem value="Bachelor of Human Resource Management">
                 Bachelor of Human Resource Management
               </MenuItem>
-              <MenuItem value="bachelor_journalism_communication">
+              <MenuItem value="Bachelor of Journalism and Communication Studies">
                 Bachelor of Journalism and Communication Studies
               </MenuItem>
-              <MenuItem value="master_business_administration">
+              <MenuItem value="Master of Business Administration">
                 Master of Business Administration (MBA)
               </MenuItem>
 
               {/* Science and Technology Programs */}
-              <MenuItem value="bachelor_computer_science">
+              <MenuItem value="Bachelor of Science in Computer Science">
                 Bachelor of Science in Computer Science
               </MenuItem>
-              <MenuItem value="bachelor_information_technology">
+              <MenuItem value="Bachelor of Information Technology">
                 Bachelor of Information Technology
               </MenuItem>
-              <MenuItem value="bachelor_software_engineering">
+              <MenuItem value="Bachelor of Science in Software Engineering">
                 Bachelor of Science in Software Engineering
               </MenuItem>
-              <MenuItem value="bachelor_climate_smart_agriculture">
+              <MenuItem value="Bachelor of Science in Climate Smart Agriculture">
                 Bachelor of Science in Climate Smart Agriculture
               </MenuItem>
-              <MenuItem value="bachelor_environmental_science">
+              <MenuItem value="Bachelor of Science in Environmental Science and Management">
                 Bachelor of Science in Environmental Science and Management
               </MenuItem>
-              <MenuItem value="master_information_technology">
+              <MenuItem value="Master of Information Technology">
                 Master of Information Technology
               </MenuItem>
 
               {/* Engineering Programs */}
-              <MenuItem value="bachelor_electrical_engineering">
+              <MenuItem value="Bachelor of Science in Electrical Engineering">
                 Bachelor of Science in Electrical Engineering
               </MenuItem>
-              <MenuItem value="bachelor_civil_engineering">
+              <MenuItem value="Bachelor of Science in Civil Engineering">
                 Bachelor of Science in Civil Engineering
               </MenuItem>
-              <MenuItem value="bachelor_architecture">
+              <MenuItem value="Bachelor of Architecture">
                 Bachelor of Architecture
               </MenuItem>
-              <MenuItem value="bachelor_petroleum_engineering">
+              <MenuItem value="Bachelor of Science in Petroleum Engineering">
                 Bachelor of Science in Petroleum Engineering
               </MenuItem>
-              <MenuItem value="bachelor_mechatronics_robotics">
+              <MenuItem value="Bachelor of Science in Mechatronics and Robotics">
                 Bachelor of Science in Mechatronics and Robotics
               </MenuItem>
-              <MenuItem value="bachelor_communications_engineering">
+              <MenuItem value="Bachelor of Science in Communications Engineering">
                 Bachelor of Science in Communications Engineering
               </MenuItem>
-              <MenuItem value="bachelor_mining_engineering">
+              <MenuItem value="Bachelor of Science in Mining Engineering">
                 Bachelor of Science in Mining Engineering
               </MenuItem>
-              <MenuItem value="diploma_electrical_engineering">
+              <MenuItem value="Diploma in Electrical Engineering">
                 Diploma in Electrical Engineering
               </MenuItem>
-              <MenuItem value="diploma_civil_engineering">
+              <MenuItem value="Diploma in Civil Engineering">
                 Diploma in Civil Engineering
               </MenuItem>
-              <MenuItem value="diploma_architecture">
+              <MenuItem value="Diploma in Architecture">
                 Diploma in Architecture
               </MenuItem>
 
               {/* Law and Humanities Programs */}
-              <MenuItem value="bachelor_laws">Bachelor of Laws (LLB)</MenuItem>
-              <MenuItem value="bachelor_international_relations">
+              <MenuItem value="Bachelor of Laws">
+                Bachelor of Laws (LLB)
+              </MenuItem>
+              <MenuItem value="Bachelor of International Relations and Diplomatic Studies">
                 Bachelor of International Relations and Diplomatic Studies
               </MenuItem>
-              <MenuItem value="master_international_relations">
+              <MenuItem value="Master of International Relations and Diplomatic Studies">
                 Master of International Relations and Diplomatic Studies
               </MenuItem>
 
               {/* Certificate Programs */}
-              <MenuItem value="higher_education_access_arts">
+              <MenuItem value="Higher Education Access Programme - Arts">
                 Higher Education Access Programme - Arts
               </MenuItem>
-              <MenuItem value="higher_education_access_sciences">
+              <MenuItem value="Higher Education Access Programme - Sciences">
                 Higher Education Access Programme - Sciences
               </MenuItem>
             </Select>

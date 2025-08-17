@@ -19,7 +19,7 @@ import Analytics from "./pages/admin/Analytics";
 import DataCenter from "./pages/admin/DataCenter";
 import KnowledgeBase from "./pages/admin/KnowledgeBase";
 // Admission Admin Pages
-import { AdmissionAdminDashboard } from "./pages/admission-admin";
+import { AdmissionAdminDashboard, ImportData } from "./pages/admission-admin";
 // Auth Pages
 import Login from "./pages/auth/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
@@ -155,6 +155,7 @@ function App() {
                           path="dashboard"
                           element={<AdmissionAdminDashboard />}
                         />
+                        <Route path="import-data" element={<ImportData />} />
                         {/* Root path redirects to dashboard */}
                         <Route
                           path=""
@@ -277,6 +278,22 @@ function App() {
                         >
                           <Layout>
                             <DataCenter />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="import-data"
+                      element={
+                        <ProtectedRoute
+                          allowedRoles={[
+                            "admin",
+                            "admissionAdmin",
+                            "admissionAgent",
+                          ]}
+                        >
+                          <Layout>
+                            <ImportData />
                           </Layout>
                         </ProtectedRoute>
                       }

@@ -21,19 +21,7 @@ const formatPhoneNumber = (phone) => {
 };
 
 // Helper function to convert program format from hyphen to underscore (if needed)
-const convertProgramFormat = (program) => {
-  // Since we've updated the UI values to match backend expectations,
-  // this is just a safety function in case some legacy values come through
-  return program.replace(/-/g, "_");
-};
-
-// Helper function to convert mode of study format (if needed)
-const convertModeOfStudy = (mode) => {
-  // Since we've updated the UI values to match backend expectations,
-  // this is just a safety function
-  if (mode === "on-campus") return "on_campus";
-  return mode;
-};
+// No longer need conversion since we store full names directly
 
 const initialFormData = {
   // Personal Details
@@ -162,7 +150,7 @@ export const useApplicationForm = () => {
           stepErrors.countryOfBirth = "Country of birth is required";
         if (!data.gender?.trim()) stepErrors.gender = "Gender is required";
         if (!data.postalAddress?.trim())
-          stepErrors.postalAddress = "Postal address is required";
+          stepErrors.postalAddress = "Physical address is required";
         break;
 
       case 1: // Program
@@ -220,8 +208,8 @@ export const useApplicationForm = () => {
           passportPhoto: processedFormData.passportPhoto, // Keep as File object
 
           // Program details
-          preferredProgram: convertProgramFormat(processedFormData.program),
-          modeOfStudy: convertModeOfStudy(processedFormData.modeOfStudy),
+          preferredProgram: processedFormData.program,
+          modeOfStudy: processedFormData.modeOfStudy,
           preferredIntake: processedFormData.intake,
           academicDocuments: processedFormData.academicDocuments, // Keep as File object
           identificationDocuments: processedFormData.identificationDocuments, // Keep as File object

@@ -177,18 +177,16 @@ export const PersonalDetailsStep = ({
             >
               <MenuItem value="male">Male</MenuItem>
               <MenuItem value="female">Female</MenuItem>
-              <MenuItem value="other">Other</MenuItem>
-              <MenuItem value="prefer_not_to_say">Prefer Not to Say</MenuItem>
             </Select>
             {errors.gender && <FormHelperText>{errors.gender}</FormHelperText>}
           </FormControl>
         </Grid>
 
-        {/* Postal Address */}
+        {/* Physical Address */}
         <Grid item xs={12}>
           <TextField
             fullWidth
-            label="Postal Address"
+            label="Physical Address"
             multiline
             rows={3}
             value={formData.postalAddress || ""}
@@ -196,7 +194,7 @@ export const PersonalDetailsStep = ({
             error={!!errors.postalAddress}
             helperText={
               errors.postalAddress ||
-              "Enter your postal address (P.O. Box, street, city, postal code)"
+              "Enter your physical address (P.O. Box, street, city, postal code)"
             }
             required
           />

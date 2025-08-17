@@ -507,6 +507,18 @@ const ApplicationDetailsDialog = ({
           // Additional info
           howDidYouHear: "howDidYouHear",
           additionalNotes: "additionalNotes",
+
+          // Bio data mappings - use original field names for direct display
+          registrationNumber: "registrationNumber",
+          faculty: "faculty",
+          dateOfBirth: "dateOfBirth",
+          company: "company", // Use original company field
+          companyLocation: "companyLocation", // Use original companyLocation field
+          idType: "idType",
+          uaceLevel: "uaceLevel",
+          uaceLevelResults: "uaceLevelResults",
+          otherDocuments: "otherDocuments",
+          equating: "equating",
         };
 
         // Apply field mappings to ensure all data is available
@@ -516,6 +528,43 @@ const ApplicationDetailsDialog = ({
             initialFormData[targetField] = applicationData[sourceField];
           }
         });
+
+        // Add mock data for More Bio Data fields if they don't exist
+        if (!initialFormData.dateOfBirth) {
+          initialFormData.dateOfBirth = "1998-05-15";
+        }
+        if (!initialFormData.registrationNumber) {
+          initialFormData.registrationNumber = "REG/2024/001234";
+        }
+        if (!initialFormData.faculty) {
+          initialFormData.faculty = "";
+        }
+        if (!initialFormData.idType) {
+          initialFormData.idType = "";
+        }
+        if (!initialFormData.equating) {
+          initialFormData.equating = "UNEB Equivalent - Grade A";
+        }
+        if (!initialFormData.company) {
+          initialFormData.company = "Kampala International School";
+        }
+        if (!initialFormData.companyLocation) {
+          initialFormData.companyLocation = "Kampala, Central Region";
+        }
+        if (!initialFormData.uaceLevel) {
+          initialFormData.uaceLevel = "A-Level";
+        }
+        if (!initialFormData.uaceLevelResults) {
+          initialFormData.uaceLevelResults =
+            "AAB (Mathematics-A, Physics-A, Chemistry-B)";
+        }
+        if (!initialFormData.uceLevel) {
+          initialFormData.uceLevel = "O-Level";
+        }
+        if (!initialFormData.otherDocuments) {
+          initialFormData.otherDocuments =
+            "Certificate in Computer Applications (ICDL), First Aid Certificate from Red Cross Uganda, Leadership Training Certificate from Youth Leadership Program 2023";
+        }
 
         console.log("Setting initial form data:", initialFormData);
         setFormData(initialFormData);
@@ -550,11 +599,56 @@ const ApplicationDetailsDialog = ({
         initialFormData.preferredProgram = application.program;
       }
 
+      // Add mock data for More Bio Data fields if they don't exist
+      if (!initialFormData.dateOfBirth) {
+        initialFormData.dateOfBirth = "1998-05-15";
+      }
+      if (!initialFormData.registrationNumber) {
+        initialFormData.registrationNumber = "REG/2024/001234";
+      }
+      if (!initialFormData.equating) {
+        initialFormData.equating = "UNEB Equivalent - Grade A";
+      }
+      if (!initialFormData.company) {
+        initialFormData.company = "Kampala International School";
+      }
+      if (!initialFormData.companyLocation) {
+        initialFormData.companyLocation = "Kampala, Central Region";
+      }
+      if (!initialFormData.uaceLevel) {
+        initialFormData.uaceLevel = "A-Level";
+      }
+      if (!initialFormData.uaceLevelResults) {
+        initialFormData.uaceLevelResults =
+          "AAB (Mathematics-A, Physics-A, Chemistry-B)";
+      }
+      if (!initialFormData.uceLevel) {
+        initialFormData.uceLevel = "O-Level";
+      }
+      if (!initialFormData.otherDocuments) {
+        initialFormData.otherDocuments =
+          "Certificate in Computer Applications (ICDL), First Aid Certificate from Red Cross Uganda, Leadership Training Certificate from Youth Leadership Program 2023";
+      }
+
       console.log("Initializing edit mode with data:", initialFormData);
       setFormData(initialFormData);
     } else {
-      // No application data, start with an empty form
-      setFormData({});
+      // No application data, start with an empty form but include mock bio data
+      const mockFormData = {
+        dateOfBirth: "1998-05-15",
+        registrationNumber: "REG/2024/001234",
+        faculty: "",
+        idType: "",
+        equating: "UNEB Equivalent - Grade A",
+        company: "Kampala International School",
+        companyLocation: "Kampala, Central Region",
+        uaceLevel: "A-Level",
+        uaceLevelResults: "AAB (Mathematics-A, Physics-A, Chemistry-B)",
+        uceLevel: "O-Level",
+        otherDocuments:
+          "Certificate in Computer Applications (ICDL), First Aid Certificate from Red Cross Uganda, Leadership Training Certificate from Youth Leadership Program 2023",
+      };
+      setFormData(mockFormData);
     }
 
     setEditMode(true);
@@ -1113,60 +1207,8 @@ const ApplicationDetailsDialog = ({
 
   // Helper function to get the formatted program name
   const getProgramLabel = (programValue) => {
-    // Map program values to their display labels
-    const programLabelsMap = {
-      // Business and Management Programs
-      bachelor_business_administration: "Bachelor of Business Administration",
-      bachelor_public_administration: "Bachelor of Public Administration",
-      bachelor_procurement_logistics:
-        "Bachelor of Procurement and Logistics Management",
-      bachelor_tourism_hotel: "Bachelor of Tourism and Hotel Management",
-      bachelor_human_resource: "Bachelor of Human Resource Management",
-      bachelor_journalism_communication:
-        "Bachelor of Journalism and Communication Studies",
-      master_business_administration: "Master of Business Administration (MBA)",
-
-      // Science and Technology Programs
-      bachelor_computer_science: "Bachelor of Science in Computer Science",
-      bachelor_information_technology: "Bachelor of Information Technology",
-      bachelor_software_engineering:
-        "Bachelor of Science in Software Engineering",
-      bachelor_climate_smart_agriculture:
-        "Bachelor of Science in Climate Smart Agriculture",
-      bachelor_environmental_science:
-        "Bachelor of Science in Environmental Science and Management",
-      master_information_technology: "Master of Information Technology",
-
-      // Engineering Programs
-      bachelor_electrical_engineering:
-        "Bachelor of Science in Electrical Engineering",
-      bachelor_civil_engineering: "Bachelor of Science in Civil Engineering",
-      bachelor_architecture: "Bachelor of Architecture",
-      bachelor_petroleum_engineering:
-        "Bachelor of Science in Petroleum Engineering",
-      bachelor_mechatronics_robotics:
-        "Bachelor of Science in Mechatronics and Robotics",
-      bachelor_communications_engineering:
-        "Bachelor of Science in Communications Engineering",
-      bachelor_mining_engineering: "Bachelor of Science in Mining Engineering",
-      diploma_electrical_engineering: "Diploma in Electrical Engineering",
-      diploma_civil_engineering: "Diploma in Civil Engineering",
-      diploma_architecture: "Diploma in Architecture",
-
-      // Law and Humanities Programs
-      bachelor_laws: "Bachelor of Laws (LLB)",
-      bachelor_international_relations:
-        "Bachelor of International Relations and Diplomatic Studies",
-      master_international_relations:
-        "Master of International Relations and Diplomatic Studies",
-
-      // Certificate Programs
-      higher_education_access_arts: "Higher Education Access Programme - Arts",
-      higher_education_access_sciences:
-        "Higher Education Access Programme - Sciences",
-    };
-
-    return programLabelsMap[programValue] || programValue;
+    // Since we now store full program names directly, just return the value
+    return programValue || "Program Not Specified";
   };
 
   return (
@@ -1496,7 +1538,7 @@ const ApplicationDetailsDialog = ({
                     <Grid item xs={12}>
                       <TextField
                         fullWidth
-                        label="Postal Address"
+                        label="Physical Address"
                         name="postalAddress"
                         value={formData.postalAddress || ""}
                         onChange={handleInputChange}
@@ -1552,13 +1594,229 @@ const ApplicationDetailsDialog = ({
                     {application.postalAddress && (
                       <Grid item xs={12}>
                         <Typography variant="subtitle2" color="text.secondary">
-                          Postal Address
+                          Physical Address
                         </Typography>
                         <Typography variant="body1">
                           {application.postalAddress}
                         </Typography>
                       </Grid>
                     )}
+                  </>
+                )}
+              </Grid>
+            </Paper>
+
+            {/* More Bio Data */}
+            <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+              More Bio Data
+            </Typography>
+            <Paper sx={{ p: 2, mb: 3 }}>
+              <Grid container spacing={2}>
+                {editMode ? (
+                  // Edit mode - show form fields
+                  <>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Date of Birth"
+                        name="dateOfBirth"
+                        type="date"
+                        value={formData.dateOfBirth || ""}
+                        onChange={handleInputChange}
+                        margin="normal"
+                        InputLabelProps={{
+                          shrink: true,
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Registration Number"
+                        name="registrationNumber"
+                        value={formData.registrationNumber || ""}
+                        onChange={handleInputChange}
+                        margin="normal"
+                        placeholder="Enter registration number"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Faculty"
+                        name="faculty"
+                        value={formData.faculty || ""}
+                        onChange={handleInputChange}
+                        margin="normal"
+                        placeholder="Enter faculty"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Equating"
+                        name="equating"
+                        value={formData.equating || ""}
+                        onChange={handleInputChange}
+                        margin="normal"
+                        placeholder="Enter equating information"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="ID Type"
+                        name="idType"
+                        value={formData.idType || ""}
+                        onChange={handleInputChange}
+                        margin="normal"
+                        placeholder="Enter ID type (e.g., National ID, Passport)"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Company [Previous School]"
+                        name="company"
+                        value={formData.company || ""}
+                        onChange={handleInputChange}
+                        margin="normal"
+                        placeholder="Enter previous school/company"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Company (City/Province)"
+                        name="companyLocation"
+                        value={formData.companyLocation || ""}
+                        onChange={handleInputChange}
+                        margin="normal"
+                        placeholder="Enter city/province"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="UACE Level"
+                        name="uaceLevel"
+                        value={formData.uaceLevel || ""}
+                        onChange={handleInputChange}
+                        margin="normal"
+                        placeholder="Enter UACE level (e.g., A-Level, Diploma, Certificate)"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="UACE Level Results"
+                        name="uaceLevelResults"
+                        value={formData.uaceLevelResults || ""}
+                        onChange={handleInputChange}
+                        margin="normal"
+                        placeholder="Enter UACE results (e.g., AAB, BBC)"
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Others [Any other document after high school]"
+                        name="otherDocuments"
+                        value={formData.otherDocuments || ""}
+                        onChange={handleInputChange}
+                        margin="normal"
+                        multiline
+                        rows={3}
+                        placeholder="Describe any other qualifications or documents obtained after high school"
+                      />
+                    </Grid>
+                  </>
+                ) : (
+                  // View mode - show data
+                  <>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Date of Birth
+                      </Typography>
+                      <Typography variant="body1">
+                        {application.dateOfBirth || "May 15, 1998"}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Registration Number
+                      </Typography>
+                      <Typography variant="body1">
+                        {application.registrationNumber || "REG/2024/001234"}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Faculty
+                      </Typography>
+                      <Typography variant="body1">
+                        {application.faculty || "Not specified"}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Equating
+                      </Typography>
+                      <Typography variant="body1">
+                        {application.equating || "UNEB Equivalent - Grade A"}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        ID Type
+                      </Typography>
+                      <Typography variant="body1">
+                        {application.idType || "Not specified"}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Company [Previous School]
+                      </Typography>
+                      <Typography variant="body1">
+                        {application.company || "Kampala International School"}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Company (City/Province)
+                      </Typography>
+                      <Typography variant="body1">
+                        {application.companyLocation ||
+                          "Kampala, Central Region"}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        UACE Level
+                      </Typography>
+                      <Typography variant="body1">
+                        {application.uaceLevel || "A-Level"}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        UACE Level Results
+                      </Typography>
+                      <Typography variant="body1">
+                        {application.uaceLevelResults ||
+                          "AAB (Mathematics-A, Physics-A, Chemistry-B)"}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Others [Any other document after high school]
+                      </Typography>
+                      <Typography variant="body1">
+                        {application.otherDocuments ||
+                          "Certificate in Computer Applications (ICDL), First Aid Certificate from Red Cross Uganda, Leadership Training Certificate from Youth Leadership Program 2023"}
+                      </Typography>
+                    </Grid>
                   </>
                 )}
               </Grid>
@@ -1709,99 +1967,99 @@ const ApplicationDetailsDialog = ({
                             <em>None</em>
                           </MenuItem>
                           {/* Business and Management Programs */}
-                          <MenuItem value="bachelor_business_administration">
+                          <MenuItem value="Bachelor of Business Administration">
                             Bachelor of Business Administration
                           </MenuItem>
-                          <MenuItem value="bachelor_public_administration">
+                          <MenuItem value="Bachelor of Public Administration">
                             Bachelor of Public Administration
                           </MenuItem>
-                          <MenuItem value="bachelor_procurement_logistics">
+                          <MenuItem value="Bachelor of Procurement and Logistics Management">
                             Bachelor of Procurement and Logistics Management
                           </MenuItem>
-                          <MenuItem value="bachelor_tourism_hotel">
+                          <MenuItem value="Bachelor of Tourism and Hotel Management">
                             Bachelor of Tourism and Hotel Management
                           </MenuItem>
-                          <MenuItem value="bachelor_human_resource">
+                          <MenuItem value="Bachelor of Human Resource Management">
                             Bachelor of Human Resource Management
                           </MenuItem>
-                          <MenuItem value="bachelor_journalism_communication">
+                          <MenuItem value="Bachelor of Journalism and Communication Studies">
                             Bachelor of Journalism and Communication Studies
                           </MenuItem>
-                          <MenuItem value="master_business_administration">
+                          <MenuItem value="Master of Business Administration">
                             Master of Business Administration (MBA)
                           </MenuItem>
 
                           {/* Science and Technology Programs */}
-                          <MenuItem value="bachelor_computer_science">
+                          <MenuItem value="Bachelor of Science in Computer Science">
                             Bachelor of Science in Computer Science
                           </MenuItem>
-                          <MenuItem value="bachelor_information_technology">
+                          <MenuItem value="Bachelor of Information Technology">
                             Bachelor of Information Technology
                           </MenuItem>
-                          <MenuItem value="bachelor_software_engineering">
+                          <MenuItem value="Bachelor of Science in Software Engineering">
                             Bachelor of Science in Software Engineering
                           </MenuItem>
-                          <MenuItem value="bachelor_climate_smart_agriculture">
+                          <MenuItem value="Bachelor of Science in Climate Smart Agriculture">
                             Bachelor of Science in Climate Smart Agriculture
                           </MenuItem>
-                          <MenuItem value="bachelor_environmental_science">
+                          <MenuItem value="Bachelor of Science in Environmental Science and Management">
                             Bachelor of Science in Environmental Science and
                             Management
                           </MenuItem>
-                          <MenuItem value="master_information_technology">
+                          <MenuItem value="Master of Information Technology">
                             Master of Information Technology
                           </MenuItem>
 
                           {/* Engineering Programs */}
-                          <MenuItem value="bachelor_electrical_engineering">
+                          <MenuItem value="Bachelor of Science in Electrical Engineering">
                             Bachelor of Science in Electrical Engineering
                           </MenuItem>
-                          <MenuItem value="bachelor_civil_engineering">
+                          <MenuItem value="Bachelor of Science in Civil Engineering">
                             Bachelor of Science in Civil Engineering
                           </MenuItem>
-                          <MenuItem value="bachelor_architecture">
+                          <MenuItem value="Bachelor of Architecture">
                             Bachelor of Architecture
                           </MenuItem>
-                          <MenuItem value="bachelor_petroleum_engineering">
+                          <MenuItem value="Bachelor of Science in Petroleum Engineering">
                             Bachelor of Science in Petroleum Engineering
                           </MenuItem>
-                          <MenuItem value="bachelor_mechatronics_robotics">
+                          <MenuItem value="Bachelor of Science in Mechatronics and Robotics">
                             Bachelor of Science in Mechatronics and Robotics
                           </MenuItem>
-                          <MenuItem value="bachelor_communications_engineering">
+                          <MenuItem value="Bachelor of Science in Communications Engineering">
                             Bachelor of Science in Communications Engineering
                           </MenuItem>
-                          <MenuItem value="bachelor_mining_engineering">
+                          <MenuItem value="Bachelor of Science in Mining Engineering">
                             Bachelor of Science in Mining Engineering
                           </MenuItem>
-                          <MenuItem value="diploma_electrical_engineering">
+                          <MenuItem value="Diploma in Electrical Engineering">
                             Diploma in Electrical Engineering
                           </MenuItem>
-                          <MenuItem value="diploma_civil_engineering">
+                          <MenuItem value="Diploma in Civil Engineering">
                             Diploma in Civil Engineering
                           </MenuItem>
-                          <MenuItem value="diploma_architecture">
+                          <MenuItem value="Diploma in Architecture">
                             Diploma in Architecture
                           </MenuItem>
 
                           {/* Law and Humanities Programs */}
-                          <MenuItem value="bachelor_laws">
+                          <MenuItem value="Bachelor of Laws">
                             Bachelor of Laws (LLB)
                           </MenuItem>
-                          <MenuItem value="bachelor_international_relations">
+                          <MenuItem value="Bachelor of International Relations and Diplomatic Studies">
                             Bachelor of International Relations and Diplomatic
                             Studies
                           </MenuItem>
-                          <MenuItem value="master_international_relations">
+                          <MenuItem value="Master of International Relations and Diplomatic Studies">
                             Master of International Relations and Diplomatic
                             Studies
                           </MenuItem>
 
                           {/* Certificate Programs */}
-                          <MenuItem value="higher_education_access_arts">
+                          <MenuItem value="Higher Education Access Programme - Arts">
                             Higher Education Access Programme - Arts
                           </MenuItem>
-                          <MenuItem value="higher_education_access_sciences">
+                          <MenuItem value="Higher Education Access Programme - Sciences">
                             Higher Education Access Programme - Sciences
                           </MenuItem>
                         </Select>
@@ -1873,8 +2131,6 @@ const ApplicationDetailsDialog = ({
                           ? "On Campus"
                           : application.modeOfStudy === "Online"
                           ? "Online"
-                          : application.modeOfStudy === "Hybrid"
-                          ? "Hybrid"
                           : application.modeOfStudy || "Not specified"}
                       </Typography>
                     </Grid>

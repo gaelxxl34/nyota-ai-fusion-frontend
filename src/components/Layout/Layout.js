@@ -25,6 +25,7 @@ import {
   Menu as MenuIcon,
   Storage as DataCenterIcon,
   MenuBook as KnowledgeBaseIcon,
+  CloudUpload as ImportIcon,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -93,6 +94,11 @@ const Layout = ({ children }) => {
           text: "Dashboard",
           icon: <DashboardIcon />,
           path: "/admission-admin/dashboard",
+        },
+        {
+          text: "Import Data",
+          icon: <ImportIcon />,
+          path: "/admission-admin/import-data",
         },
       ];
 
@@ -187,6 +193,15 @@ const Layout = ({ children }) => {
         text: "Data Center",
         icon: <DataCenterIcon />,
         path: "/admin/data-center",
+      });
+    }
+
+    // Import Data is available to admin and admissionAgent roles
+    if (role === "admin" || role === "admissionAgent") {
+      adminMenuItems.push({
+        text: "Import Data",
+        icon: <ImportIcon />,
+        path: "/admin/import-data",
       });
     }
 
