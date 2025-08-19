@@ -69,7 +69,7 @@ const LeadsOverview = () => {
   } = useLeadManagement({
     autoRefresh: true,
     refreshInterval: 120000, // 2 minutes
-    pageSize: 25,
+    pageSize: 50,
   });
 
   // UI states

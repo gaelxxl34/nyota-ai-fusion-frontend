@@ -5,7 +5,7 @@ export const leadService = {
   async getAllLeads(options = {}) {
     try {
       const {
-        limit = 25,
+        limit = 50,
         offset = 0,
         status,
         source,
@@ -44,7 +44,7 @@ export const leadService = {
   // Get leads by status with pagination
   async getLeadsByStatus(status, options = {}) {
     try {
-      const { limit = 25, offset = 0 } = options;
+      const { limit = 50, offset = 0 } = options;
 
       console.log(`🔄 Fetching leads by status: ${status}`);
 

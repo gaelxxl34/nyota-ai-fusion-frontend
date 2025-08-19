@@ -11,7 +11,7 @@ export const useLeadManagement = ({
   initialFilters = {},
   initialSortBy = "createdAt",
   initialSortOrder = "desc",
-  pageSize = 25,
+  pageSize = 50,
 } = {}) => {
   // State management
   const [leads, setLeads] = useState([]);

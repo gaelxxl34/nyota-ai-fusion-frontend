@@ -14,19 +14,26 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Chip,
   Button,
   TextField,
-  InputAdornment,
   IconButton,
   Badge,
   Alert,
   Skeleton,
   CircularProgress,
   Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Drawer,
+  Divider,
+  Stack,
+  Collapse,
 } from "@mui/material";
 import {
-  Search as SearchIcon,
   Download as DownloadIcon,
   PersonAdd as PersonAddIcon,
   Person as PersonIcon,
@@ -40,6 +47,11 @@ import {
   Delete as DeleteIcon,
   Pause as PauseIcon,
   Block as BlockIcon,
+  FilterList as FilterListIcon,
+  Clear as ClearIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  DateRange as DateRangeIcon,
 } from "@mui/icons-material";
 import { leadService } from "../../services/leadService";
 import { useAuth } from "../../contexts/AuthContext";
@@ -53,18 +65,76 @@ import LeadEditDialog from "../../components/leads/LeadEditDialog";
 import LeadDeleteDialog from "../../components/leads/LeadDeleteDialog";
 import StartConversationDialog from "../../components/leads/StartConversationDialog";
 
+// Move TabPanel outside the main component to prevent recreation on every render
+const TabPanel = React.memo(({ children, value, index, ...other }) => {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`data-center-tabpanel-${index}`}
+      aria-labelledby={`data-center-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+});
+
 const DataCenter = () => {
   const { checkPermission } = useRolePermissions();
   const { getUserRole } = useAuth();
   const userRole = getUserRole();
 
   const [currentTab, setCurrentTab] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
   const [leads, setLeads] = useState([]);
   const [personalLeads, setPersonalLeads] = useState([]); // State for "For You" tab
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Filter states
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    source: "",
+    program: "",
+    dateRange: "",
+    priority: "",
+  });
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [searchName, setSearchName] = useState("");
+  const [searchEmail, setSearchEmail] = useState("");
+  const [searchPhone, setSearchPhone] = useState("");
+  const [searchProgram, setSearchProgram] = useState("");
+  const [searchSource, setSearchSource] = useState("");
+
+  // Advanced search object for easy reference
+  const advancedSearch = {
+    name: searchName,
+    email: searchEmail,
+    phone: searchPhone,
+    program: searchProgram,
+    source: searchSource,
+  };
+
+  // Optimized search handlers using useCallback to prevent input focus loss
+  const handleSearchNameChange = useCallback((e) => {
+    setSearchName(e.target.value);
+  }, []);
+
+  const handleSearchEmailChange = useCallback((e) => {
+    setSearchEmail(e.target.value);
+  }, []);
+
+  const handleSearchPhoneChange = useCallback((e) => {
+    setSearchPhone(e.target.value);
+  }, []);
+
+  const handleSearchProgramChange = useCallback((e) => {
+    setSearchProgram(e.target.value);
+  }, []);
+
+  const handleSearchSourceChange = useCallback((e) => {
+    setSearchSource(e.target.value);
+  }, []);
 
   // Helper function to check if user role is restricted for applied leads
   const isRestrictedRole = (role) => {
@@ -82,9 +152,9 @@ const DataCenter = () => {
     bySource: {},
   });
   const [pagination, setPagination] = useState({
-    hasMore: true,
-    offset: 0,
-    limit: 25,
+    page: 0,
+    rowsPerPage: 50,
+    total: 0,
   });
   // State for action menu and dialogs
   const [anchorEl, setAnchorEl] = useState(null);
@@ -278,135 +348,50 @@ const DataCenter = () => {
     filteredTabs: filteredTabs.map((t) => t.label),
     currentTab,
     leadsCount: leads.length,
-    hasMore: pagination.hasMore,
+    currentPage: pagination.page,
+    rowsPerPage: pagination.rowsPerPage,
+    totalLeads: pagination.total,
   });
 
   // Manual refresh function - only refreshes leads, not stats
   const refreshCurrentTab = useCallback(() => {
     console.log("📊 Manual refresh: updating leads only");
-    setPagination({ hasMore: true, offset: 0, limit: 25 });
+    setPagination((prev) => ({ ...prev, page: 0 }));
     setRefreshTrigger((prev) => prev + 1);
     // Don't refresh stats on manual refresh - only leads
   }, []);
 
-  // Load more leads
-  const loadMoreLeads = useCallback(async () => {
-    if (
-      loadingMore ||
-      !pagination.hasMore ||
-      filteredTabs.length === 0 ||
-      tabSwitching
-    )
-      return;
+  // Handle pagination
+  const handleChangePage = useCallback((event, newPage) => {
+    setPagination((prev) => ({ ...prev, page: newPage }));
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
 
-    const currentTabConfig = filteredTabs[currentTab];
-    if (!currentTabConfig) return;
+  const handleChangeRowsPerPage = useCallback((event) => {
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setPagination((prev) => ({
+      ...prev,
+      page: 0,
+      rowsPerPage: newRowsPerPage,
+    }));
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
 
-    try {
-      setLoadingMore(true);
-
-      const currentOffset = pagination.offset;
-      const limit = 25;
-
-      console.log(
-        `📊 Loading more leads for tab ${currentTab} (offset: ${currentOffset})`
-      );
-
-      let leadsResponse;
-
-      if (currentTabConfig.label === "For You") {
-        // Special handling for "For You" tab - fetch personal submissions
-        leadsResponse = await leadService.getMySubmittedLeads({
-          page: Math.floor(currentOffset / limit) + 1,
-          limit,
-          sortBy: "createdAt",
-          sortOrder: "desc",
-        });
-      } else if (currentTabConfig.label === "All Leads") {
-        leadsResponse = await leadService.getAllLeads({
-          limit,
-          offset: currentOffset,
-          sortBy: "createdAt",
-          sortOrder: "desc",
-        });
-
-        if (leadsResponse.data) {
-          leadsResponse.data = leadsResponse.data.filter((lead) => {
-            // Get the current status from timeline if available, otherwise fallback to status field
-            const currentStatus =
-              lead.timeline &&
-              Array.isArray(lead.timeline) &&
-              lead.timeline.length > 0
-                ? lead.timeline[lead.timeline.length - 1].status
-                : lead.status;
-            return currentTabConfig.statuses.includes(currentStatus);
-          });
-        }
-      } else {
-        if (currentTabConfig.statuses.length === 1) {
-          leadsResponse = await leadService.getLeadsByStatus(
-            currentTabConfig.statuses[0],
-            {
-              limit,
-              offset: currentOffset,
-              sortBy: "createdAt",
-              sortOrder: "desc",
-            }
-          );
-        } else {
-          leadsResponse = await leadService.getAllLeads({
-            limit: limit * 2,
-            offset: Math.floor(
-              currentOffset / currentTabConfig.statuses.length
-            ),
-            sortBy: "createdAt",
-            sortOrder: "desc",
-          });
-
-          if (leadsResponse.data) {
-            leadsResponse.data = leadsResponse.data
-              .filter((lead) => {
-                // Get the current status from timeline if available, otherwise fallback to status field
-                const currentStatus =
-                  lead.timeline &&
-                  Array.isArray(lead.timeline) &&
-                  lead.timeline.length > 0
-                    ? lead.timeline[lead.timeline.length - 1].status
-                    : lead.status;
-                return currentTabConfig.statuses.includes(currentStatus);
-              })
-              .slice(0, limit);
-          }
-        }
-      }
-
-      const newLeads = leadsResponse.data || [];
-      const hasMore = leadsResponse.pagination?.hasMore || false;
-
-      console.log(
-        `📊 Received ${newLeads.length} more leads, hasMore: ${hasMore}`
-      );
-
-      setLeads((prev) => [...prev, ...newLeads]);
-      setPagination({
-        hasMore,
-        offset: currentOffset + newLeads.length,
-        limit,
-      });
-    } catch (err) {
-      console.error(`Error loading more leads:`, err);
-      setError(err.message);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [
-    currentTab,
-    loadingMore,
-    pagination.hasMore,
-    pagination.offset,
-    filteredTabs,
-    tabSwitching,
-  ]);
+  // Clear all filters
+  const clearAllFilters = useCallback(() => {
+    setFilters({
+      source: "",
+      program: "",
+      dateRange: "",
+      priority: "",
+    });
+    setSearchName("");
+    setSearchEmail("");
+    setSearchPhone("");
+    setSearchProgram("");
+    setSearchSource("");
+    setShowAdvancedSearch(false);
+  }, []);
 
   // Handle tab change
   const handleTabChange = useCallback(
@@ -423,11 +408,11 @@ const DataCenter = () => {
       // Update current tab
       setCurrentTab(newTabIndex);
 
-      // Clear search when changing tabs
-      setSearchTerm("");
+      // Clear search and filters when changing tabs
+      clearAllFilters();
 
       // Reset pagination for new tab
-      setPagination({ hasMore: true, offset: 0, limit: 25 });
+      setPagination((prev) => ({ ...prev, page: 0 }));
 
       // Clear current leads to prevent showing old data during transition
       setLeads([]);
@@ -435,7 +420,7 @@ const DataCenter = () => {
       // The useEffect will handle fetching ONLY leads data when currentTab changes
       // No stats refresh needed - they stay the same across tabs
     },
-    [currentTab]
+    [currentTab, clearAllFilters]
   );
 
   // Fetch initial data only once on component mount
@@ -507,8 +492,13 @@ const DataCenter = () => {
         setLoading(true);
         setError("");
 
-        const limit = 25;
-        console.log(`📊 Fetching ${currentTabConfig.label} data`);
+        const limit = pagination.rowsPerPage;
+        const offset = pagination.page * pagination.rowsPerPage;
+        console.log(
+          `📊 Fetching ${currentTabConfig.label} data (page ${
+            pagination.page + 1
+          }, limit ${limit})`
+        );
 
         let leadsResponse;
 
@@ -516,15 +506,23 @@ const DataCenter = () => {
           // Special handling for "For You" tab - fetch personal submissions
           leadsResponse = await leadService.getMySubmittedLeads({
             limit,
-            page: 1,
+            page: pagination.page + 1,
             sortBy: "createdAt",
             sortOrder: "desc",
           });
           setPersonalLeads(leadsResponse.data || []);
+          // Update total count for pagination
+          setPagination((prev) => ({
+            ...prev,
+            total:
+              leadsResponse.pagination?.total ||
+              leadsResponse.data?.length ||
+              0,
+          }));
         } else if (currentTabConfig.label === "All Leads") {
           leadsResponse = await leadService.getAllLeads({
             limit,
-            offset: 0,
+            offset,
             sortBy: "createdAt",
             sortOrder: "desc",
           });
@@ -541,13 +539,24 @@ const DataCenter = () => {
               return currentTabConfig.statuses.includes(currentStatus);
             });
           }
+          // Update total count for pagination
+          const totalCount = currentTabConfig.statuses.reduce(
+            (total, status) => {
+              return total + (leadStats.byStatus[status] || 0);
+            },
+            0
+          );
+          setPagination((prev) => ({
+            ...prev,
+            total: totalCount,
+          }));
         } else {
           if (currentTabConfig.statuses.length === 1) {
             leadsResponse = await leadService.getLeadsByStatus(
               currentTabConfig.statuses[0],
               {
                 limit,
-                offset: 0,
+                offset,
                 sortBy: "createdAt",
                 sortOrder: "desc",
               }
@@ -555,8 +564,8 @@ const DataCenter = () => {
           } else {
             // For tabs with multiple statuses, get all leads and filter
             leadsResponse = await leadService.getAllLeads({
-              limit: limit * 3, // Get more to ensure we have enough after filtering
-              offset: 0,
+              limit: limit * 2, // Get more to ensure we have enough after filtering
+              offset: Math.floor(offset / currentTabConfig.statuses.length),
               sortBy: "createdAt",
               sortOrder: "desc",
             });
@@ -576,22 +585,26 @@ const DataCenter = () => {
                 .slice(0, limit);
             }
           }
+          // Update total count for pagination
+          const totalCount = currentTabConfig.statuses.reduce(
+            (total, status) => {
+              return total + (leadStats.byStatus[status] || 0);
+            },
+            0
+          );
+          setPagination((prev) => ({
+            ...prev,
+            total: totalCount,
+          }));
         }
 
         const newLeads = leadsResponse.data || [];
-        const hasMore =
-          leadsResponse.pagination?.hasMore || newLeads.length >= limit;
 
         console.log(
-          `📊 Received ${newLeads.length} leads, hasMore: ${hasMore}`
+          `📊 Received ${newLeads.length} leads for page ${pagination.page + 1}`
         );
 
         setLeads(newLeads);
-        setPagination({
-          hasMore,
-          offset: newLeads.length,
-          limit,
-        });
       } catch (err) {
         console.error(`Error fetching leads:`, err);
         setError(err.message);
@@ -603,14 +616,21 @@ const DataCenter = () => {
 
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTab, refreshTrigger, userRole]);
+  }, [
+    currentTab,
+    refreshTrigger,
+    userRole,
+    pagination.page,
+    pagination.rowsPerPage,
+    leadStats,
+  ]);
 
-  // Auto-refresh every 2 minutes (120 seconds) - only refreshes leads, not stats
+  // Auto-refresh every 5 minutes (300 seconds) - only refreshes leads, not stats
   useEffect(() => {
     const interval = setInterval(() => {
       console.log("🔄 Auto-refreshing current tab leads only...");
       setRefreshTrigger((prev) => prev + 1);
-    }, 120000); // Changed from 60000 to 120000 (2 minutes)
+    }, 300000); // Changed to 300000 (5 minutes)
 
     return () => clearInterval(interval);
   }, []); // No dependencies needed
@@ -830,27 +850,142 @@ const DataCenter = () => {
     }
   };
 
-  // Filter data based on search term
+  // Enhanced filter and search functionality
   const filteredLeads = useMemo(() => {
-    const tabLeads = getCurrentTabLeads;
-    if (!searchTerm) return tabLeads;
+    let tabLeads = getCurrentTabLeads;
 
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    return tabLeads.filter(
-      (lead) =>
-        lead.name?.toLowerCase().includes(lowerSearchTerm) ||
-        lead.email?.toLowerCase().includes(lowerSearchTerm) ||
-        lead.phone?.toLowerCase().includes(lowerSearchTerm) ||
-        (typeof lead.program === "string" &&
-          lead.program?.toLowerCase().includes(lowerSearchTerm)) ||
-        (typeof lead.program === "object" &&
-          lead.program !== null &&
-          (lead.program.name?.toLowerCase().includes(lowerSearchTerm) ||
-            lead.program.code?.toLowerCase().includes(lowerSearchTerm))) ||
-        lead.source?.toLowerCase().includes(lowerSearchTerm)
-    );
-  }, [getCurrentTabLeads, searchTerm]);
+    // Apply filters first
+    if (filters.source) {
+      tabLeads = tabLeads.filter((lead) => lead.source === filters.source);
+    }
 
+    if (filters.program) {
+      tabLeads = tabLeads.filter((lead) => {
+        if (typeof lead.program === "string") {
+          return lead.program === filters.program;
+        } else if (typeof lead.program === "object" && lead.program !== null) {
+          return (
+            lead.program.name === filters.program ||
+            lead.program.code === filters.program
+          );
+        }
+        return false;
+      });
+    }
+
+    if (filters.dateRange) {
+      const now = new Date();
+      let startDate;
+
+      switch (filters.dateRange) {
+        case "today":
+          startDate = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate()
+          );
+          break;
+        case "week":
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case "month":
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case "quarter":
+          const quarter = Math.floor(now.getMonth() / 3);
+          startDate = new Date(now.getFullYear(), quarter * 3, 1);
+          break;
+        default:
+          startDate = null;
+      }
+
+      if (startDate) {
+        tabLeads = tabLeads.filter((lead) => {
+          const leadDate = lead.createdAt?.toDate
+            ? lead.createdAt.toDate()
+            : new Date(lead.createdAt);
+          return leadDate >= startDate;
+        });
+      }
+    }
+
+    // Apply advanced search if active
+    if (showAdvancedSearch) {
+      // Advanced search
+      return tabLeads.filter((lead) => {
+        const matchName =
+          !searchName ||
+          lead.name?.toLowerCase().includes(searchName.toLowerCase());
+
+        const matchEmail =
+          !searchEmail ||
+          lead.email?.toLowerCase().includes(searchEmail.toLowerCase());
+
+        const matchPhone =
+          !searchPhone ||
+          lead.phone?.toLowerCase().includes(searchPhone.toLowerCase());
+
+        const matchProgram =
+          !searchProgram ||
+          (typeof lead.program === "string" &&
+            lead.program
+              ?.toLowerCase()
+              .includes(searchProgram.toLowerCase())) ||
+          (typeof lead.program === "object" &&
+            lead.program !== null &&
+            (lead.program.name
+              ?.toLowerCase()
+              .includes(searchProgram.toLowerCase()) ||
+              lead.program.code
+                ?.toLowerCase()
+                .includes(searchProgram.toLowerCase())));
+
+        const matchSource =
+          !searchSource ||
+          lead.source?.toLowerCase().includes(searchSource.toLowerCase());
+
+        return (
+          matchName && matchEmail && matchPhone && matchProgram && matchSource
+        );
+      });
+    }
+
+    return tabLeads;
+  }, [
+    getCurrentTabLeads,
+    filters,
+    showAdvancedSearch,
+    searchName,
+    searchEmail,
+    searchPhone,
+    searchProgram,
+    searchSource,
+  ]);
+
+  // Get unique values for filters
+  const getUniqueValues = useMemo(() => {
+    const allLeads = getCurrentTabLeads;
+
+    const sources = [
+      ...new Set(allLeads.map((lead) => lead.source).filter(Boolean)),
+    ];
+
+    const programs = [
+      ...new Set(
+        allLeads
+          .map((lead) => {
+            if (typeof lead.program === "string") return lead.program;
+            if (typeof lead.program === "object" && lead.program !== null) {
+              return lead.program.name || lead.program.code;
+            }
+            return null;
+          })
+          .filter(Boolean)
+      ),
+    ];
+
+    return { sources, programs };
+  }, [getCurrentTabLeads]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -1087,20 +1222,6 @@ const DataCenter = () => {
       return updatedStats;
     });
   };
-
-  const TabPanel = React.memo(({ children, value, index, ...other }) => {
-    return (
-      <div
-        role="tabpanel"
-        hidden={value !== index}
-        id={`data-center-tabpanel-${index}`}
-        aria-labelledby={`data-center-tab-${index}`}
-        {...other}
-      >
-        {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-      </div>
-    );
-  });
 
   return (
     <Box sx={{ p: 3 }}>
@@ -1489,32 +1610,65 @@ const DataCenter = () => {
                       gap: 2,
                     }}
                   >
-                    <TextField
-                      id="lead-search-field"
-                      placeholder="Search by name, email, phone, program..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
+                    <Stack
+                      direction="row"
+                      spacing={2}
+                      alignItems="center"
+                      sx={{ flex: 1 }}
+                    >
+                      <Button
+                        variant="outlined"
+                        startIcon={
+                          showAdvancedSearch ? (
+                            <ExpandLessIcon />
+                          ) : (
+                            <ExpandMoreIcon />
+                          )
                         }
-                      }}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon />
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ minWidth: 350 }}
-                      variant="outlined"
-                      size="small"
-                      autoComplete="off"
-                      disabled={loading || tabSwitching}
-                      inputProps={{
-                        "aria-label": "search leads",
-                      }}
-                    />
+                        onClick={() =>
+                          setShowAdvancedSearch(!showAdvancedSearch)
+                        }
+                        size="small"
+                      >
+                        Advanced Search
+                      </Button>
+
+                      <Button
+                        variant="outlined"
+                        startIcon={<FilterListIcon />}
+                        onClick={() => setFilterDrawerOpen(true)}
+                        size="small"
+                        color={
+                          Object.values(filters).some(Boolean)
+                            ? "primary"
+                            : "inherit"
+                        }
+                      >
+                        Filters
+                        {Object.values(filters).some(Boolean) && (
+                          <Chip
+                            size="small"
+                            label={
+                              Object.values(filters).filter(Boolean).length
+                            }
+                            sx={{ ml: 1, height: 20 }}
+                          />
+                        )}
+                      </Button>
+
+                      {(Object.values(filters).some(Boolean) ||
+                        Object.values(advancedSearch).some(Boolean)) && (
+                        <Button
+                          variant="text"
+                          startIcon={<ClearIcon />}
+                          onClick={clearAllFilters}
+                          size="small"
+                          color="secondary"
+                        >
+                          Clear All
+                        </Button>
+                      )}
+                    </Stack>
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                       {userRole !== "admissionAdmin" &&
                         userRole !== "admissionAgent" && (
@@ -1555,6 +1709,77 @@ const DataCenter = () => {
                     </Box>
                   </Box>
 
+                  {/* Advanced Search Panel */}
+                  <Collapse in={showAdvancedSearch}>
+                    <Paper sx={{ p: 2, mb: 2, bgcolor: "grey.50" }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Advanced Search
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6} md={2.4}>
+                          <TextField
+                            label="Name"
+                            value={searchName}
+                            onChange={handleSearchNameChange}
+                            size="small"
+                            fullWidth
+                            variant="outlined"
+                            placeholder="Search by name..."
+                            InputLabelProps={{ shrink: true }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={2.4}>
+                          <TextField
+                            label="Email"
+                            value={searchEmail}
+                            onChange={handleSearchEmailChange}
+                            size="small"
+                            fullWidth
+                            variant="outlined"
+                            placeholder="Search by email..."
+                            InputLabelProps={{ shrink: true }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={2.4}>
+                          <TextField
+                            label="Phone"
+                            value={searchPhone}
+                            onChange={handleSearchPhoneChange}
+                            size="small"
+                            fullWidth
+                            variant="outlined"
+                            placeholder="Search by phone..."
+                            InputLabelProps={{ shrink: true }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={2.4}>
+                          <TextField
+                            label="Program"
+                            value={searchProgram}
+                            onChange={handleSearchProgramChange}
+                            size="small"
+                            fullWidth
+                            variant="outlined"
+                            placeholder="Search by program..."
+                            InputLabelProps={{ shrink: true }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={2.4}>
+                          <TextField
+                            label="Source"
+                            value={searchSource}
+                            onChange={handleSearchSourceChange}
+                            size="small"
+                            fullWidth
+                            variant="outlined"
+                            placeholder="Search by source..."
+                            InputLabelProps={{ shrink: true }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </Paper>
+                  </Collapse>
+
                   {/* Leads Table */}
                   <TableContainer>
                     <Table>
@@ -1591,8 +1816,9 @@ const DataCenter = () => {
                                 variant="body2"
                                 color="text.secondary"
                               >
-                                {searchTerm
-                                  ? "No leads found matching your search."
+                                {Object.values(filters).some(Boolean) ||
+                                Object.values(advancedSearch).some(Boolean)
+                                  ? "No leads found matching your filters/search criteria."
                                   : tab.label === "For You"
                                   ? "You haven't submitted any leads yet. Start by creating your first lead!"
                                   : `No leads found in ${tab.label} category.`}
@@ -1721,49 +1947,287 @@ const DataCenter = () => {
                     </Table>
                   </TableContainer>
 
-                  {/* Load More Button */}
-                  {pagination.hasMore && (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "center",
-                        mt: 2,
-                        mb: 2,
-                      }}
-                    >
-                      <Button
-                        variant="outlined"
-                        onClick={loadMoreLeads}
-                        disabled={loadingMore}
-                        startIcon={
-                          loadingMore ? <CircularProgress size={16} /> : null
-                        }
-                      >
-                        {loadingMore ? "Loading..." : `Load More Leads`}
-                      </Button>
-                    </Box>
-                  )}
-
-                  {!pagination.hasMore && leads.length > 25 && (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "center",
-                        mt: 2,
-                        mb: 2,
-                      }}
-                    >
-                      <Typography variant="body2" color="text.secondary">
-                        All leads loaded ({leads.length} total)
-                      </Typography>
-                    </Box>
-                  )}
+                  {/* Pagination */}
+                  <TablePagination
+                    rowsPerPageOptions={[25, 50, 100]}
+                    component="div"
+                    count={pagination.total}
+                    rowsPerPage={pagination.rowsPerPage}
+                    page={pagination.page}
+                    onPageChange={handleChangePage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                    labelRowsPerPage="Leads per page:"
+                    labelDisplayedRows={({ from, to, count }) =>
+                      `${from}-${to} of ${
+                        count !== -1 ? count : `more than ${to}`
+                      }`
+                    }
+                  />
                 </Box>
               </TabPanel>
             ))}
           </Paper>
         </>
       )}
+
+      {/* Filter Drawer */}
+      <Drawer
+        anchor="right"
+        open={filterDrawerOpen}
+        onClose={() => setFilterDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: 320,
+            p: 2,
+            backgroundColor: "#7a0000", // Match sidebar color
+            color: "#ffffff", // White text
+          },
+        }}
+      >
+        <Typography variant="h6" gutterBottom sx={{ color: "#ffffff" }}>
+          Filters
+        </Typography>
+        <Divider sx={{ mb: 2, borderColor: "rgba(255, 255, 255, 0.2)" }} />
+
+        <Stack spacing={3}>
+          {/* Source Filter */}
+          <FormControl fullWidth size="small">
+            <InputLabel
+              sx={{ color: "#ffffff", "&.Mui-focused": { color: "#ffffff" } }}
+            >
+              Source
+            </InputLabel>
+            <Select
+              value={filters.source}
+              label="Source"
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, source: e.target.value }))
+              }
+              sx={{
+                color: "#ffffff",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(255, 255, 255, 0.3)",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(255, 255, 255, 0.5)",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#ffffff",
+                },
+                "& .MuiSvgIcon-root": {
+                  color: "#ffffff",
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    backgroundColor: "#ffffff",
+                    color: "#000000",
+                  },
+                },
+              }}
+            >
+              <MenuItem value="">All Sources</MenuItem>
+              {getUniqueValues.sources.map((source) => (
+                <MenuItem key={source} value={source}>
+                  {source}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Program Filter */}
+          <FormControl fullWidth size="small">
+            <InputLabel
+              sx={{ color: "#ffffff", "&.Mui-focused": { color: "#ffffff" } }}
+            >
+              Program
+            </InputLabel>
+            <Select
+              value={filters.program}
+              label="Program"
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, program: e.target.value }))
+              }
+              sx={{
+                color: "#ffffff",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(255, 255, 255, 0.3)",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(255, 255, 255, 0.5)",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#ffffff",
+                },
+                "& .MuiSvgIcon-root": {
+                  color: "#ffffff",
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    backgroundColor: "#ffffff",
+                    color: "#000000",
+                  },
+                },
+              }}
+            >
+              <MenuItem value="">All Programs</MenuItem>
+              {getUniqueValues.programs.map((program) => (
+                <MenuItem key={program} value={program}>
+                  {program}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Date Range Filter */}
+          <FormControl fullWidth size="small">
+            <InputLabel
+              sx={{ color: "#ffffff", "&.Mui-focused": { color: "#ffffff" } }}
+            >
+              Date Range
+            </InputLabel>
+            <Select
+              value={filters.dateRange}
+              label="Date Range"
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, dateRange: e.target.value }))
+              }
+              startAdornment={
+                <DateRangeIcon sx={{ mr: 1, color: "#ffffff" }} />
+              }
+              sx={{
+                color: "#ffffff",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(255, 255, 255, 0.3)",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(255, 255, 255, 0.5)",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#ffffff",
+                },
+                "& .MuiSvgIcon-root": {
+                  color: "#ffffff",
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    backgroundColor: "#ffffff",
+                    color: "#000000",
+                  },
+                },
+              }}
+            >
+              <MenuItem value="">All Time</MenuItem>
+              <MenuItem value="today">Today</MenuItem>
+              <MenuItem value="week">This Week</MenuItem>
+              <MenuItem value="month">This Month</MenuItem>
+              <MenuItem value="quarter">This Quarter</MenuItem>
+            </Select>
+          </FormControl>
+
+          {/* Applied Filters Summary */}
+          {Object.values(filters).some(Boolean) && (
+            <Box>
+              <Typography
+                variant="subtitle2"
+                gutterBottom
+                sx={{ color: "#ffffff" }}
+              >
+                Applied Filters:
+              </Typography>
+              <Stack direction="column" spacing={1}>
+                {filters.source && (
+                  <Chip
+                    label={`Source: ${filters.source}`}
+                    onDelete={() =>
+                      setFilters((prev) => ({ ...prev, source: "" }))
+                    }
+                    size="small"
+                    sx={{
+                      backgroundColor: "rgba(255, 255, 255, 0.2)",
+                      color: "#ffffff",
+                      "& .MuiChip-deleteIcon": {
+                        color: "#ffffff",
+                      },
+                    }}
+                  />
+                )}
+                {filters.program && (
+                  <Chip
+                    label={`Program: ${filters.program}`}
+                    onDelete={() =>
+                      setFilters((prev) => ({ ...prev, program: "" }))
+                    }
+                    size="small"
+                    sx={{
+                      backgroundColor: "rgba(255, 255, 255, 0.2)",
+                      color: "#ffffff",
+                      "& .MuiChip-deleteIcon": {
+                        color: "#ffffff",
+                      },
+                    }}
+                  />
+                )}
+                {filters.dateRange && (
+                  <Chip
+                    label={`Date: ${filters.dateRange}`}
+                    onDelete={() =>
+                      setFilters((prev) => ({ ...prev, dateRange: "" }))
+                    }
+                    size="small"
+                    sx={{
+                      backgroundColor: "rgba(255, 255, 255, 0.2)",
+                      color: "#ffffff",
+                      "& .MuiChip-deleteIcon": {
+                        color: "#ffffff",
+                      },
+                    }}
+                  />
+                )}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Filter Actions */}
+          <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={clearAllFilters}
+              startIcon={<ClearIcon />}
+              fullWidth
+              sx={{
+                borderColor: "#ffffff",
+                color: "#ffffff",
+                "&:hover": {
+                  borderColor: "#ffffff",
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                },
+              }}
+            >
+              Clear All
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => setFilterDrawerOpen(false)}
+              fullWidth
+              sx={{
+                backgroundColor: "#ffffff",
+                color: "#7a0000",
+                "&:hover": {
+                  backgroundColor: "rgba(255, 255, 255, 0.9)",
+                },
+              }}
+            >
+              Apply
+            </Button>
+          </Stack>
+        </Stack>
+      </Drawer>
 
       {/* Inquiry Contact Dialog */}
       <InquiryContactDialog
