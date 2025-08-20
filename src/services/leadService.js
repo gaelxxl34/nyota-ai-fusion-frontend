@@ -44,12 +44,23 @@ export const leadService = {
   // Get leads by status with pagination
   async getLeadsByStatus(status, options = {}) {
     try {
-      const { limit = 50, offset = 0 } = options;
+      const {
+        limit = 50,
+        offset = 0,
+        sortBy = "createdAt",
+        sortOrder = "desc",
+      } = options;
 
       console.log(`🔄 Fetching leads by status: ${status}`);
 
       const response = await axiosInstance.get("/api/leads", {
-        params: { status, limit, offset },
+        params: {
+          status,
+          limit,
+          offset,
+          sortBy,
+          sortOrder,
+        },
       });
 
       console.log(
@@ -364,8 +375,14 @@ export const leadService = {
   // Get leads submitted by current user (for "For You" tab)
   async getMySubmittedLeads(options = {}) {
     try {
-      const { page = 1, limit = 50, status } = options;
-      const params = { page, limit };
+      const {
+        page = 1,
+        limit = 50,
+        status,
+        sortBy = "createdAt",
+        sortOrder = "desc",
+      } = options;
+      const params = { page, limit, sortBy, sortOrder };
 
       if (status) {
         params.status = status;

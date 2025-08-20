@@ -520,6 +520,7 @@ const DataCenter = () => {
               0,
           }));
         } else if (currentTabConfig.label === "All Leads") {
+          // Fetch all leads and let the backend handle any role-based filtering
           leadsResponse = await leadService.getAllLeads({
             limit,
             offset,
@@ -527,19 +528,7 @@ const DataCenter = () => {
             sortOrder: "desc",
           });
 
-          if (leadsResponse.data) {
-            leadsResponse.data = leadsResponse.data.filter((lead) => {
-              // Get the current status from timeline if available, otherwise fallback to status field
-              const currentStatus =
-                lead.timeline &&
-                Array.isArray(lead.timeline) &&
-                lead.timeline.length > 0
-                  ? lead.timeline[lead.timeline.length - 1].status
-                  : lead.status;
-              return currentTabConfig.statuses.includes(currentStatus);
-            });
-          }
-          // Update total count for pagination
+          // Update total count for pagination using stats
           const totalCount = currentTabConfig.statuses.reduce(
             (total, status) => {
               return total + (leadStats.byStatus[status] || 0);
@@ -552,6 +541,7 @@ const DataCenter = () => {
           }));
         } else {
           if (currentTabConfig.statuses.length === 1) {
+            // Single status - use optimized status endpoint
             leadsResponse = await leadService.getLeadsByStatus(
               currentTabConfig.statuses[0],
               {
@@ -562,30 +552,53 @@ const DataCenter = () => {
               }
             );
           } else {
-            // For tabs with multiple statuses, get all leads and filter
-            leadsResponse = await leadService.getAllLeads({
-              limit: limit * 2, // Get more to ensure we have enough after filtering
-              offset: Math.floor(offset / currentTabConfig.statuses.length),
-              sortBy: "createdAt",
-              sortOrder: "desc",
+            // Multiple statuses - use getAllLeads and let backend filter by status if possible
+            // For now, we'll fetch each status separately and combine results
+            const statusPromises = currentTabConfig.statuses.map(
+              async (status) => {
+                const statusResponse = await leadService.getLeadsByStatus(
+                  status,
+                  {
+                    limit:
+                      Math.ceil(limit / currentTabConfig.statuses.length) + 5, // Get a bit more to ensure good distribution
+                    offset: Math.floor(
+                      offset / currentTabConfig.statuses.length
+                    ),
+                    sortBy: "createdAt",
+                    sortOrder: "desc",
+                  }
+                );
+                return statusResponse.data || [];
+              }
+            );
+
+            const statusResults = await Promise.all(statusPromises);
+
+            // Combine all results and sort by createdAt desc to maintain consistency
+            const allStatusLeads = statusResults.flat();
+            allStatusLeads.sort((a, b) => {
+              const dateA =
+                a.createdAt instanceof Date
+                  ? a.createdAt
+                  : new Date(a.createdAt || 0);
+              const dateB =
+                b.createdAt instanceof Date
+                  ? b.createdAt
+                  : new Date(b.createdAt || 0);
+              return dateB - dateA; // desc order (newest first)
             });
 
-            if (leadsResponse.data) {
-              leadsResponse.data = leadsResponse.data
-                .filter((lead) => {
-                  // Get the current status from timeline if available, otherwise fallback to status field
-                  const currentStatus =
-                    lead.timeline &&
-                    Array.isArray(lead.timeline) &&
-                    lead.timeline.length > 0
-                      ? lead.timeline[lead.timeline.length - 1].status
-                      : lead.status;
-                  return currentTabConfig.statuses.includes(currentStatus);
-                })
-                .slice(0, limit);
-            }
+            // Take only the required number after sorting
+            leadsResponse = {
+              data: allStatusLeads.slice(0, limit),
+              pagination: {
+                hasMore: allStatusLeads.length > limit,
+                total: allStatusLeads.length,
+              },
+            };
           }
-          // Update total count for pagination
+
+          // Update total count for pagination using stats
           const totalCount = currentTabConfig.statuses.reduce(
             (total, status) => {
               return total + (leadStats.byStatus[status] || 0);
@@ -603,6 +616,19 @@ const DataCenter = () => {
         console.log(
           `📊 Received ${newLeads.length} leads for page ${pagination.page + 1}`
         );
+
+        // Log the first few leads to verify sort order
+        if (newLeads.length > 0) {
+          console.log(
+            "🔍 First 3 leads sort verification:",
+            newLeads.slice(0, 3).map((lead) => ({
+              id: lead.id,
+              name: lead.name,
+              createdAt: lead.createdAt,
+              status: lead.status,
+            }))
+          );
+        }
 
         setLeads(newLeads);
       } catch (err) {
