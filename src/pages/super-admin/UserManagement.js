@@ -43,9 +43,11 @@ import {
   Refresh as RefreshIcon,
   Key as KeyIcon,
   Shield as ShieldIcon,
+  Visibility as ViewIcon,
 } from "@mui/icons-material";
 import { superAdminService } from "../../services/superAdminService";
 import { useAuth } from "../../contexts/AuthContext";
+import ApplicationDetailsDialog from "../../components/applications/ApplicationDetailsDialog";
 
 const UserManagement = () => {
   const { user } = useAuth();
@@ -56,11 +58,15 @@ const UserManagement = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [viewApplicationDialogOpen, setViewApplicationDialogOpen] =
+    useState(false);
+  const [selectedApplicant, setSelectedApplicant] = useState(null);
 
   // Available roles for IUEA system
   const ROLES = [
@@ -72,6 +78,11 @@ const UserManagement = () => {
       value: "admissionAgent",
       label: "Admission Agent",
       color: "warning",
+    },
+    {
+      value: "applicant",
+      label: "Applicant",
+      color: "default",
     },
   ];
 
@@ -305,6 +316,12 @@ This comprehensive deletion cannot be undone!`;
     }
   };
 
+  // Handle view application for applicants
+  const handleViewApplication = (user) => {
+    setSelectedApplicant(user);
+    setViewApplicationDialogOpen(true);
+  };
+
   // Menu handlers
   const handleMenuOpen = (event, user) => {
     setAnchorEl(event.currentTarget);
@@ -316,19 +333,49 @@ This comprehensive deletion cannot be undone!`;
     setSelectedUser(null);
   };
 
-  // Filter users based on search
-  const filteredUsers = users.filter((user) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      user.name?.toLowerCase().includes(searchLower) ||
-      user.email?.toLowerCase().includes(searchLower) ||
-      user.role?.toLowerCase().includes(searchLower)
-    );
-  });
+  // Filter and sort users based on search and role filter
+  const filteredUsers = users
+    .filter((user) => {
+      const searchLower = searchTerm.toLowerCase();
+      const searchMatch =
+        user.name?.toLowerCase().includes(searchLower) ||
+        user.email?.toLowerCase().includes(searchLower) ||
+        user.role?.toLowerCase().includes(searchLower);
+
+      // Role filter
+      if (roleFilter === "all") {
+        return searchMatch;
+      } else if (roleFilter === "applicant") {
+        // Show users with no role or role === "applicant"
+        return searchMatch && (!user.role || user.role === "applicant");
+      } else {
+        return searchMatch && user.role === roleFilter;
+      }
+    })
+    .sort((a, b) => {
+      // Sort by createdAt from most recent (descending)
+      const dateA = new Date(
+        a.createdAt?._seconds ? a.createdAt._seconds * 1000 : a.createdAt || 0
+      );
+      const dateB = new Date(
+        b.createdAt?._seconds ? b.createdAt._seconds * 1000 : b.createdAt || 0
+      );
+      return dateB - dateA; // Most recent first
+    });
 
   // Get role config
   const getRoleConfig = (role) => {
-    return ROLES.find((r) => r.value === role) || ROLES[4]; // Default to team member
+    // If no role is provided or role is null/undefined, default to applicant
+    if (!role) {
+      return { value: "applicant", label: "Applicant", color: "default" };
+    }
+    return (
+      ROLES.find((r) => r.value === role) || {
+        value: "applicant",
+        label: "Applicant",
+        color: "default",
+      }
+    );
   };
 
   // Pagination
@@ -400,6 +447,24 @@ This comprehensive deletion cannot be undone!`;
               ),
             }}
           />
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Filter by Role</InputLabel>
+            <Select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              label="Filter by Role"
+            >
+              <MenuItem value="all">All Roles</MenuItem>
+              {ROLES.map((role) => (
+                <MenuItem key={role.value} value={role.value}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <ShieldIcon fontSize="small" />
+                    {role.label}
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <IconButton onClick={fetchUsers} color="primary">
             <RefreshIcon />
           </IconButton>
@@ -533,6 +598,20 @@ This comprehensive deletion cannot be undone!`;
                             gap: 1,
                           }}
                         >
+                          {/* View Application button - only for applicants */}
+                          {(!tableUser.role ||
+                            tableUser.role === "applicant") && (
+                            <Tooltip title="View Application">
+                              <IconButton
+                                size="small"
+                                color="info"
+                                onClick={() => handleViewApplication(tableUser)}
+                              >
+                                <ViewIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+
                           <Tooltip title="Edit">
                             <IconButton
                               size="small"
@@ -703,6 +782,19 @@ This comprehensive deletion cannot be undone!`;
           <ListItemText>Reset Password</ListItemText>
         </MenuItem>
       </Menu>
+
+      {/* Application Details Dialog */}
+      <ApplicationDetailsDialog
+        open={viewApplicationDialogOpen}
+        onClose={() => {
+          setViewApplicationDialogOpen(false);
+          setSelectedApplicant(null);
+        }}
+        applicationId={selectedApplicant?.applicationId}
+        leadId={selectedApplicant?.id}
+        email={selectedApplicant?.email}
+        key={selectedApplicant?.id} // Force re-mount when different user is selected
+      />
     </Box>
   );
 };

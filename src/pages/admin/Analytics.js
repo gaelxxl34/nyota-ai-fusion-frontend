@@ -43,7 +43,6 @@ import {
   People as PeopleIcon,
   CheckCircle as CheckCircleIcon,
   HourglassEmpty as PendingIcon,
-  Cancel as RejectedIcon,
   Insights as InsightsIcon,
   Assessment as ReportIcon,
   BarChart as ChartIcon,
@@ -59,9 +58,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
-  Legend,
   AreaChart,
   Area,
 } from "recharts";
@@ -70,7 +66,7 @@ import { useRolePermissions } from "../../hooks/useRolePermissions";
 import { PERMISSIONS } from "../../config/roles.config";
 
 const Analytics = () => {
-  const { checkPermission, role } = useRolePermissions();
+  const { checkPermission } = useRolePermissions();
 
   // Check if user has permission to view analytics
   const hasAnalyticsPermission = checkPermission(PERMISSIONS.ANALYTICS);

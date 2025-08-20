@@ -113,6 +113,7 @@ const AdminDashboard = () => {
         userAnalyticsData,
         leadAnalyticsData,
         performanceData,
+        allUsersData,
       ] = await Promise.all([
         superAdminService.getSystemStats().catch((err) => {
           console.error("System stats error:", err);
@@ -130,6 +131,10 @@ const AdminDashboard = () => {
           console.error("Performance metrics error:", err);
           return null;
         }),
+        superAdminService.getAllUsers().catch((err) => {
+          console.error("All users error:", err);
+          return null;
+        }),
       ]);
 
       // Update states with new data structure
@@ -143,7 +148,32 @@ const AdminDashboard = () => {
           systemHealth: systemStatsData.systemHealth || "operational",
         });
 
-        setRoleMetrics(systemStatsData.roleDetails || []);
+        // Process role metrics from all users data
+        let processedRoleMetrics = [];
+
+        if (allUsersData && allUsersData.users) {
+          // Count users by role
+          const roleCounts = {};
+
+          allUsersData.users.forEach((user) => {
+            const role = user.role || "applicant"; // Default to applicant if no role
+            roleCounts[role] = (roleCounts[role] || 0) + 1;
+          });
+
+          // Convert to array format expected by the UI
+          processedRoleMetrics = Object.entries(roleCounts).map(
+            ([role, count]) => ({
+              role: role,
+              count: count,
+              name: role === "applicant" ? "Applicant" : role,
+            })
+          );
+        } else {
+          // Fallback to backend data if getAllUsers failed
+          processedRoleMetrics = systemStatsData.roleDetails || [];
+        }
+
+        setRoleMetrics(processedRoleMetrics);
         setLeadFunnel(systemStatsData.leadFunnel || {});
 
         if (systemStatsData.systemPerformance) {
@@ -171,7 +201,12 @@ const AdminDashboard = () => {
       }
 
       // If all requests failed, show error
-      if (!systemStatsData && !userAnalyticsData && !leadAnalyticsData) {
+      if (
+        !systemStatsData &&
+        !userAnalyticsData &&
+        !leadAnalyticsData &&
+        !allUsersData
+      ) {
         setError(
           "Failed to load dashboard data. Please check your permissions and try again."
         );
@@ -492,6 +527,12 @@ const AdminDashboard = () => {
                           bgColor: "#fff7ed",
                           icon: "🎓",
                           title: "Admission",
+                        },
+                        applicant: {
+                          color: "#6b7280",
+                          bgColor: "#f3f4f6",
+                          icon: "🎯",
+                          title: "Applicant",
                         },
                       };
                       return (
