@@ -32,6 +32,7 @@ import {
   Divider,
   Stack,
   Collapse,
+  Dialog,
 } from "@mui/material";
 import {
   Download as DownloadIcon,
@@ -164,6 +165,7 @@ const DataCenter = () => {
   const [conversationDialogOpen, setConversationDialogOpen] = useState(false);
   const [viewApplicationDialogOpen, setViewApplicationDialogOpen] =
     useState(false);
+  const [createAccountDialogOpen, setCreateAccountDialogOpen] = useState(false);
   // const { } = useAuth(); // Keep for future use
 
   // Define lead status categories for tabs - Updated for new funnel
@@ -1718,6 +1720,20 @@ const DataCenter = () => {
                           Add Applicant
                         </Button>
                       )}
+                      <Button
+                        variant="contained"
+                        startIcon={<PersonAddIcon />}
+                        onClick={() => setCreateAccountDialogOpen(true)}
+                        color="secondary"
+                        sx={{
+                          backgroundColor: "#7a0000",
+                          "&:hover": {
+                            backgroundColor: "#5a0000",
+                          },
+                        }}
+                      >
+                        Create Account For
+                      </Button>
                       <IconButton
                         onClick={() => {
                           console.log("Manual refresh triggered");
@@ -2326,6 +2342,54 @@ const DataCenter = () => {
           selectedLead?.id
         } /* Add key to force re-mount when different lead is selected */
       />
+
+      {/* Create Account Dialog */}
+      <Dialog
+        open={createAccountDialogOpen}
+        onClose={() => setCreateAccountDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            height: "80vh",
+            maxHeight: "700px",
+          },
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            p: 2,
+            borderBottom: 1,
+            borderColor: "divider",
+          }}
+        >
+          <Typography variant="h6">Create IUEA Account</Typography>
+          <IconButton
+            onClick={() => setCreateAccountDialogOpen(false)}
+            sx={{ color: "grey.500" }}
+          >
+            <ClearIcon />
+          </IconButton>
+        </Box>
+        <Box sx={{ flex: 1, p: 0 }}>
+          <iframe
+            src="https://applicant.iuea.ac.ug/embed/signup"
+            title="IUEA Application Form"
+            width="100%"
+            height="100%"
+            frameBorder="0"
+            scrolling="no"
+            style={{
+              border: "none",
+              display: "block",
+              minHeight: "600px",
+            }}
+          />
+        </Box>
+      </Dialog>
     </Box>
   );
 };

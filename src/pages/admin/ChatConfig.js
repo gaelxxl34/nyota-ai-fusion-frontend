@@ -71,35 +71,41 @@ const ChatConfig = () => {
   const allTabs = [
     {
       label: "New Contact",
-      statuses: ["NO_LEAD"],
+      statuses: ["NO_LEAD", "NEW", "INQUIRY"],
       color: "warning.main",
       icon: "👋",
       tabId: "new-contact-tab",
     },
     {
       label: "Contacted",
-      statuses: ["CONTACTED", "NURTURE"],
+      statuses: ["CONTACTED", "NURTURE", "QUALIFIED", "COLD"],
       color: "primary.main",
       icon: "📞",
       tabId: "contacted-tab",
     },
     {
       label: "Interested",
-      statuses: ["PRE_QUALIFIED", "FOLLOW_UP"],
+      statuses: ["INTERESTED", "PRE_QUALIFIED", "FOLLOW_UP", "HOT", "WARM"],
       color: "info.main",
       icon: "🎯",
       tabId: "prequalified-tab",
     },
     {
       label: "Applied",
-      statuses: ["APPLIED", "REVIEW", "PENDING_DOCS"],
+      statuses: [
+        "APPLIED",
+        "REVIEW",
+        "PENDING_DOCS",
+        "APPLICATION_SUBMITTED",
+        "IN_REVIEW",
+      ],
       color: "success.main",
       icon: "📝",
       tabId: "applied-tab",
     },
     {
       label: "Admitted",
-      statuses: ["ADMITTED", "ENROLLED", "SUCCESS"],
+      statuses: ["ADMITTED", "ENROLLED", "SUCCESS", "ACCEPTED", "COMPLETED"],
       color: "success.dark",
       icon: "🎉",
       tabId: "admitted-tab",
@@ -149,11 +155,13 @@ const ChatConfig = () => {
       }
 
       // Filter conversations by lead status for current tab
-      return conversationsArray.filter(([phoneNumber, messages]) => {
+      const filtered = conversationsArray.filter(([phoneNumber, messages]) => {
         const metadata = conversationMetadata.get(phoneNumber);
         const leadStatus = metadata?.leadStatus || "NO_LEAD";
         return currentTab.statuses.includes(leadStatus);
       });
+
+      return filtered;
     } catch (error) {
       console.error("❌ Error filtering conversations:", error);
       return [];
@@ -178,11 +186,6 @@ const ChatConfig = () => {
           }
         });
 
-        console.log(
-          `📊 Tab "${
-            tab.label
-          }" count: ${count} (statuses: ${tab.statuses?.join(", ")})`
-        );
         return count;
       } catch (error) {
         console.error("❌ Error getting tab count:", error);
@@ -258,6 +261,35 @@ const ChatConfig = () => {
         if (response.data.success) {
           const apiConversations = response.data.conversations || [];
           const pagination = response.data.pagination || {};
+
+          console.log(
+            `✅ Loaded ${apiConversations.length} conversations, hasMore: ${
+              pagination.hasMore
+            }, total available: ${pagination.totalCount || "unknown"}`
+          );
+
+          // Debug: Log all unique statuses to ensure proper tab mapping
+          const allStatuses = new Set();
+          apiConversations.forEach((conversation) => {
+            allStatuses.add(conversation.leadStatus || "NO_LEAD");
+          });
+          const statusArray = Array.from(allStatuses).sort();
+          console.log(
+            `📊 All unique lead statuses in current batch:`,
+            statusArray
+          );
+
+          // Check if any statuses are not mapped to tabs
+          const allTabStatuses = new Set();
+          allTabs.forEach((tab) => {
+            tab.statuses?.forEach((status) => allTabStatuses.add(status));
+          });
+          const unmappedStatuses = statusArray.filter(
+            (status) => !allTabStatuses.has(status)
+          );
+          if (unmappedStatuses.length > 0) {
+            console.warn(`⚠️ Unmapped lead statuses found:`, unmappedStatuses);
+          }
 
           const newConversationsMap = loadMore
             ? new Map(conversations)
@@ -360,6 +392,36 @@ const ChatConfig = () => {
   const getConversationsList = () => {
     try {
       const filteredConversations = getFilteredConversations();
+
+      // Debug for all tabs to ensure proper status mapping
+      const currentTab = mainTabs[tabValue];
+      console.log(`🔍 Tab "${currentTab?.label}" Debug:`, {
+        totalConversations: conversations.size,
+        filteredCount: filteredConversations.length,
+        tabStatuses: currentTab?.statuses,
+        tabIndex: tabValue,
+      });
+
+      // Count conversations for each status in current tab
+      if (currentTab?.statuses) {
+        const statusCounts = {};
+        currentTab.statuses.forEach((status) => {
+          statusCounts[status] = 0;
+        });
+
+        conversations.forEach((messages, phoneNumber) => {
+          const metadata = conversationMetadata.get(phoneNumber);
+          const leadStatus = metadata?.leadStatus || "NO_LEAD";
+          if (currentTab.statuses.includes(leadStatus)) {
+            statusCounts[leadStatus] = (statusCounts[leadStatus] || 0) + 1;
+          }
+        });
+
+        console.log(
+          `📊 Status breakdown for "${currentTab.label}":`,
+          statusCounts
+        );
+      }
 
       // Apply search filter if search term exists
       let finalConversations = filteredConversations;
