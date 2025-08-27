@@ -161,6 +161,44 @@ const Layout = ({ children }) => {
       return admissionAdminItems;
     }
 
+    // Admission Agent menu
+    if (role === "admissionAgent") {
+      const admissionAgentItems = [];
+
+      // Add basic items that admission agents need
+      if (checkPermission(role, PERMISSIONS.DATA_CENTER)) {
+        admissionAgentItems.push({
+          text: "Data Center",
+          icon: <DataCenterIcon />,
+          path: "/admin/data-center",
+        });
+      }
+
+      // Import Data is specifically available to admission agents
+      admissionAgentItems.push({
+        text: "Import Data",
+        icon: <ImportIcon />,
+        path: "/admin/import-data",
+      });
+
+      // Knowledge Base is available to all admin roles
+      admissionAgentItems.push({
+        text: "Knowledge Base",
+        icon: <KnowledgeBaseIcon />,
+        path: "/admin/knowledge-base",
+      });
+
+      if (checkPermission(role, PERMISSIONS.SETTINGS)) {
+        admissionAgentItems.push({
+          text: "Settings",
+          icon: <SettingsIcon />,
+          path: "/admin/settings",
+        });
+      }
+
+      return admissionAgentItems;
+    }
+
     // Admin level menu based on permissions (for IUEA admins and staff)
     const adminMenuItems = [];
 
@@ -196,8 +234,8 @@ const Layout = ({ children }) => {
       });
     }
 
-    // Import Data is available to admin and admissionAgent roles
-    if (role === "admin" || role === "admissionAgent") {
+    // Import Data is available to admin roles
+    if (role === "admin") {
       adminMenuItems.push({
         text: "Import Data",
         icon: <ImportIcon />,
