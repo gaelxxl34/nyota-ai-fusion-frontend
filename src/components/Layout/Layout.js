@@ -181,6 +181,15 @@ const Layout = ({ children }) => {
         path: "/admin/import-data",
       });
 
+      // Chat Configuration for admission agents
+      if (checkPermission(role, PERMISSIONS.CHAT_CONFIG)) {
+        admissionAgentItems.push({
+          text: "Chat Configuration",
+          icon: <ChatIcon />,
+          path: "/admin/chat-config",
+        });
+      }
+
       // Knowledge Base is available to all admin roles
       admissionAgentItems.push({
         text: "Knowledge Base",
