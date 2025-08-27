@@ -83,7 +83,7 @@ const TabPanel = React.memo(({ children, value, index, ...other }) => {
 
 const DataCenter = () => {
   const { checkPermission } = useRolePermissions();
-  const { getUserRole } = useAuth();
+  const { getUserRole, user } = useAuth();
   const userRole = getUserRole();
 
   const [currentTab, setCurrentTab] = useState(0);
@@ -353,6 +353,13 @@ const DataCenter = () => {
     currentPage: pagination.page,
     rowsPerPage: pagination.rowsPerPage,
     totalLeads: pagination.total,
+    user: user, // Added user data for debugging
+    submittedByValue:
+      user?.name ||
+      user?.displayName ||
+      user?.email?.split("@")[0] ||
+      `${userRole}-staff` ||
+      "staff",
   });
 
   // Manual refresh function - only refreshes leads, not stats
@@ -662,6 +669,25 @@ const DataCenter = () => {
 
     return () => clearInterval(interval);
   }, []); // No dependencies needed
+
+  // Handle messages from the iframe (for signup success notifications)
+  useEffect(() => {
+    const handleMessage = (event) => {
+      // Verify origin for security
+      if (event.origin !== "https://applicant.iuea.ac.ug") return;
+
+      if (event.data?.type === "signup_success") {
+        console.log("🎉 Signup success received from iframe:", event.data);
+        // Close dialog and refresh data
+        setCreateAccountDialogOpen(false);
+        // Refresh leads to show the new signup
+        setRefreshTrigger((prev) => prev + 1);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   // Get leads for current tab with status filtering
   const getCurrentTabLeads = useMemo(() => {
@@ -2344,6 +2370,21 @@ const DataCenter = () => {
       />
 
       {/* Create Account Dialog */}
+      {/* 
+        This dialog embeds the IUEA signup form and passes the current user's information
+        as the 'submittedBy' parameter to track who assisted with the account creation.
+        
+        Two methods are used to ensure maximum compatibility:
+        1. URL parameter: ?submittedBy=value
+        2. PostMessage API: sends submittedBy data after iframe loads
+        
+        The submittedBy value is derived from:
+        - user.name (first choice)
+        - user.displayName (second choice) 
+        - user.email (username part before @)
+        - userRole + '-staff' (role-based fallback)
+        - 'staff' (final fallback)
+      */}
       <Dialog
         open={createAccountDialogOpen}
         onClose={() => setCreateAccountDialogOpen(false)}
@@ -2376,7 +2417,42 @@ const DataCenter = () => {
         </Box>
         <Box sx={{ flex: 1, p: 0 }}>
           <iframe
-            src="https://applicant.iuea.ac.ug/embed/signup"
+            ref={(iframe) => {
+              if (iframe && createAccountDialogOpen) {
+                // Send submittedBy data via PostMessage when iframe loads
+                const handleLoad = () => {
+                  const submittedByValue =
+                    user?.name ||
+                    user?.displayName ||
+                    user?.email?.split("@")[0] ||
+                    `${userRole}-staff` ||
+                    "staff";
+                  console.log(
+                    "📨 Sending submittedBy to iframe:",
+                    submittedByValue
+                  );
+                  setTimeout(() => {
+                    iframe.contentWindow?.postMessage(
+                      {
+                        type: "submittedBy",
+                        value: submittedByValue,
+                      },
+                      "*"
+                    );
+                  }, 1000); // Delay to ensure iframe is fully loaded
+                };
+                iframe.addEventListener("load", handleLoad);
+                // Clean up listener
+                return () => iframe.removeEventListener("load", handleLoad);
+              }
+            }}
+            src={`https://applicant.iuea.ac.ug/embed/signup?submittedBy=${encodeURIComponent(
+              user?.name ||
+                user?.displayName ||
+                user?.email?.split("@")[0] ||
+                `${userRole}-staff` ||
+                "staff"
+            )}`}
             title="IUEA Application Form"
             width="100%"
             height="100%"
