@@ -26,6 +26,7 @@ import {
   Storage as DataCenterIcon,
   MenuBook as KnowledgeBaseIcon,
   CloudUpload as ImportIcon,
+  Campaign as CampaignIcon,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -68,6 +69,11 @@ const Layout = ({ children }) => {
           text: "User Management",
           icon: <PeopleIcon />,
           path: "/super-admin/users",
+        },
+        {
+          text: "Lead Forms",
+          icon: <CampaignIcon />,
+          path: "/super-admin/lead-forms",
         },
         {
           text: "Chat Management",

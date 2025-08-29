@@ -149,4 +149,92 @@ export const superAdminService = {
       );
     }
   },
+
+  // ========== LEAD FORMS MANAGEMENT ==========
+
+  // Get all lead forms
+  async getLeadForms() {
+    try {
+      const response = await axiosInstance.get("/api/super-admin/lead-forms");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching lead forms:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch lead forms"
+      );
+    }
+  },
+
+  // Create new lead form
+  async createLeadForm(formData) {
+    try {
+      const response = await axiosInstance.post(
+        "/api/super-admin/lead-forms",
+        formData
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error creating lead form:", error);
+      throw error;
+    }
+  },
+
+  // Update lead form
+  async updateLeadForm(formId, formData) {
+    try {
+      const response = await axiosInstance.put(
+        `/api/super-admin/lead-forms/${formId}`,
+        formData
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error updating lead form:", error);
+      throw error;
+    }
+  },
+
+  // Delete lead form
+  async deleteLeadForm(formId) {
+    try {
+      const response = await axiosInstance.delete(
+        `/api/super-admin/lead-forms/${formId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting lead form:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to delete lead form"
+      );
+    }
+  },
+
+  // Get lead form statistics
+  async getLeadFormStats(formId, timeRange = "30") {
+    try {
+      const response = await axiosInstance.get(
+        `/api/super-admin/lead-forms/${formId}/stats?timeRange=${timeRange}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching lead form stats:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch lead form statistics"
+      );
+    }
+  },
+
+  // Test Meta webhook connection for a specific form
+  async testLeadFormWebhook(formId) {
+    try {
+      const response = await axiosInstance.post(
+        `/api/super-admin/lead-forms/${formId}/test-webhook`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error testing webhook:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to test webhook"
+      );
+    }
+  },
 };

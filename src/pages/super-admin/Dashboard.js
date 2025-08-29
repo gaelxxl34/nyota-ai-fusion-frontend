@@ -1296,22 +1296,22 @@ const AdminDashboard = () => {
                   <Button
                     variant="outlined"
                     fullWidth
-                    startIcon={<AnalyticsIcon />}
-                    onClick={() => navigate("/analytics")}
+                    startIcon={<CampaignIcon />}
+                    onClick={() => navigate("/super-admin/lead-forms")}
                     sx={{ py: 2 }}
                   >
-                    View Analytics
+                    Lead Forms
                   </Button>
                 </Grid>
                 <Grid item xs={12} sm={4}>
                   <Button
                     variant="outlined"
                     fullWidth
-                    startIcon={<CampaignIcon />}
-                    onClick={() => navigate("/leads")}
+                    startIcon={<AnalyticsIcon />}
+                    onClick={() => navigate("/analytics")}
                     sx={{ py: 2 }}
                   >
-                    Lead Management
+                    View Analytics
                   </Button>
                 </Grid>
               </Grid>

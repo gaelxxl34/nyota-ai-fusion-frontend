@@ -11,6 +11,7 @@ import ChatManagement from "./pages/super-admin/ChatManagement";
 import Settings from "./pages/super-admin/Settings";
 import UserManagement from "./pages/super-admin/UserManagement";
 import SuperAdminSettings from "./pages/super-admin/AdminSettings";
+import LeadFormsManagement from "./pages/super-admin/LeadFormsManagement";
 // Admin Pages (formerly organization)
 import TeamManagement from "./pages/admin/TeamManagement";
 import LeadsOverview from "./pages/admin/LeadsOverview";
@@ -127,6 +128,10 @@ function App() {
                           element={<SuperAdminDashboard />}
                         />
                         <Route path="users" element={<UserManagement />} />
+                        <Route
+                          path="lead-forms"
+                          element={<LeadFormsManagement />}
+                        />
                         <Route path="chat" element={<ChatManagement />} />
                         <Route
                           path="settings"
