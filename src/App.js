@@ -12,6 +12,7 @@ import Settings from "./pages/super-admin/Settings";
 import UserManagement from "./pages/super-admin/UserManagement";
 import SuperAdminSettings from "./pages/super-admin/AdminSettings";
 import LeadFormsManagement from "./pages/super-admin/LeadFormsManagement";
+import BulkActions from "./pages/super-admin/BulkActions";
 // Admin Pages (formerly organization)
 import TeamManagement from "./pages/admin/TeamManagement";
 import LeadsOverview from "./pages/admin/LeadsOverview";
@@ -132,6 +133,7 @@ function App() {
                           path="lead-forms"
                           element={<LeadFormsManagement />}
                         />
+                        <Route path="bulk-actions" element={<BulkActions />} />
                         <Route path="chat" element={<ChatManagement />} />
                         <Route
                           path="settings"

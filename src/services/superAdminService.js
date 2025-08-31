@@ -237,4 +237,98 @@ export const superAdminService = {
       );
     }
   },
+
+  // ========== BULK ACTIONS ==========
+
+  // Get all interested leads for bulk messaging
+  async getInterestedLeads() {
+    try {
+      const response = await axiosInstance.get(
+        "/api/super-admin/bulk-actions/interested-leads"
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching interested leads:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch interested leads"
+      );
+    }
+  },
+
+  // Get interested leads for bulk actions
+  async getInterestedLeads() {
+    try {
+      const response = await axiosInstance.get(
+        "/api/super-admin/bulk-actions/interested-leads"
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching interested leads:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch interested leads"
+      );
+    }
+  },
+
+  // Start bulk messaging campaign
+  async startBulkMessaging(campaignData) {
+    try {
+      const response = await axiosInstance.post(
+        "/api/super-admin/bulk-actions/send-messages",
+        campaignData
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error starting bulk messaging:", error);
+      throw new Error(
+        error.response?.data?.message ||
+          "Failed to start bulk messaging campaign"
+      );
+    }
+  },
+
+  // Get campaign status and logs
+  async getCampaign(campaignId) {
+    try {
+      const response = await axiosInstance.get(
+        `/api/super-admin/bulk-actions/campaigns/${campaignId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching campaign:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch campaign"
+      );
+    }
+  },
+
+  // Get all campaigns
+  async getAllCampaigns(limit = 20, offset = 0) {
+    try {
+      const response = await axiosInstance.get(
+        `/api/super-admin/bulk-actions/campaigns?limit=${limit}&offset=${offset}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching campaigns:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch campaigns"
+      );
+    }
+  },
+
+  // Delete a campaign
+  async deleteCampaign(campaignId) {
+    try {
+      const response = await axiosInstance.delete(
+        `/api/super-admin/bulk-actions/campaigns/${campaignId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting campaign:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to delete campaign"
+      );
+    }
+  },
 };

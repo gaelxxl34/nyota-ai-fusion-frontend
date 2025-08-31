@@ -27,6 +27,7 @@ import {
   MenuBook as KnowledgeBaseIcon,
   CloudUpload as ImportIcon,
   Campaign as CampaignIcon,
+  Send as BulkActionsIcon,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -74,6 +75,11 @@ const Layout = ({ children }) => {
           text: "Lead Forms",
           icon: <CampaignIcon />,
           path: "/super-admin/lead-forms",
+        },
+        {
+          text: "Bulk Actions",
+          icon: <BulkActionsIcon />,
+          path: "/super-admin/bulk-actions",
         },
         {
           text: "Chat Management",
