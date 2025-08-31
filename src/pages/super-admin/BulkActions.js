@@ -439,16 +439,39 @@ const BulkActions = () => {
       return;
     }
 
+    if (
+      !leadsData[selectedLeadStatus] ||
+      leadsData[selectedLeadStatus].length === 0
+    ) {
+      enqueueSnackbar(`No ${selectedLeadStatus} leads found to process`, {
+        variant: "error",
+      });
+      return;
+    }
+
+    if (selectedLeadStatus !== "interested") {
+      enqueueSnackbar(
+        `Campaigns for "${selectedLeadStatus}" leads are not yet implemented`,
+        { variant: "warning" }
+      );
+      return;
+    }
+
     try {
       setLoading(true);
       await superAdminService.startBulkMessaging({
         campaignName: campaignForm.name,
         description: campaignForm.description,
+        leadStatus: selectedLeadStatus, // Pass the selected lead status
+        targetCount: leadsData[selectedLeadStatus]?.length || 0, // Pass target count
       });
 
-      enqueueSnackbar(`Campaign "${campaignForm.name}" started successfully!`, {
-        variant: "success",
-      });
+      enqueueSnackbar(
+        `Campaign "${campaignForm.name}" started successfully! Processing ${leadsData[selectedLeadStatus].length} interested leads.`,
+        {
+          variant: "success",
+        }
+      );
 
       setShowCreateDialog(false);
       setCampaignForm({ name: "", description: "" });
@@ -509,13 +532,27 @@ const BulkActions = () => {
   const getLogIcon = (type) => {
     switch (type) {
       case "success":
-        return <CheckCircleIcon color="success" />;
+        return <CheckCircleIcon color="success" fontSize="small" />;
       case "error":
-        return <ErrorIcon color="error" />;
+        return <ErrorIcon color="error" fontSize="small" />;
       case "warning":
-        return <WarningIcon color="warning" />;
+        return <WarningIcon color="warning" fontSize="small" />;
       default:
-        return <InfoIcon color="info" />;
+        return <InfoIcon color="info" fontSize="small" />;
+    }
+  };
+
+  // Get log text color based on type
+  const getLogTextColor = (type) => {
+    switch (type) {
+      case "success":
+        return "success.main";
+      case "error":
+        return "error.main";
+      case "warning":
+        return "warning.main";
+      default:
+        return "text.primary";
     }
   };
 
@@ -892,20 +929,68 @@ We're here to support you and are excited to have you on this journey! 🌟`;
                       {campaign.logs && campaign.logs.length > 0 ? (
                         <Paper
                           variant="outlined"
-                          sx={{ maxHeight: 300, overflow: "auto" }}
+                          sx={{
+                            maxHeight: 300,
+                            overflow: "auto",
+                            bgcolor: "background.paper",
+                            border: "1px solid",
+                            borderColor: "divider",
+                          }}
                         >
                           <List dense>
                             {campaign.logs
                               .slice()
                               .reverse()
                               .map((log, index) => (
-                                <ListItem key={index}>
+                                <ListItem
+                                  key={index}
+                                  sx={{
+                                    borderLeft: "3px solid",
+                                    borderLeftColor:
+                                      log.type === "error"
+                                        ? "error.main"
+                                        : log.type === "success"
+                                        ? "success.main"
+                                        : log.type === "warning"
+                                        ? "warning.main"
+                                        : "info.main",
+                                    mb: 0.5,
+                                    bgcolor:
+                                      log.type === "error"
+                                        ? "error.50"
+                                        : "transparent",
+                                  }}
+                                >
                                   <ListItemIcon sx={{ minWidth: 32 }}>
                                     {getLogIcon(log.type)}
                                   </ListItemIcon>
                                   <ListItemText
-                                    primary={log.message}
-                                    secondary={formatDate(log.timestamp)}
+                                    primary={
+                                      <Typography
+                                        variant="body2"
+                                        sx={{
+                                          color: getLogTextColor(log.type),
+                                          fontWeight:
+                                            log.type === "error"
+                                              ? "bold"
+                                              : "normal",
+                                          fontSize: "0.875rem",
+                                        }}
+                                      >
+                                        {log.message}
+                                      </Typography>
+                                    }
+                                    secondary={
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          color: "text.secondary",
+                                          fontSize: "0.75rem",
+                                        }}
+                                      >
+                                        {formatDate(log.timestamp)}
+                                      </Typography>
+                                    }
                                   />
                                 </ListItem>
                               ))}
@@ -1087,9 +1172,19 @@ We're here to support you and are excited to have you on this journey! 🌟`;
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 3 }}>
             This will send emails and WhatsApp messages to all{" "}
-            {leadsData[selectedLeadStatus].length} {selectedLeadStatus} leads.
-            This action cannot be undone.
+            {leadsData[selectedLeadStatus]?.length || 0} {selectedLeadStatus}{" "}
+            leads. This action cannot be undone.
           </Alert>
+
+          {selectedLeadStatus !== "interested" && (
+            <Alert severity="info" sx={{ mb: 3 }}>
+              <Typography variant="body2">
+                <strong>Note:</strong> Currently, only "interested" leads
+                campaigns are fully implemented. Other lead statuses will be
+                supported in future updates.
+              </Typography>
+            </Alert>
+          )}
 
           <TextField
             fullWidth
@@ -1098,7 +1193,10 @@ We're here to support you and are excited to have you on this journey! 🌟`;
             onChange={(e) => handleFormChange("name", e.target.value)}
             margin="normal"
             required
-            placeholder="e.g., Monthly Follow-up Campaign"
+            placeholder={`e.g., ${
+              selectedLeadStatus.charAt(0).toUpperCase() +
+              selectedLeadStatus.slice(1)
+            } Leads Follow-up - ${new Date().toLocaleDateString()}`}
           />
 
           <TextField
@@ -1109,10 +1207,10 @@ We're here to support you and are excited to have you on this journey! 🌟`;
             margin="normal"
             multiline
             rows={3}
-            placeholder="Brief description of this campaign"
+            placeholder={`Follow-up campaign for ${selectedLeadStatus} leads to encourage application completion`}
           />
 
-          {leadsData[selectedLeadStatus].length > 0 && (
+          {leadsData[selectedLeadStatus]?.length > 0 && (
             <Alert severity="info" sx={{ mt: 2 }}>
               <Typography variant="body2">
                 <strong>Target Audience:</strong>{" "}
@@ -1120,7 +1218,25 @@ We're here to support you and are excited to have you on this journey! 🌟`;
                 {selectedLeadStatus.toUpperCase()}" status
               </Typography>
               <Typography variant="body2">
-                <strong>Messages to send:</strong> Email + WhatsApp follow-up
+                <strong>Messages to send:</strong> Personalized email + WhatsApp
+                follow-up
+              </Typography>
+              <Typography variant="body2">
+                <strong>Campaign Type:</strong>{" "}
+                {selectedLeadStatus === "interested"
+                  ? "✅ Fully Supported"
+                  : "⚠️ Limited Support"}
+              </Typography>
+            </Alert>
+          )}
+
+          {(!leadsData[selectedLeadStatus] ||
+            leadsData[selectedLeadStatus].length === 0) && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              <Typography variant="body2">
+                <strong>No leads found!</strong> There are no leads with "
+                {selectedLeadStatus.toUpperCase()}" status. Please select a
+                different status or wait for new leads to arrive.
               </Typography>
             </Alert>
           )}
@@ -1133,11 +1249,19 @@ We're here to support you and are excited to have you on this journey! 🌟`;
             disabled={
               loading ||
               !campaignForm.name.trim() ||
+              !leadsData[selectedLeadStatus] ||
               leadsData[selectedLeadStatus].length === 0
             }
             startIcon={loading ? <CircularProgress size={20} /> : <SendIcon />}
           >
-            {loading ? "Starting..." : "Start Campaign"}
+            {loading
+              ? "Starting..."
+              : selectedLeadStatus === "interested"
+              ? "Start Interested Leads Campaign"
+              : `Start ${
+                  selectedLeadStatus.charAt(0).toUpperCase() +
+                  selectedLeadStatus.slice(1)
+                } Campaign (Not Available)`}
           </Button>
         </DialogActions>
       </Dialog>
