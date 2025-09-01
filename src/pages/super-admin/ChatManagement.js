@@ -18,14 +18,11 @@ import {
   FormControlLabel,
   Alert,
   LinearProgress,
-  Badge,
   Card,
   CardContent,
   Grid,
-  Divider,
 } from "@mui/material";
 import {
-  Assessment as AssessmentIcon,
   Chat as ChatIcon,
   Person as PersonIcon,
   Warning as WarningIcon,
@@ -42,7 +39,6 @@ import {
 import { useConversations } from "../../hooks/useConversations";
 import ConversationFilters from "../../components/chat/ConversationFilters";
 import EnhancedConversationList from "../../components/chat/EnhancedConversationList";
-import StatsCards from "../../components/common/StatsCards";
 import ConversationDetailsDialog from "../../components/chat/ConversationDetailsDialog";
 import ChatAnalyticsDashboard from "../../components/chat/ChatAnalyticsDashboard";
 import ChatSettingsPanel from "../../components/chat/ChatSettingsPanel";

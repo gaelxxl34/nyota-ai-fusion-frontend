@@ -2,24 +2,15 @@ import React, {
   useEffect,
   useState,
   useCallback,
-  useMemo,
   useRef,
+  useMemo,
 } from "react";
 import {
   Box,
-  Paper,
   Typography,
-  TextField,
   Button,
-  Container,
-  Grid,
-  CircularProgress,
-  IconButton,
   Snackbar,
   Alert,
-  Tabs,
-  Tab,
-  Badge,
   Tooltip,
   Chip,
   AppBar,
@@ -27,9 +18,6 @@ import {
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
-  CloudDownload as LoadAllIcon,
-  Settings as SettingsIcon,
-  FilterList as FilterIcon,
   WhatsApp as WhatsAppIcon,
   Notifications as NotificationsIcon,
 } from "@mui/icons-material";
@@ -39,7 +27,6 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useRolePermissions } from "../../hooks/useRolePermissions";
 import { axiosInstance } from "../../services/axiosConfig";
 import Swal from "sweetalert2";
-import ChatSettingsPanel from "../../components/chat/ChatSettingsPanel";
 import ChatMessageHandler from "../../services/chatMessageHandler";
 import ConversationTabs from "../../components/chat/ConversationTabs";
 import TabPanel from "../../components/chat/TabPanel";
@@ -92,58 +79,61 @@ const ChatConfig = () => {
   }, [activeConversation]);
 
   // Define main tabs for each lead status plus Knowledge Base
-  const allTabs = [
-    {
-      label: "New Contact",
-      statuses: ["NO_LEAD", "NEW", "INQUIRY", "INITIAL_CONTACT", "PROSPECT"],
-      color: "warning.main",
-      icon: "👋",
-      tabId: "new-contact-tab",
-    },
-    {
-      label: "Interested",
-      statuses: [
-        "INTERESTED",
-        "PRE_QUALIFIED",
-        "FOLLOW_UP",
-        "HOT",
-        "WARM",
-        "ENGAGED",
-      ],
-      color: "info.main",
-      icon: "🎯",
-      tabId: "prequalified-tab",
-    },
-    {
-      label: "Applied",
-      statuses: [
-        "APPLIED",
-        "REVIEW",
-        "PENDING_DOCS",
-        "APPLICATION_SUBMITTED",
-        "IN_REVIEW",
-        "DOCUMENTATION_PENDING",
-        "UNDER_REVIEW",
-      ],
-      color: "success.main",
-      icon: "📝",
-      tabId: "applied-tab",
-    },
-    {
-      label: "Admitted",
-      statuses: [
-        "ADMITTED",
-        "ENROLLED",
-        "SUCCESS",
-        "ACCEPTED",
-        "COMPLETED",
-        "FINALIZED",
-      ],
-      color: "success.dark",
-      icon: "🎉",
-      tabId: "admitted-tab",
-    },
-  ];
+  const allTabs = useMemo(
+    () => [
+      {
+        label: "New Contact",
+        statuses: ["NO_LEAD", "NEW", "INQUIRY", "INITIAL_CONTACT", "PROSPECT"],
+        color: "warning.main",
+        icon: "👋",
+        tabId: "new-contact-tab",
+      },
+      {
+        label: "Interested",
+        statuses: [
+          "INTERESTED",
+          "PRE_QUALIFIED",
+          "FOLLOW_UP",
+          "HOT",
+          "WARM",
+          "ENGAGED",
+        ],
+        color: "info.main",
+        icon: "🎯",
+        tabId: "prequalified-tab",
+      },
+      {
+        label: "Applied",
+        statuses: [
+          "APPLIED",
+          "REVIEW",
+          "PENDING_DOCS",
+          "APPLICATION_SUBMITTED",
+          "IN_REVIEW",
+          "DOCUMENTATION_PENDING",
+          "UNDER_REVIEW",
+        ],
+        color: "success.main",
+        icon: "📝",
+        tabId: "applied-tab",
+      },
+      {
+        label: "Admitted",
+        statuses: [
+          "ADMITTED",
+          "ENROLLED",
+          "SUCCESS",
+          "ACCEPTED",
+          "COMPLETED",
+          "FINALIZED",
+        ],
+        color: "success.dark",
+        icon: "🎉",
+        tabId: "admitted-tab",
+      },
+    ],
+    []
+  );
 
   // Filter tabs based on user role permissions - only hide UI tabs, don't filter data
   const getFilteredTabs = () => {
@@ -431,7 +421,13 @@ const ChatConfig = () => {
         }
       }
     },
-    [conversations, unreadCounts, conversationMetadata, normalizePhoneNumber]
+    [
+      conversations,
+      unreadCounts,
+      conversationMetadata,
+      normalizePhoneNumber,
+      allTabs,
+    ]
   );
 
   // Load more conversations
@@ -522,7 +518,7 @@ const ChatConfig = () => {
         severity: "error",
       });
     }
-  }, [normalizePhoneNumber]);
+  }, [normalizePhoneNumber, hasMoreConversations]);
 
   const getConversationsList = () => {
     try {

@@ -288,21 +288,6 @@ export const superAdminService = {
     }
   },
 
-  // Get interested leads for bulk actions
-  async getInterestedLeads() {
-    try {
-      const response = await axiosInstance.get(
-        "/api/super-admin/bulk-actions/interested-leads"
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching interested leads:", error);
-      throw new Error(
-        error.response?.data?.message || "Failed to fetch interested leads"
-      );
-    }
-  },
-
   // Start bulk messaging campaign
   async startBulkMessaging(campaignData) {
     try {
