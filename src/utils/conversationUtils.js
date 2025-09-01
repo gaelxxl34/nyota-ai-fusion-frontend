@@ -86,8 +86,6 @@ export const getLeadStatusColor = (status) => {
       return "info";
     case "qualified":
       return "success";
-    case "contacted":
-      return "warning";
     case "converted":
       return "success";
     case "lost":

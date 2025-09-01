@@ -71,21 +71,21 @@ const ChatConfig = () => {
   const allTabs = [
     {
       label: "New Contact",
-      statuses: ["NO_LEAD", "NEW", "INQUIRY"],
+      statuses: ["NO_LEAD", "NEW", "INQUIRY", "INITIAL_CONTACT", "PROSPECT"],
       color: "warning.main",
       icon: "👋",
       tabId: "new-contact-tab",
     },
     {
-      label: "Contacted",
-      statuses: ["CONTACTED", "NURTURE", "QUALIFIED", "COLD"],
-      color: "primary.main",
-      icon: "📞",
-      tabId: "contacted-tab",
-    },
-    {
       label: "Interested",
-      statuses: ["INTERESTED", "PRE_QUALIFIED", "FOLLOW_UP", "HOT", "WARM"],
+      statuses: [
+        "INTERESTED",
+        "PRE_QUALIFIED",
+        "FOLLOW_UP",
+        "HOT",
+        "WARM",
+        "ENGAGED",
+      ],
       color: "info.main",
       icon: "🎯",
       tabId: "prequalified-tab",
@@ -98,6 +98,8 @@ const ChatConfig = () => {
         "PENDING_DOCS",
         "APPLICATION_SUBMITTED",
         "IN_REVIEW",
+        "DOCUMENTATION_PENDING",
+        "UNDER_REVIEW",
       ],
       color: "success.main",
       icon: "📝",
@@ -105,7 +107,14 @@ const ChatConfig = () => {
     },
     {
       label: "Admitted",
-      statuses: ["ADMITTED", "ENROLLED", "SUCCESS", "ACCEPTED", "COMPLETED"],
+      statuses: [
+        "ADMITTED",
+        "ENROLLED",
+        "SUCCESS",
+        "ACCEPTED",
+        "COMPLETED",
+        "FINALIZED",
+      ],
       color: "success.dark",
       icon: "🎉",
       tabId: "admitted-tab",
@@ -249,7 +258,7 @@ const ChatConfig = () => {
         }
 
         const currentOffset = loadMore ? conversations.size : 0;
-        const limit = 25;
+        const limit = 500; // Much larger limit for faster loading
 
         // Fetch all conversations without lead status filtering - we'll filter client-side
         let apiUrl = `/api/whatsapp/conversations?limit=${limit}&offset=${currentOffset}&status=active&includeClosed=false`;
@@ -289,6 +298,18 @@ const ChatConfig = () => {
           );
           if (unmappedStatuses.length > 0) {
             console.warn(`⚠️ Unmapped lead statuses found:`, unmappedStatuses);
+            console.warn(
+              `💡 Consider adding these to the tabs configuration for better organization`
+            );
+
+            // Show notification about unmapped statuses
+            setSnackbar({
+              open: true,
+              message: `Found ${
+                unmappedStatuses.length
+              } unmapped lead statuses: ${unmappedStatuses.join(", ")}`,
+              severity: "warning",
+            });
           }
 
           const newConversationsMap = loadMore
@@ -343,8 +364,19 @@ const ChatConfig = () => {
           setHasMoreConversations(hasMore);
 
           console.log(
-            `✅ Loaded ${apiConversations.length} conversations, hasMore: ${hasMore}`
+            `✅ Updated state - Conversations: ${newConversationsMap.size}, hasMore: ${hasMore}`
           );
+
+          // If we're on initial load and there are more conversations, automatically load them for better search
+          if (!loadMore && hasMore && newConversationsMap.size < 2000) {
+            // Auto-load up to 2000 conversations
+            console.log(
+              `🔄 Auto-loading more conversations for comprehensive search... (${newConversationsMap.size} loaded so far)`
+            );
+            setTimeout(() => {
+              fetchConversations(true);
+            }, 50); // Reduced delay for faster loading
+          }
 
           // Return first phone number for auto-selection
           if (!loadMore && apiConversations.length > 0) {
@@ -386,8 +418,106 @@ const ChatConfig = () => {
     await fetchConversations(true);
   }, [hasMoreConversations, loadingMoreConversations, fetchConversations]);
 
-  // Remove old fetchLeadStatuses since lead status now comes from API
-  // const fetchLeadStatuses = useCallback(async () => { ... }, []);
+  // Enhanced search handler with automatic conversation loading
+  const handleSearchTermChange = useCallback(
+    (newSearchTerm) => {
+      setSearchTerm(newSearchTerm);
+
+      // If user is searching and we have more conversations available, suggest loading more
+      if (newSearchTerm && newSearchTerm.trim() && hasMoreConversations) {
+        console.log(
+          `🔍 Search initiated: "${newSearchTerm}". More conversations available for loading.`
+        );
+
+        // Show a notification that more conversations could be loaded for better search
+        setSnackbar({
+          open: true,
+          message: `Searching in ${conversations.size} conversations. ${
+            hasMoreConversations ? 'Click "Load All" for complete search.' : ""
+          }`,
+          severity: "info",
+        });
+      }
+    },
+    [hasMoreConversations, conversations.size]
+  );
+
+  // Load ALL remaining conversations for comprehensive search
+  const loadAllConversations = useCallback(async () => {
+    if (!hasMoreConversations) return;
+
+    setSnackbar({
+      open: true,
+      message: "Loading all conversations at once...",
+      severity: "info",
+    });
+
+    try {
+      // Use the special loadAll endpoint for maximum efficiency
+      const apiUrl = `/api/whatsapp/conversations?loadAll=true&status=active&includeClosed=false`;
+
+      console.log(`🚀 Loading ALL conversations at once...`);
+      const response = await axiosInstance.get(apiUrl);
+
+      if (response.data.success) {
+        const allConversations = response.data.conversations || [];
+
+        console.log(
+          `✅ Loaded ${allConversations.length} conversations in one request!`
+        );
+
+        const newConversationsMap = new Map();
+        const newUnreadCountsMap = new Map();
+        const newConversationMetadataMap = new Map();
+
+        for (const conversation of allConversations) {
+          const phoneNumber = normalizePhoneNumber(conversation.phoneNumber);
+          if (!phoneNumber) continue;
+
+          // Store conversation metadata (including leadStatus from API)
+          newConversationMetadataMap.set(phoneNumber, {
+            id: conversation.id,
+            contactName: conversation.contactName,
+            contactId: conversation.contactId,
+            status: conversation.status,
+            leadStatus: conversation.leadStatus || "NO_LEAD",
+            leadId: conversation.leadId,
+            aiEnabled: conversation.aiEnabled !== false,
+            createdAt: conversation.createdAt,
+            updatedAt: conversation.updatedAt,
+            lastMessage: conversation.lastMessage,
+            lastMessageTime: conversation.lastMessageTime,
+            messageCount: conversation.messageCount || 0,
+          });
+
+          // Store empty messages array - messages will be loaded on demand
+          newConversationsMap.set(phoneNumber, []);
+
+          // Set unread count from API
+          newUnreadCountsMap.set(phoneNumber, conversation.unreadCount || 0);
+        }
+
+        // Update state with all data
+        setConversations(newConversationsMap);
+        setUnreadCounts(newUnreadCountsMap);
+        setConversationMetadata(newConversationMetadataMap);
+        setHasMoreConversations(false); // All loaded
+
+        setSnackbar({
+          open: true,
+          message: `🎉 Loaded ALL ${newConversationsMap.size} conversations! Search now covers everything.`,
+          severity: "success",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading all conversations:", error);
+      setSnackbar({
+        open: true,
+        message: "Failed to load all conversations. Please try again.",
+        severity: "error",
+      });
+    }
+  }, [normalizePhoneNumber]);
 
   const getConversationsList = () => {
     try {
@@ -432,13 +562,26 @@ const ChatConfig = () => {
             const metadata = conversationMetadata.get(phoneNumber);
             const contactName = metadata?.contactName || "";
             const lastMessage = metadata?.lastMessage || "";
+            const leadStatus = metadata?.leadStatus || "";
 
+            // Enhanced search: phone number, contact name, last message, lead status, and recent messages
             return (
               phoneNumber.includes(searchTerm) ||
               contactName.toLowerCase().includes(lowerSearchTerm) ||
-              lastMessage.toLowerCase().includes(lowerSearchTerm)
+              lastMessage.toLowerCase().includes(lowerSearchTerm) ||
+              leadStatus.toLowerCase().includes(lowerSearchTerm) ||
+              // Also search through recent messages in the conversation
+              messages.some(
+                (msg) =>
+                  msg.content &&
+                  msg.content.toLowerCase().includes(lowerSearchTerm)
+              )
             );
           }
+        );
+
+        console.log(
+          `🔍 Search results: ${finalConversations.length} conversations found for "${searchTerm}"`
         );
       }
 
@@ -763,9 +906,10 @@ const ChatConfig = () => {
 
     try {
       setTabValue(newValue);
-      if (searchTerm) {
-        setSearchTerm("");
-      }
+      // Keep search term when switching tabs to maintain search functionality across tabs
+      // if (searchTerm) {
+      //   setSearchTerm("");
+      // }
 
       // Select first conversation from the new tab if none is selected or current is not visible
       setTimeout(() => {
@@ -786,7 +930,11 @@ const ChatConfig = () => {
         }
       }, 100); // Small delay to ensure filtering is complete
 
-      console.log(`📊 Switched to tab: ${mainTabs[newValue]?.label}`);
+      console.log(
+        `📊 Switched to tab: ${mainTabs[newValue]?.label}${
+          searchTerm ? ` with search: "${searchTerm}"` : ""
+        }`
+      );
     } catch (error) {
       console.error("❌ Error in handleTabChange:", error);
     }
@@ -978,6 +1126,23 @@ const ChatConfig = () => {
             />
           </Tooltip>
 
+          {hasMoreConversations && (
+            <Tooltip title="Load all conversations for comprehensive search">
+              <Button
+                color="inherit"
+                variant="outlined"
+                size="small"
+                onClick={loadAllConversations}
+                disabled={loadingMoreConversations}
+                sx={{ mr: 2, borderColor: "rgba(255,255,255,0.5)" }}
+              >
+                {loadingMoreConversations
+                  ? "Loading..."
+                  : `Load All (${conversations.size}+)`}
+              </Button>
+            </Tooltip>
+          )}
+
           <Tooltip title="Refresh conversations">
             <Button
               color="inherit"
@@ -1014,7 +1179,7 @@ const ChatConfig = () => {
                   setMessage={setMessage}
                   loading={loading}
                   searchTerm={searchTerm}
-                  setSearchTerm={setSearchTerm}
+                  setSearchTerm={handleSearchTermChange}
                   onConversationSelect={switchConversation}
                   onConversationClear={clearConversation}
                   onConversationDelete={deleteConversation}

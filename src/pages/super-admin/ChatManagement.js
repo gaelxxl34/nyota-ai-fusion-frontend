@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Paper,
@@ -17,6 +17,12 @@ import {
   Checkbox,
   FormControlLabel,
   Alert,
+  LinearProgress,
+  Badge,
+  Card,
+  CardContent,
+  Grid,
+  Divider,
 } from "@mui/material";
 import {
   Assessment as AssessmentIcon,
@@ -27,6 +33,9 @@ import {
   DeleteSweep as DeleteSweepIcon,
   Refresh as RefreshIcon,
   GetApp as ExportIcon,
+  CloudDownload as LoadAllIcon,
+  FilterList as FilterIcon,
+  CloudDownload,
 } from "@mui/icons-material";
 
 // Custom hooks and components
@@ -58,6 +67,8 @@ const ChatManagement = () => {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedConversations, setSelectedConversations] = useState(new Set());
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [totalConversationsCount, setTotalConversationsCount] = useState(0);
 
   // Dialog states
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -86,6 +97,7 @@ const ChatManagement = () => {
     deleteConversations,
     updateFilter,
     loadMore,
+    loadConversations,
     refresh,
   } = useConversations();
 
@@ -96,7 +108,51 @@ const ChatManagement = () => {
     loading,
     error,
     filters,
+    pagination,
   });
+
+  // Update total conversations count when data changes
+  useEffect(() => {
+    if (pagination?.totalCount) {
+      setTotalConversationsCount(pagination.totalCount);
+    }
+  }, [pagination]);
+
+  // Load all conversations function
+  const handleLoadAllConversations = async () => {
+    setLoadingAll(true);
+    try {
+      // Calculate how many more conversations we need to load
+      const remaining = (pagination?.totalCount || 0) - conversations.length;
+
+      if (remaining > 0) {
+        showSnackbar(`Loading ${remaining} remaining conversations...`, "info");
+
+        // Load all remaining conversations by setting a high limit
+        await loadConversations({
+          resetPagination: false,
+          limit: remaining,
+          offset: conversations.length,
+        });
+
+        showSnackbar(
+          `Successfully loaded all ${
+            pagination?.totalCount || 0
+          } conversations`,
+          "success"
+        );
+      } else {
+        showSnackbar("All conversations are already loaded", "info");
+      }
+    } catch (error) {
+      showSnackbar(
+        `Failed to load all conversations: ${error.message}`,
+        "error"
+      );
+    } finally {
+      setLoadingAll(false);
+    }
+  };
 
   // Calculate statistics from conversations
   const stats = React.useMemo(() => {
@@ -111,31 +167,39 @@ const ChatManagement = () => {
 
     return [
       {
-        title: "Active Conversations",
-        value: loading ? "..." : (conversationStats.active || 0).toString(),
+        title: "Total Conversations",
+        value: loading
+          ? "..."
+          : (totalConversationsCount || conversations?.length || 0).toString(),
         icon: <ChatIcon />,
         color: "primary",
+        subtitle: `${conversations?.length || 0} loaded`,
+      },
+      {
+        title: "Filtered Results",
+        value: loading
+          ? "..."
+          : (filteredConversations?.length || 0).toString(),
+        icon: <FilterIcon />,
+        color: "info",
+        subtitle: "Matching filters",
       },
       {
         title: "Total Leads",
         value: loading ? "..." : (conversationStats.totalLeads || 0).toString(),
         icon: <PersonIcon />,
         color: "success",
+        subtitle: "Active leads",
       },
       {
-        title: "Response Rate",
-        value: loading ? "..." : `${conversationStats.responseRate || 0}%`,
-        icon: <AssessmentIcon />,
-        color: "info",
-      },
-      {
-        title: "Issues",
+        title: "Issues Found",
         value: loading ? "..." : (conversationStats.issues || 0).toString(),
         icon: <WarningIcon />,
         color: "warning",
+        subtitle: "Need attention",
       },
     ];
-  }, [filteredConversations, loading]);
+  }, [filteredConversations, conversations, totalConversationsCount, loading]);
 
   // Event handlers
   const handleTabChange = (event, newValue) => {
@@ -294,15 +358,47 @@ const ChatManagement = () => {
           alignItems: "center",
         }}
       >
-        <Typography variant="h4" gutterBottom>
-          Chat Management
-        </Typography>
-        <Box sx={{ display: "flex", gap: 1 }}>
+        <Box>
+          <Typography variant="h4" gutterBottom>
+            Chat Management
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {totalConversationsCount > 0 && (
+              <>
+                {conversations?.length || 0} of {totalConversationsCount}{" "}
+                conversations loaded
+                {conversations?.length !== totalConversationsCount && (
+                  <>
+                    {" "}
+                    • {totalConversationsCount -
+                      (conversations?.length || 0)}{" "}
+                    remaining
+                  </>
+                )}
+              </>
+            )}
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          {/* Load All Conversations Button */}
+          {conversations?.length < totalConversationsCount && (
+            <Button
+              variant="outlined"
+              startIcon={<LoadAllIcon />}
+              onClick={handleLoadAllConversations}
+              disabled={loading || loadingAll}
+              color="info"
+            >
+              Load All ({totalConversationsCount - (conversations?.length || 0)}{" "}
+              more)
+            </Button>
+          )}
+
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
             onClick={handleRefresh}
-            disabled={loading}
+            disabled={loading || loadingAll}
           >
             Refresh
           </Button>
@@ -314,21 +410,139 @@ const ChatManagement = () => {
           >
             Export CSV
           </Button>
-          {selectedConversations.size > 0 && (
+        </Box>
+      </Box>
+
+      {/* Loading indicator for load all operation */}
+      {loadingAll && (
+        <Box sx={{ mb: 2 }}>
+          <LinearProgress />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+            Loading all conversations...
+          </Typography>
+        </Box>
+      )}
+
+      {/* Bulk Actions Toolbar */}
+      {selectedConversations.size > 0 && (
+        <Paper
+          sx={{
+            mb: 2,
+            p: 2,
+            backgroundColor: "primary.light",
+            color: "primary.contrastText",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="h6">
+              {selectedConversations.size} conversation
+              {selectedConversations.size !== 1 ? "s" : ""} selected
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setSelectedConversations(new Set())}
+              sx={{
+                borderColor: "primary.contrastText",
+                color: "primary.contrastText",
+                "&:hover": {
+                  borderColor: "primary.contrastText",
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                },
+              }}
+            >
+              Clear Selection
+            </Button>
+          </Box>
+          <Box sx={{ display: "flex", gap: 1 }}>
             <Button
               variant="contained"
               color="error"
               startIcon={<DeleteSweepIcon />}
               onClick={handleBulkDeleteClick}
+              size="small"
             >
-              Delete Selected ({selectedConversations.size})
+              Delete Selected
             </Button>
-          )}
-        </Box>
-      </Box>
+            <Button
+              variant="outlined"
+              startIcon={<ExportIcon />}
+              onClick={handleExportConversations}
+              size="small"
+              sx={{
+                borderColor: "primary.contrastText",
+                color: "primary.contrastText",
+                "&:hover": {
+                  borderColor: "primary.contrastText",
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                },
+              }}
+            >
+              Export Selected
+            </Button>
+          </Box>
+        </Paper>
+      )}
 
       {/* Statistics Cards */}
-      <StatsCards stats={stats} />
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        {stats.map((stat, index) => (
+          <Grid item xs={12} sm={6} md={3} key={index}>
+            <Card
+              sx={{
+                height: "100%",
+                background: `linear-gradient(135deg, ${
+                  stat.color === "primary"
+                    ? "#1976d2, #42a5f5"
+                    : stat.color === "success"
+                    ? "#2e7d32, #66bb6a"
+                    : stat.color === "warning"
+                    ? "#ed6c02, #ffb74d"
+                    : "#0288d1, #4fc3f7"
+                })`,
+                color: "white",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <CardContent>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <Box>
+                    <Typography variant="h4" fontWeight="bold">
+                      {stat.value}
+                    </Typography>
+                    <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                      {stat.title}
+                    </Typography>
+                    {stat.subtitle && (
+                      <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                        {stat.subtitle}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Box
+                    sx={{
+                      opacity: 0.3,
+                      transform: "scale(1.5)",
+                    }}
+                  >
+                    {stat.icon}
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
 
       {/* Tabs */}
       <Paper sx={{ mb: 3 }}>
@@ -349,49 +563,86 @@ const ChatManagement = () => {
       {activeTab === 0 && (
         <Box>
           {/* Filters */}
-          <ConversationFilters
-            filters={filters}
-            onFilterChange={updateFilter}
-            totalCount={conversations.length}
-            filteredCount={filteredConversations.length}
-          />
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <ConversationFilters
+              filters={filters}
+              onFilterChange={updateFilter}
+              totalCount={conversations.length}
+              filteredCount={filteredConversations.length}
+            />
+          </Paper>
 
-          {/* Bulk Actions */}
-          {filteredConversations.length > 0 && (
-            <Box
-              sx={{ mb: 2, p: 2, bgcolor: "background.paper", borderRadius: 1 }}
-            >
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={
-                      selectedConversations.size ===
-                        filteredConversations.length &&
-                      filteredConversations.length > 0
-                    }
-                    indeterminate={
-                      selectedConversations.size > 0 &&
-                      selectedConversations.size < filteredConversations.length
-                    }
-                    onChange={handleSelectAll}
-                  />
-                }
-                label={`Select All (${selectedConversations.size} selected)`}
-              />
+          {/* Load More Button */}
+          {pagination.hasMore && !loadingAll && (
+            <Box sx={{ mb: 2, textAlign: "center" }}>
+              <Button
+                variant="outlined"
+                onClick={loadMore}
+                disabled={loading}
+                startIcon={<CloudDownload />}
+              >
+                Load More Conversations
+              </Button>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mt: 1 }}
+              >
+                Loaded {conversations.length} of{" "}
+                {pagination.totalCount || "many"} conversations
+              </Typography>
             </Box>
           )}
 
+          {/* Bulk Actions */}
+          {filteredConversations.length > 0 && (
+            <Paper sx={{ mb: 2, p: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={
+                        selectedConversations.size ===
+                          filteredConversations.length &&
+                        filteredConversations.length > 0
+                      }
+                      indeterminate={
+                        selectedConversations.size > 0 &&
+                        selectedConversations.size <
+                          filteredConversations.length
+                      }
+                      onChange={handleSelectAll}
+                    />
+                  }
+                  label={`Select All (${selectedConversations.size} selected)`}
+                />
+                <Typography variant="body2" color="text.secondary">
+                  Showing {filteredConversations.length} of{" "}
+                  {conversations.length} loaded conversations
+                </Typography>
+              </Box>
+            </Paper>
+          )}
+
           {/* Conversations List */}
-          <EnhancedConversationList
-            conversations={filteredConversations}
-            loading={loading}
-            selectedConversations={selectedConversations}
-            onConversationSelect={handleConversationSelect}
-            onMenuOpen={handleMenuOpen}
-            onLoadMore={loadMore}
-            hasMore={pagination.hasMore}
-            lastRefresh={lastRefresh}
-          />
+          <Paper>
+            <EnhancedConversationList
+              conversations={filteredConversations}
+              loading={loading}
+              selectedConversations={selectedConversations}
+              onConversationSelect={handleConversationSelect}
+              onMenuOpen={handleMenuOpen}
+              onLoadMore={loadMore}
+              hasMore={pagination.hasMore}
+              lastRefresh={lastRefresh}
+            />
+          </Paper>
         </Box>
       )}
 

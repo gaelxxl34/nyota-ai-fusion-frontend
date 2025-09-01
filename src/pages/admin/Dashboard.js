@@ -506,6 +506,12 @@ const AdminDashboard = () => {
                         label: "Inquiries",
                         sublabel: "Initial Interest",
                       },
+                      interested: {
+                        color: "#6366f1",
+                        icon: <CampaignIcon />,
+                        label: "Interested",
+                        sublabel: "Expressed Interest",
+                      },
                       qualified: {
                         color: "#7c3aed",
                         icon: <EmojiEventsIcon />,
@@ -532,7 +538,14 @@ const AdminDashboard = () => {
                       },
                     };
 
-                    const config = stageConfig[stage];
+                    const config = stageConfig[stage] || {
+                      color: "#6b7280",
+                      icon: <ForumIcon />,
+                      label: stage
+                        .replace(/_/g, " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase()),
+                      sublabel: "Unknown Stage",
+                    };
                     const isActive = count > 0;
 
                     return (

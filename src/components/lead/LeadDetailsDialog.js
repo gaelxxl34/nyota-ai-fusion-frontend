@@ -251,7 +251,6 @@ const LeadDetailsDialog = ({
   // Get status color and progress
   const getStatusInfo = (status) => {
     const statusMap = {
-      CONTACTED: { color: "primary", progress: 20, label: "Contacted" },
       PRE_QUALIFIED: { color: "warning", progress: 40, label: "Interested" },
       APPLIED: { color: "info", progress: 60, label: "Applied" },
       QUALIFIED: { color: "success", progress: 75, label: "Qualified" },
@@ -664,7 +663,6 @@ const LeadDetailsDialog = ({
                           }
                           disabled={!editing}
                         >
-                          <MenuItem value="CONTACTED">Contacted</MenuItem>
                           <MenuItem value="PRE_QUALIFIED">Interested</MenuItem>
                           <MenuItem value="APPLIED">Applied</MenuItem>
                           <MenuItem value="QUALIFIED">Qualified</MenuItem>

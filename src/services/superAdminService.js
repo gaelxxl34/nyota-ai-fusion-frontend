@@ -150,6 +150,39 @@ export const superAdminService = {
     }
   },
 
+  // Conversation Analytics
+  async getConversationStats(forceRefresh = false) {
+    try {
+      const response = await axiosInstance.get(
+        `/api/super-admin/analytics/conversations${
+          forceRefresh ? "?refresh=true" : ""
+        }`
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching conversation statistics:", error);
+      throw new Error(
+        error.response?.data?.message ||
+          "Failed to fetch conversation statistics"
+      );
+    }
+  },
+
+  // Get simplified conversation counts for dashboard
+  async getConversationCounts() {
+    try {
+      const response = await axiosInstance.get(
+        "/api/super-admin/analytics/conversations/counts"
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching conversation counts:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch conversation counts"
+      );
+    }
+  },
+
   // ========== LEAD FORMS MANAGEMENT ==========
 
   // Get all lead forms

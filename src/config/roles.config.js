@@ -138,7 +138,6 @@ export const canViewLeadStage = (role, stage) => {
     // Legacy status mappings for backward compatibility
     NO_LEAD: LEAD_STAGES.INTERESTED,
     INQUIRY: LEAD_STAGES.INTERESTED,
-    CONTACTED: LEAD_STAGES.INTERESTED,
     PRE_QUALIFIED: LEAD_STAGES.QUALIFIED,
     REJECTED: LEAD_STAGES.EXPIRED,
     NURTURE: LEAD_STAGES.INTERESTED,

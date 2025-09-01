@@ -14,9 +14,7 @@ class ConversationService {
     const {
       limit = 25, // Reduced from loading all at once
       offset = 0,
-      status = "active",
-      includeClosed = false,
-      leadStatus = null, // New: filter by lead status
+      leadStatus = null, // Filter by lead status only
     } = options;
 
     console.log(
@@ -27,8 +25,6 @@ class ConversationService {
       const params = new URLSearchParams({
         limit: limit.toString(),
         offset: offset.toString(),
-        status,
-        includeClosed: includeClosed.toString(),
       });
 
       // Add leadStatus if provided

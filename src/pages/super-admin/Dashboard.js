@@ -56,11 +56,17 @@ const AdminDashboard = () => {
   const [roleMetrics, setRoleMetrics] = useState([]);
   const [leadFunnel, setLeadFunnel] = useState({
     new_contact: 0,
-    contacted: 0,
+    interested: 0,
     qualified: 0,
     applied: 0,
     admitted: 0,
     enrolled: 0,
+  });
+
+  const [conversationStats, setConversationStats] = useState({
+    total: 0,
+    byStatus: {},
+    recentActivity: 0,
   });
 
   // eslint-disable-next-line no-unused-vars
@@ -114,6 +120,7 @@ const AdminDashboard = () => {
         leadAnalyticsData,
         performanceData,
         allUsersData,
+        conversationStatsData,
       ] = await Promise.all([
         superAdminService.getSystemStats().catch((err) => {
           console.error("System stats error:", err);
@@ -133,6 +140,10 @@ const AdminDashboard = () => {
         }),
         superAdminService.getAllUsers().catch((err) => {
           console.error("All users error:", err);
+          return null;
+        }),
+        superAdminService.getConversationCounts().catch((err) => {
+          console.error("Conversation stats error:", err);
           return null;
         }),
       ]);
@@ -174,7 +185,20 @@ const AdminDashboard = () => {
         }
 
         setRoleMetrics(processedRoleMetrics);
-        setLeadFunnel(systemStatsData.leadFunnel || {});
+
+        // Process leadFunnel data to exclude 'contacted' stage
+        const leadFunnelData = systemStatsData.leadFunnel || {};
+        const processedLeadFunnel = { ...leadFunnelData };
+
+        // Remove 'contacted' if it exists and merge its count with 'interested'
+        if (processedLeadFunnel.contacted) {
+          processedLeadFunnel.interested =
+            (processedLeadFunnel.interested || 0) +
+            processedLeadFunnel.contacted;
+          delete processedLeadFunnel.contacted;
+        }
+
+        setLeadFunnel(processedLeadFunnel);
 
         if (systemStatsData.systemPerformance) {
           setSystemPerformance({
@@ -190,6 +214,15 @@ const AdminDashboard = () => {
 
       if (userAnalyticsData) setUserAnalytics(userAnalyticsData);
       if (leadAnalyticsData) setLeadAnalytics(leadAnalyticsData);
+
+      // Process conversation statistics
+      if (conversationStatsData) {
+        setConversationStats({
+          total: conversationStatsData.total || 0,
+          byStatus: conversationStatsData.byStatus || {},
+          recentActivity: conversationStatsData.recentActivity || 0,
+        });
+      }
 
       if (performanceData) {
         setSystemPerformance((prev) => ({
@@ -231,6 +264,7 @@ const AdminDashboard = () => {
       setRoleMetrics([]);
       setLeadFunnel({
         new_contact: 0,
+        interested: 0,
         qualified: 0,
         applied: 0,
         admitted: 0,
@@ -315,6 +349,20 @@ const AdminDashboard = () => {
       icon: <SchoolIcon />,
       gradient: "linear-gradient(45deg, #16a34a 30%, #22c55e 90%)",
       subtitle: "Successfully enrolled",
+    },
+    {
+      title: "Total Conversations",
+      value: formatNumber(conversationStats.total || 0),
+      icon: <ChatIcon />,
+      gradient: "linear-gradient(45deg, #7c3aed 30%, #a855f7 90%)",
+      subtitle: "All conversations",
+    },
+    {
+      title: "Active Conversations",
+      value: formatNumber(conversationStats.byStatus?.active || 0),
+      icon: <ForumIcon />,
+      gradient: "linear-gradient(45deg, #059669 30%, #10b981 90%)",
+      subtitle: "Currently active",
     },
     {
       title: "Overall Conversion",
@@ -795,8 +843,7 @@ const AdminDashboard = () => {
                 >
                   {Object.entries(leadFunnel).map(([stage, count], index) => {
                     const stages = Object.keys(leadFunnel);
-                    const maxCount =
-                      leadFunnel.new_contact || leadFunnel.contacted || 1;
+                    const maxCount = leadFunnel.new_contact || 1;
                     const percentage = ((count / maxCount) * 100).toFixed(1);
                     const previousStage =
                       index > 0 ? leadFunnel[stages[index - 1]] : count;
@@ -813,11 +860,11 @@ const AdminDashboard = () => {
                         label: "New Contacts",
                         sublabel: "Initial Inquiries",
                       },
-                      contacted: {
+                      interested: {
                         color: "#7c3aed",
-                        icon: <ChatIcon />,
-                        label: "Contacted",
-                        sublabel: "Follow-up Made",
+                        icon: <CampaignIcon />,
+                        label: "Interested",
+                        sublabel: "Expressed Interest",
                       },
                       qualified: {
                         color: "#0891b2",
@@ -845,7 +892,14 @@ const AdminDashboard = () => {
                       },
                     };
 
-                    const config = stageConfig[stage];
+                    const config = stageConfig[stage] || {
+                      color: "#6b7280",
+                      icon: <ForumIcon />,
+                      label: stage
+                        .replace(/_/g, " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase()),
+                      sublabel: "Unknown Stage",
+                    };
                     const isActive = count > 0;
 
                     return (
@@ -1031,19 +1085,17 @@ const AdminDashboard = () => {
                             Overall Conversion
                           </Typography>
                           <Typography variant="h3" fontWeight="bold">
-                            {(leadFunnel.new_contact || leadFunnel.contacted) >
-                            0
+                            {leadFunnel.new_contact > 0
                               ? (
                                   (leadFunnel.enrolled /
-                                    (leadFunnel.new_contact ||
-                                      leadFunnel.contacted)) *
+                                    leadFunnel.new_contact) *
                                   100
                                 ).toFixed(1)
                               : "0.0"}
                             %
                           </Typography>
                           <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                            From contact to enrollment
+                            From interested to enrollment
                           </Typography>
                         </Box>
                         <TrendingUpIcon sx={{ fontSize: 40, opacity: 0.3 }} />
@@ -1077,19 +1129,17 @@ const AdminDashboard = () => {
                             Application Rate
                           </Typography>
                           <Typography variant="h3" fontWeight="bold">
-                            {(leadFunnel.new_contact || leadFunnel.contacted) >
-                            0
+                            {leadFunnel.new_contact > 0
                               ? (
                                   (leadFunnel.applied /
-                                    (leadFunnel.new_contact ||
-                                      leadFunnel.contacted)) *
+                                    leadFunnel.new_contact) *
                                   100
                                 ).toFixed(1)
                               : "0.0"}
                             %
                           </Typography>
                           <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                            Contacts that applied
+                            Interested that applied
                           </Typography>
                         </Box>
                         <AssignmentIcon sx={{ fontSize: 40, opacity: 0.3 }} />
@@ -1180,17 +1230,16 @@ const AdminDashboard = () => {
                     }}
                   >
                     <Typography variant="body2" color="text.secondary">
-                      Contact to Qualified
+                      New to Qualified
                     </Typography>
                     <Typography variant="body2" fontWeight="bold">
-                      {platformStats.conversionRates?.contactedToQualified || 0}
-                      %
+                      {platformStats.conversionRates?.inquiryToContacted || 0}%
                     </Typography>
                   </Box>
                   <LinearProgress
                     variant="determinate"
                     value={parseFloat(
-                      platformStats.conversionRates?.contactedToQualified || 0
+                      platformStats.conversionRates?.inquiryToContacted || 0
                     )}
                     color="primary"
                   />

@@ -295,7 +295,6 @@ export const useLeadManagement = ({
   const getStatusColor = useCallback((status) => {
     const colors = {
       INQUIRY: "primary",
-      CONTACTED: "info",
       PRE_QUALIFIED: "warning",
       APPLIED: "info",
       QUALIFIED: "success",

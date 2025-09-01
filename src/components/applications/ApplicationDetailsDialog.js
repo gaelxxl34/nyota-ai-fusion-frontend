@@ -529,12 +529,12 @@ const ApplicationDetailsDialog = ({
           }
         });
 
-        // Add mock data for More Bio Data fields if they don't exist
+        // Initialize empty values for Bio Data fields if they don't exist
         if (!initialFormData.dateOfBirth) {
-          initialFormData.dateOfBirth = "1998-05-15";
+          initialFormData.dateOfBirth = "";
         }
         if (!initialFormData.registrationNumber) {
-          initialFormData.registrationNumber = "REG/2024/001234";
+          initialFormData.registrationNumber = "";
         }
         if (!initialFormData.faculty) {
           initialFormData.faculty = "";
@@ -543,27 +543,25 @@ const ApplicationDetailsDialog = ({
           initialFormData.idType = "";
         }
         if (!initialFormData.equating) {
-          initialFormData.equating = "UNEB Equivalent - Grade A";
+          initialFormData.equating = "";
         }
         if (!initialFormData.company) {
-          initialFormData.company = "Kampala International School";
+          initialFormData.company = "";
         }
         if (!initialFormData.companyLocation) {
-          initialFormData.companyLocation = "Kampala, Central Region";
+          initialFormData.companyLocation = "";
         }
         if (!initialFormData.uaceLevel) {
-          initialFormData.uaceLevel = "A-Level";
+          initialFormData.uaceLevel = "";
         }
         if (!initialFormData.uaceLevelResults) {
-          initialFormData.uaceLevelResults =
-            "AAB (Mathematics-A, Physics-A, Chemistry-B)";
+          initialFormData.uaceLevelResults = "";
         }
         if (!initialFormData.uceLevel) {
-          initialFormData.uceLevel = "O-Level";
+          initialFormData.uceLevel = "";
         }
         if (!initialFormData.otherDocuments) {
-          initialFormData.otherDocuments =
-            "Certificate in Computer Applications (ICDL), First Aid Certificate from Red Cross Uganda, Leadership Training Certificate from Youth Leadership Program 2023";
+          initialFormData.otherDocuments = "";
         }
 
         console.log("Setting initial form data:", initialFormData);
@@ -599,56 +597,53 @@ const ApplicationDetailsDialog = ({
         initialFormData.preferredProgram = application.program;
       }
 
-      // Add mock data for More Bio Data fields if they don't exist
+      // Initialize empty values for Bio Data fields if they don't exist
       if (!initialFormData.dateOfBirth) {
-        initialFormData.dateOfBirth = "1998-05-15";
+        initialFormData.dateOfBirth = "";
       }
       if (!initialFormData.registrationNumber) {
-        initialFormData.registrationNumber = "REG/2024/001234";
+        initialFormData.registrationNumber = "";
       }
       if (!initialFormData.equating) {
-        initialFormData.equating = "UNEB Equivalent - Grade A";
+        initialFormData.equating = "";
       }
       if (!initialFormData.company) {
-        initialFormData.company = "Kampala International School";
+        initialFormData.company = "";
       }
       if (!initialFormData.companyLocation) {
-        initialFormData.companyLocation = "Kampala, Central Region";
+        initialFormData.companyLocation = "";
       }
       if (!initialFormData.uaceLevel) {
-        initialFormData.uaceLevel = "A-Level";
+        initialFormData.uaceLevel = "";
       }
       if (!initialFormData.uaceLevelResults) {
-        initialFormData.uaceLevelResults =
-          "AAB (Mathematics-A, Physics-A, Chemistry-B)";
+        initialFormData.uaceLevelResults = "";
       }
       if (!initialFormData.uceLevel) {
-        initialFormData.uceLevel = "O-Level";
+        initialFormData.uceLevel = "";
       }
       if (!initialFormData.otherDocuments) {
-        initialFormData.otherDocuments =
-          "Certificate in Computer Applications (ICDL), First Aid Certificate from Red Cross Uganda, Leadership Training Certificate from Youth Leadership Program 2023";
+        initialFormData.otherDocuments = "";
       }
 
       console.log("Initializing edit mode with data:", initialFormData);
       setFormData(initialFormData);
     } else {
-      // No application data, start with an empty form but include mock bio data
-      const mockFormData = {
-        dateOfBirth: "1998-05-15",
-        registrationNumber: "REG/2024/001234",
+      // No application data, start with empty form fields
+      const emptyFormData = {
+        dateOfBirth: "",
+        registrationNumber: "",
         faculty: "",
         idType: "",
-        equating: "UNEB Equivalent - Grade A",
-        company: "Kampala International School",
-        companyLocation: "Kampala, Central Region",
-        uaceLevel: "A-Level",
-        uaceLevelResults: "AAB (Mathematics-A, Physics-A, Chemistry-B)",
-        uceLevel: "O-Level",
-        otherDocuments:
-          "Certificate in Computer Applications (ICDL), First Aid Certificate from Red Cross Uganda, Leadership Training Certificate from Youth Leadership Program 2023",
+        equating: "",
+        company: "",
+        companyLocation: "",
+        uaceLevel: "",
+        uaceLevelResults: "",
+        uceLevel: "",
+        otherDocuments: "",
       };
-      setFormData(mockFormData);
+      setFormData(emptyFormData);
     }
 
     setEditMode(true);
@@ -1739,7 +1734,7 @@ const ApplicationDetailsDialog = ({
                         Date of Birth
                       </Typography>
                       <Typography variant="body1">
-                        {application.dateOfBirth || "May 15, 1998"}
+                        {application.dateOfBirth || "Not provided"}
                       </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -1747,7 +1742,7 @@ const ApplicationDetailsDialog = ({
                         Registration Number
                       </Typography>
                       <Typography variant="body1">
-                        {application.registrationNumber || "REG/2024/001234"}
+                        {application.registrationNumber || "Not provided"}
                       </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -1763,7 +1758,7 @@ const ApplicationDetailsDialog = ({
                         Equating
                       </Typography>
                       <Typography variant="body1">
-                        {application.equating || "UNEB Equivalent - Grade A"}
+                        {application.equating || "Not provided"}
                       </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -1779,7 +1774,7 @@ const ApplicationDetailsDialog = ({
                         Company [Previous School]
                       </Typography>
                       <Typography variant="body1">
-                        {application.company || "Kampala International School"}
+                        {application.company || "Not provided"}
                       </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -1787,8 +1782,7 @@ const ApplicationDetailsDialog = ({
                         Company (City/Province)
                       </Typography>
                       <Typography variant="body1">
-                        {application.companyLocation ||
-                          "Kampala, Central Region"}
+                        {application.companyLocation || "Not provided"}
                       </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -1796,7 +1790,7 @@ const ApplicationDetailsDialog = ({
                         UACE Level
                       </Typography>
                       <Typography variant="body1">
-                        {application.uaceLevel || "A-Level"}
+                        {application.uaceLevel || "Not provided"}
                       </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -1804,8 +1798,7 @@ const ApplicationDetailsDialog = ({
                         UACE Level Results
                       </Typography>
                       <Typography variant="body1">
-                        {application.uaceLevelResults ||
-                          "AAB (Mathematics-A, Physics-A, Chemistry-B)"}
+                        {application.uaceLevelResults || "Not provided"}
                       </Typography>
                     </Grid>
                     <Grid item xs={12}>
@@ -1813,8 +1806,7 @@ const ApplicationDetailsDialog = ({
                         Others [Any other document after high school]
                       </Typography>
                       <Typography variant="body1">
-                        {application.otherDocuments ||
-                          "Certificate in Computer Applications (ICDL), First Aid Certificate from Red Cross Uganda, Leadership Training Certificate from Youth Leadership Program 2023"}
+                        {application.otherDocuments || "Not provided"}
                       </Typography>
                     </Grid>
                   </>

@@ -8,8 +8,9 @@ import {
   InputAdornment,
   Box,
   Chip,
+  Button,
 } from "@mui/material";
-import { Search as SearchIcon } from "@mui/icons-material";
+import { Search as SearchIcon, Clear as ClearIcon } from "@mui/icons-material";
 
 /**
  * Reusable filter component for conversations
@@ -24,7 +25,6 @@ const ConversationFilters = ({
   const {
     searchQuery = "",
     timeFilter = "all",
-    statusFilter = "all",
     leadStatusFilter = "all",
     sortBy = "lastMessage",
     sortOrder = "desc",
@@ -35,24 +35,42 @@ const ConversationFilters = ({
   };
 
   const clearFilter = (filterType) => {
-    handleFilterChange(filterType, "all");
+    const resetValue = filterType === "searchQuery" ? "" : "all";
+    handleFilterChange(filterType, resetValue);
+  };
+
+  const clearAllFilters = () => {
+    handleFilterChange("searchQuery", "");
+    handleFilterChange("timeFilter", "all");
+    handleFilterChange("leadStatusFilter", "all");
   };
 
   const activeFilters = [
-    { key: "status", value: statusFilter, label: `Status: ${statusFilter}` },
     {
       key: "leadStatus",
       value: leadStatusFilter,
-      label: `Lead: ${leadStatusFilter}`,
+      label: `Lead: ${leadStatusFilter.replace("_", " ")}`,
+      display: leadStatusFilter !== "all",
     },
-    { key: "time", value: timeFilter, label: `Time: ${timeFilter}` },
-  ].filter((filter) => filter.value !== "all");
+    {
+      key: "time",
+      value: timeFilter,
+      label: `Time: ${timeFilter}`,
+      display: timeFilter !== "all",
+    },
+    {
+      key: "search",
+      value: searchQuery,
+      label: `Search: "${searchQuery}"`,
+      display: searchQuery.trim() !== "",
+    },
+  ].filter((filter) => filter.display);
 
   return (
     <Box>
       {/* Main filter row */}
       <Grid container spacing={2}>
-        <Grid item xs={12} md={2.4}>
+        <Grid item xs={12} md={3}>
           <TextField
             fullWidth
             size="small"
@@ -69,7 +87,7 @@ const ConversationFilters = ({
           />
         </Grid>
 
-        <Grid item xs={12} md={2.4}>
+        <Grid item xs={12} md={3}>
           <FormControl fullWidth size="small">
             <Select
               value={timeFilter}
@@ -84,23 +102,7 @@ const ConversationFilters = ({
           </FormControl>
         </Grid>
 
-        <Grid item xs={12} md={2.4}>
-          <FormControl fullWidth size="small">
-            <Select
-              value={statusFilter}
-              onChange={(e) =>
-                handleFilterChange("statusFilter", e.target.value)
-              }
-              displayEmpty
-            >
-              <MenuItem value="all">All Status</MenuItem>
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </Select>
-          </FormControl>
-        </Grid>
-
-        <Grid item xs={12} md={2.4}>
+        <Grid item xs={12} md={3}>
           <FormControl fullWidth size="small">
             <Select
               value={leadStatusFilter}
@@ -111,16 +113,19 @@ const ConversationFilters = ({
             >
               <MenuItem value="all">All Leads</MenuItem>
               <MenuItem value="no_lead">No Lead</MenuItem>
-              <MenuItem value="new">New Leads</MenuItem>
-              <MenuItem value="qualified">Qualified</MenuItem>
-              <MenuItem value="contacted">Contacted</MenuItem>
-              <MenuItem value="converted">Converted</MenuItem>
-              <MenuItem value="lost">Lost</MenuItem>
+              <MenuItem value="INTERESTED">Interested</MenuItem>
+              <MenuItem value="APPLIED">Applied</MenuItem>
+              <MenuItem value="IN_REVIEW">In Review</MenuItem>
+              <MenuItem value="QUALIFIED">Qualified</MenuItem>
+              <MenuItem value="ADMITTED">Admitted</MenuItem>
+              <MenuItem value="ENROLLED">Enrolled</MenuItem>
+              <MenuItem value="DEFERRED">Deferred</MenuItem>
+              <MenuItem value="EXPIRED">Expired</MenuItem>
             </Select>
           </FormControl>
         </Grid>
 
-        <Grid item xs={12} md={2.4}>
+        <Grid item xs={12} md={3}>
           <FormControl fullWidth size="small">
             <Select
               value={sortBy}
@@ -139,7 +144,7 @@ const ConversationFilters = ({
 
       {/* Second row with sort order and active filters */}
       <Grid container spacing={2} sx={{ mt: 1 }}>
-        <Grid item xs={12} md={2.4}>
+        <Grid item xs={12} md={3}>
           <FormControl fullWidth size="small">
             <Select
               value={sortOrder}
@@ -152,7 +157,7 @@ const ConversationFilters = ({
           </FormControl>
         </Grid>
 
-        <Grid item xs={12} md={9.6}>
+        <Grid item xs={12} md={9}>
           <Box
             sx={{
               display: "flex",
@@ -167,12 +172,27 @@ const ConversationFilters = ({
               variant="outlined"
               size="small"
             />
+
+            {/* Clear All Filters Button */}
+            {activeFilters.length > 0 && (
+              <Button
+                size="small"
+                startIcon={<ClearIcon />}
+                onClick={clearAllFilters}
+                sx={{ minWidth: "auto" }}
+              >
+                Clear All
+              </Button>
+            )}
+
+            {/* Active Filter Chips */}
             {activeFilters.map((filter) => (
               <Chip
                 key={filter.key}
                 label={filter.label}
                 onDelete={() => clearFilter(filter.key)}
                 size="small"
+                color="secondary"
               />
             ))}
           </Box>

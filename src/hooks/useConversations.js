@@ -22,7 +22,6 @@ export const useConversations = (initialFilters = {}) => {
   const [filters, setFilters] = useState({
     searchQuery: "",
     timeFilter: "all",
-    statusFilter: "all",
     leadStatusFilter: "all",
     sortBy: "lastMessage",
     sortOrder: "desc",
@@ -39,11 +38,6 @@ export const useConversations = (initialFilters = {}) => {
         const apiOptions = {
           limit: pagination.limit,
           offset: options.resetPagination ? 0 : pagination.offset,
-          status:
-            filters.statusFilter === "all" ? "active" : filters.statusFilter,
-          includeClosed:
-            filters.statusFilter === "all" ||
-            filters.statusFilter === "inactive",
           leadStatus:
             filters.leadStatusFilter === "all"
               ? null
@@ -153,17 +147,8 @@ export const useConversations = (initialFilters = {}) => {
           conv.phoneNumber?.includes(query) ||
           conv.lastMessage?.toLowerCase().includes(query) ||
           conv.leadName?.toLowerCase().includes(query) ||
-          conv.leadId?.toLowerCase().includes(query) ||
-          conv.status?.toLowerCase().includes(query)
+          conv.leadId?.toLowerCase().includes(query)
       );
-    }
-
-    // Apply status filter
-    if (filters.statusFilter && filters.statusFilter !== "all") {
-      filtered = filtered.filter((conv) => {
-        const convStatus = conv.status?.toLowerCase() || "active";
-        return convStatus === filters.statusFilter.toLowerCase();
-      });
     }
 
     // Apply lead status filter
