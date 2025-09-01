@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import {
   Box,
   List,
@@ -42,17 +42,62 @@ const ConversationList = ({
   loadingMoreConversations = false,
   onLoadMore,
 }) => {
-  const filteredConversations = conversations.filter((conv) => {
-    if (!searchTerm) return true;
-    const profileName = getProfileName(conv.phoneNumber).toLowerCase();
-    const phoneNumber = conv.phoneNumber.toLowerCase();
-    const lastMessage = conv.lastMessage.toLowerCase();
-    return (
-      profileName.includes(searchTerm.toLowerCase()) ||
-      phoneNumber.includes(searchTerm.toLowerCase()) ||
-      lastMessage.includes(searchTerm.toLowerCase())
-    );
-  });
+  // Performance optimization: Limit initial render to 50 items for better performance
+  const [displayLimit, setDisplayLimit] = useState(50);
+
+  // Memoized filtered conversations for better performance
+  const filteredConversations = useMemo(() => {
+    if (!searchTerm || !searchTerm.trim()) {
+      return conversations;
+    }
+
+    const lowerSearchTerm = searchTerm.toLowerCase();
+
+    return conversations.filter((conv) => {
+      try {
+        const profileName = (
+          getProfileName(conv.phoneNumber) || ""
+        ).toLowerCase();
+        const phoneNumber = (conv.phoneNumber || "").toLowerCase();
+        const lastMessage = (conv.lastMessage || "").toLowerCase();
+
+        return (
+          profileName.includes(lowerSearchTerm) ||
+          phoneNumber.includes(lowerSearchTerm) ||
+          lastMessage.includes(lowerSearchTerm)
+        );
+      } catch (error) {
+        console.warn("Error filtering conversation:", conv.phoneNumber, error);
+        return false;
+      }
+    });
+  }, [conversations, searchTerm, getProfileName]);
+
+  // Load more conversations when user scrolls near the bottom
+  const handleLoadMore = useCallback(() => {
+    if (displayLimit < filteredConversations.length) {
+      setDisplayLimit((prev) =>
+        Math.min(prev + 50, filteredConversations.length)
+      );
+    }
+  }, [displayLimit, filteredConversations.length]);
+
+  // Handle scroll to load more conversations
+  const handleScroll = useCallback(
+    (e) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.target;
+      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
+
+      if (isNearBottom && displayLimit < filteredConversations.length) {
+        handleLoadMore();
+      }
+    },
+    [displayLimit, filteredConversations.length, handleLoadMore]
+  );
+
+  const displayedConversations = useMemo(() => {
+    return filteredConversations.slice(0, displayLimit);
+  }, [filteredConversations, displayLimit]);
 
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
@@ -220,8 +265,9 @@ const ConversationList = ({
         overflow: "auto",
         maxHeight: "100vh",
       }}
+      onScroll={handleScroll}
     >
-      {filteredConversations.map((conversation) => {
+      {displayedConversations.map((conversation) => {
         const unreadCount = unreadCounts.get(conversation.phoneNumber) || 0;
         const isActive = activeConversation === conversation.phoneNumber;
         const aiEnabled =
@@ -380,25 +426,38 @@ const ConversationList = ({
         );
       })}
 
-      {/* Load More Button */}
-      {hasMoreConversations && (
+      {/* Show more indicator */}
+      {displayLimit < filteredConversations.length && (
         <ListItem sx={{ justifyContent: "center", py: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Showing {displayLimit} of {filteredConversations.length}{" "}
+            conversations
+          </Typography>
+        </ListItem>
+      )}
+
+      {/* Load more conversations from server */}
+      {hasMoreConversations && (
+        <Box sx={{ p: 2, textAlign: "center" }}>
           <Button
             variant="outlined"
             onClick={onLoadMore}
             disabled={loadingMoreConversations}
-            sx={{
-              borderRadius: 2,
-              textTransform: "none",
-              minWidth: 120,
-            }}
             startIcon={
               loadingMoreConversations ? <CircularProgress size={16} /> : null
             }
+            sx={{
+              borderColor: "primary.main",
+              color: "primary.main",
+              "&:hover": {
+                bgcolor: "primary.main",
+                color: "white",
+              },
+            }}
           >
             {loadingMoreConversations ? "Loading..." : "Load More"}
           </Button>
-        </ListItem>
+        </Box>
       )}
     </List>
   );

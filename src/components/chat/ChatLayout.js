@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   Box,
   TextField,
@@ -46,7 +46,16 @@ const ChatLayout = ({
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
-  const conversationsList = getConversationsList();
+  // Simple search handling without debouncing
+  const handleSearchChange = (event) => {
+    const newValue = event.target.value;
+    setSearchTerm(newValue);
+  };
+
+  // Memoized conversations list to prevent unnecessary recalculations
+  const conversationsList = useMemo(() => {
+    return getConversationsList();
+  }, [getConversationsList]);
 
   const handleConversationSelect = (phoneNumber) => {
     onConversationSelect(phoneNumber);
@@ -68,8 +77,8 @@ const ChatLayout = ({
         <TextField
           fullWidth
           placeholder="Search conversations..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={searchTerm || ""}
+          onChange={handleSearchChange}
           size="small"
           InputProps={{
             startAdornment: (

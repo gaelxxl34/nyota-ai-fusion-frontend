@@ -1,31 +1,49 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   Box,
+  Paper,
   Typography,
+  TextField,
   Button,
-  Alert,
+  Container,
+  Grid,
+  CircularProgress,
+  IconButton,
   Snackbar,
+  Alert,
+  Tabs,
+  Tab,
+  Badge,
+  Tooltip,
   Chip,
   AppBar,
   Toolbar,
-  Tooltip,
 } from "@mui/material";
 import {
-  WhatsApp as WhatsAppIcon,
   Refresh as RefreshIcon,
+  CloudDownload as LoadAllIcon,
+  Settings as SettingsIcon,
+  FilterList as FilterIcon,
+  WhatsApp as WhatsAppIcon,
   Notifications as NotificationsIcon,
 } from "@mui/icons-material";
-import Swal from "sweetalert2";
-
-import ConversationTabs from "../../components/chat/ConversationTabs";
 import ChatLayout from "../../components/chat/ChatLayout";
+import ConversationService from "../../services/conversationService";
+import { useAuth } from "../../contexts/AuthContext";
+import { useRolePermissions } from "../../hooks/useRolePermissions";
+import { axiosInstance } from "../../services/axiosConfig";
+import Swal from "sweetalert2";
+import ChatSettingsPanel from "../../components/chat/ChatSettingsPanel";
+import ChatMessageHandler from "../../services/chatMessageHandler";
+import ConversationTabs from "../../components/chat/ConversationTabs";
 import TabPanel from "../../components/chat/TabPanel";
 import ErrorBoundary from "../../components/chat/ErrorBoundary";
-import { axiosInstance } from "../../services/axiosConfig";
-import ChatMessageHandler from "../../services/chatMessageHandler";
-import ConversationService from "../../services/conversationService";
-import { useRolePermissions } from "../../hooks/useRolePermissions";
-import { useAuth } from "../../contexts/AuthContext";
 
 const ChatConfig = () => {
   const { checkLeadStageAccess } = useRolePermissions();
@@ -40,6 +58,12 @@ const ChatConfig = () => {
   const [unreadCounts, setUnreadCounts] = useState(new Map());
   const [autoReplySettings, setAutoReplySettings] = useState(new Map());
   const [message, setMessage] = useState("");
+
+  // Debug: Track all message state changes
+  useEffect(() => {
+    console.log("Message state changed:", message);
+  }, [message]);
+
   const [loading, setLoading] = useState(false);
   const [conversationsLoading, setConversationsLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -418,29 +442,10 @@ const ChatConfig = () => {
     await fetchConversations(true);
   }, [hasMoreConversations, loadingMoreConversations, fetchConversations]);
 
-  // Enhanced search handler with automatic conversation loading
-  const handleSearchTermChange = useCallback(
-    (newSearchTerm) => {
-      setSearchTerm(newSearchTerm);
-
-      // If user is searching and we have more conversations available, suggest loading more
-      if (newSearchTerm && newSearchTerm.trim() && hasMoreConversations) {
-        console.log(
-          `🔍 Search initiated: "${newSearchTerm}". More conversations available for loading.`
-        );
-
-        // Show a notification that more conversations could be loaded for better search
-        setSnackbar({
-          open: true,
-          message: `Searching in ${conversations.size} conversations. ${
-            hasMoreConversations ? 'Click "Load All" for complete search.' : ""
-          }`,
-          severity: "info",
-        });
-      }
-    },
-    [hasMoreConversations, conversations.size]
-  );
+  // Simple search handler without debouncing
+  const handleSearchTermChange = (newSearchTerm) => {
+    setSearchTerm(newSearchTerm);
+  };
 
   // Load ALL remaining conversations for comprehensive search
   const loadAllConversations = useCallback(async () => {
@@ -628,7 +633,9 @@ const ChatConfig = () => {
   };
 
   const sendMessage = async (messageText) => {
-    if (!messageText.trim() || !activeConversation || loading) return;
+    if (!messageText.trim() || !activeConversation || loading) {
+      return;
+    }
     setLoading(true);
 
     // Create optimistic message for immediate UI feedback
@@ -670,7 +677,31 @@ const ChatConfig = () => {
         message: messageText,
         messageType: "text",
       });
+
       if (response.data.success) {
+        // Remove the optimistic message
+        setConversations((prev) => {
+          const newConversations = new Map(prev);
+          const existingMessages =
+            newConversations.get(activeConversation) || [];
+          const updatedMessages = existingMessages.filter(
+            (msg) => msg.id !== optimisticMessage.id
+          );
+          newConversations.set(activeConversation, updatedMessages);
+          return newConversations;
+        });
+
+        setChatMessages((prev) =>
+          prev.filter((msg) => msg.id !== optimisticMessage.id)
+        );
+
+        // Refresh the conversation messages to get the real message from server
+        setTimeout(() => {
+          switchConversation(activeConversation);
+        }, 500);
+
+        // Clear the input field
+        console.log("Clearing message after successful send");
         setMessage("");
         setSnackbar({
           open: true,
@@ -678,26 +709,47 @@ const ChatConfig = () => {
           severity: "success",
         });
       } else {
+        // API returned success: false - remove optimistic message
+        setConversations((prev) => {
+          const newConversations = new Map(prev);
+          const existingMessages =
+            newConversations.get(activeConversation) || [];
+          const updatedMessages = existingMessages.filter(
+            (msg) => msg.id !== optimisticMessage.id
+          );
+          newConversations.set(activeConversation, updatedMessages);
+          return newConversations;
+        });
+
+        setChatMessages((prev) =>
+          prev.filter((msg) => msg.id !== optimisticMessage.id)
+        );
+
+        // Show error message
+        setSnackbar({
+          open: true,
+          message: response.data.error || "Failed to send message",
+          severity: "error",
+        });
+
         throw new Error(response.data.error || "Failed to send message");
       }
     } catch (error) {
       console.error("❌ Error sending message:", error);
 
-      // Update optimistic message to failed status
+      // Remove the failed optimistic message entirely from UI
       setConversations((prev) => {
         const newConversations = new Map(prev);
         const existingMessages = newConversations.get(activeConversation) || [];
-        const updatedMessages = existingMessages.map((msg) =>
-          msg.id === optimisticMessage.id ? { ...msg, status: "failed" } : msg
+        const updatedMessages = existingMessages.filter(
+          (msg) => msg.id !== optimisticMessage.id
         );
         newConversations.set(activeConversation, updatedMessages);
         return newConversations;
       });
 
       setChatMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === optimisticMessage.id ? { ...msg, status: "failed" } : msg
-        )
+        prev.filter((msg) => msg.id !== optimisticMessage.id)
       );
 
       setSnackbar({
@@ -949,8 +1001,15 @@ const ChatConfig = () => {
   };
 
   const handleInputChange = (event) => {
+    console.log("Input change event:", {
+      value: event.target.value,
+      currentMessage: message,
+      eventType: event.type,
+    });
+
     const newValue = event.target.value;
     setMessage(newValue);
+
     if (newValue.length > 0 && !userTyping) {
       setUserTyping(true);
     } else if (newValue.length === 0 && userTyping) {
