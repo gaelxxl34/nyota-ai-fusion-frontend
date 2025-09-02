@@ -32,13 +32,14 @@ import { PROGRAM_OPTIONS } from "../config/program.constants";
 
 const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
   const { user } = useAuth();
+  // Fixed template message to be sent for WhatsApp validation/contact
+  const TEMPLATE_MESSAGE = `Hello 👋\nThank you for your interest in IUEA 🎓\nWe’ve received your message and we’re here to help 😊\n👉 Are you interested in a specific program, or would you like support with the admission process?`;
   const [formData, setFormData] = useState({
     name: "",
     phone: "", // Will store the formatted international phone number
     email: "",
     source: "MANUAL",
     program: "",
-    message: "",
     notes: "",
   });
 
@@ -72,18 +73,8 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
   };
 
   const generateDefaultMessage = () => {
-    const { name, program } = formData;
-    let message = `Hello ${
-      name || "there"
-    }! Thank you for your interest in our programs.`;
-
-    if (program) {
-      message += ` I see you're interested in ${program}.`;
-    }
-
-    message += ` I'm excited to help you with information about admission requirements, fees, and application process. When would be a good time for a brief call to discuss your educational goals?`;
-
-    return message;
+    // Return fixed template message regardless of name/program (per new requirement)
+    return TEMPLATE_MESSAGE;
   };
 
   const validateForm = () => {
@@ -126,7 +117,8 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
     setSuccess("");
 
     try {
-      const message = formData.message || generateDefaultMessage();
+      // Always use auto-generated personalized message (manual edit removed)
+      const message = generateDefaultMessage();
 
       // Prepare contact info
       const contactInfo = {
@@ -148,7 +140,8 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
         const result = await leadService.contactLeadViaWhatsApp(
           contactInfo,
           message,
-          user
+          user,
+          { templateName: "whatsapp_validation" }
         );
 
         if (result.success) {
@@ -204,7 +197,6 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
       email: "",
       source: "MANUAL",
       program: "",
-      message: "",
       notes: "",
     });
     setError("");
@@ -374,20 +366,34 @@ const InquiryContactDialog = ({ open, onClose, onSuccess }) => {
             </FormControl>
           </Grid>
 
-          {/* WhatsApp Message (if applicable) */}
+          {/* Message Preview (WhatsApp) */}
           {contactMethod === "whatsapp" && (
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="WhatsApp Message"
-                multiline
-                rows={4}
-                value={formData.message}
-                onChange={handleInputChange("message")}
-                placeholder="Leave empty to use auto-generated message..."
-                variant="outlined"
-                helperText="A personalized message will be auto-generated if left empty"
-              />
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                Message Preview
+              </Typography>
+              <Box
+                sx={{
+                  border: 1,
+                  borderColor: "grey.300",
+                  bgcolor: "grey.50",
+                  p: 2,
+                  borderRadius: 1,
+                  fontSize: 14,
+                  lineHeight: 1.5,
+                  whiteSpace: "pre-line",
+                  fontFamily: "Roboto, Helvetica, Arial, sans-serif",
+                }}
+              >
+                {TEMPLATE_MESSAGE}
+              </Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 0.5, display: "block" }}
+              >
+                This predefined template (whatsapp_validation) will be sent.
+              </Typography>
             </Grid>
           )}
 

@@ -218,7 +218,12 @@ export const leadService = {
   },
 
   // Contact lead via WhatsApp (finds existing or creates new)
-  async contactLeadViaWhatsApp(contactInfo, message, userInfo = null) {
+  async contactLeadViaWhatsApp(
+    contactInfo,
+    message,
+    userInfo = null,
+    options = {}
+  ) {
     try {
       // First try to find existing lead by email (primary identifier)
       let lead = null;
@@ -250,24 +255,50 @@ export const leadService = {
         lead = newLead.data;
       }
 
-      // Send WhatsApp message with lead data
-      const messageResult = await this.sendWhatsAppMessage(
-        contactInfo.phone,
-        message,
-        {
-          id: lead.id,
-          name: lead.name,
-          email: lead.email,
-          phone: lead.phone,
-        }
-      );
+      let messageResult;
+
+      if (options.templateName) {
+        // Use template message endpoint - server will enforce template content
+        const payload = {
+          to: contactInfo.phone,
+          templateName: options.templateName,
+          leadData: {
+            id: lead.id,
+            name: lead.name,
+            email: lead.email,
+            phone: lead.phone,
+          },
+        };
+        const response = await axiosInstance.post(
+          "/api/whatsapp/send-template-message",
+          payload
+        );
+        messageResult = response.data;
+      } else {
+        // Send WhatsApp message with lead data as plain text
+        messageResult = await this.sendWhatsAppMessage(
+          contactInfo.phone,
+          message,
+          {
+            id: lead.id,
+            name: lead.name,
+            email: lead.email,
+            phone: lead.phone,
+          }
+        );
+      }
 
       // Only add interaction record for successful delivery - don't change status
-      if (messageResult.success && messageResult.delivered) {
+      if (
+        messageResult.success &&
+        (messageResult.delivered || messageResult.templateName)
+      ) {
         // Add interaction record for successful delivery
         await this.addInteraction(lead.id, {
           type: "WHATSAPP",
-          content: message,
+          content: options.templateName
+            ? `[TEMPLATE:${options.templateName}] ${message}`
+            : message,
           channel: "WHATSAPP",
           automated: false,
         });
