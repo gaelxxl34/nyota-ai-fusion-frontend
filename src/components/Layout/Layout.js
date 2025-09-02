@@ -72,6 +72,11 @@ const Layout = ({ children }) => {
           path: "/super-admin/users",
         },
         {
+          text: "Import Data",
+          icon: <ImportIcon />,
+          path: "/admission-admin/import-data",
+        },
+        {
           text: "Lead Forms",
           icon: <CampaignIcon />,
           path: "/super-admin/lead-forms",

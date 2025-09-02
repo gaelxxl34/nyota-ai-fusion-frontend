@@ -381,8 +381,10 @@ export const leadService = {
         status,
         sortBy = "createdAt",
         sortOrder = "desc",
+        all = false,
       } = options;
       const params = { page, limit, sortBy, sortOrder };
+      if (all) params.all = true;
 
       if (status) {
         params.status = status;

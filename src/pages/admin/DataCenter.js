@@ -513,20 +513,22 @@ const DataCenter = () => {
 
         if (currentTabConfig.label === "For You") {
           // Special handling for "For You" tab - fetch personal submissions
+          // Always fetch ALL personal leads (server caps internally) so user can see everything
+          // Ignore table pagination for fetching; we'll paginate client-side if needed
           leadsResponse = await leadService.getMySubmittedLeads({
-            limit,
-            page: pagination.page + 1,
+            limit: 10000, // request a large number; backend will cap safely
+            page: 1,
             sortBy: "createdAt",
             sortOrder: "desc",
+            all: true,
           });
-          setPersonalLeads(leadsResponse.data || []);
-          // Update total count for pagination
+          const allPersonal = leadsResponse.data || [];
+          setPersonalLeads(allPersonal);
+          // Adjust pagination total
           setPagination((prev) => ({
             ...prev,
-            total:
-              leadsResponse.pagination?.total ||
-              leadsResponse.data?.length ||
-              0,
+            total: allPersonal.length,
+            // If current rowsPerPage exceeds total, keep it; else leave as is
           }));
         } else if (currentTabConfig.label === "All Leads") {
           // Fetch all leads and let the backend handle any role-based filtering
@@ -1128,6 +1130,225 @@ const DataCenter = () => {
     }
 
     return typeof dateValue === "string" ? dateValue : "N/A";
+  };
+
+  // Helper function to extract submitted by information
+  const getSubmittedBy = (lead) => {
+    // Check if lead has submittedBy information
+    if (lead.submittedBy) {
+      if (typeof lead.submittedBy === "string") {
+        return lead.submittedBy;
+      }
+      if (typeof lead.submittedBy === "object") {
+        return (
+          lead.submittedBy.name ||
+          lead.submittedBy.email ||
+          lead.submittedBy.uid ||
+          "Unknown User"
+        );
+      }
+    }
+
+    // Check timeline for creation entry with submittedBy info
+    if (lead.timeline && Array.isArray(lead.timeline)) {
+      const creationEntry = lead.timeline.find(
+        (entry) =>
+          entry.action === "CREATED" || entry.action === "APPLICATION_SUBMITTED"
+      );
+      if (creationEntry && creationEntry.notes) {
+        const byMatch = creationEntry.notes.match(/by (.+?)(?:\s|$)/);
+        if (byMatch) {
+          return byMatch[1];
+        }
+      }
+    }
+
+    return "System";
+  };
+
+  // Helper function to extract last updated by information
+  const getLastUpdatedBy = (lead) => {
+    // For "For You" tab, prioritize application update information
+    if (lead.applicationUpdatedBy) {
+      if (typeof lead.applicationUpdatedBy === "object") {
+        return (
+          lead.applicationUpdatedBy.name ||
+          lead.applicationUpdatedBy.email ||
+          lead.applicationUpdatedBy.displayName ||
+          "Unknown User"
+        );
+      }
+      if (typeof lead.applicationUpdatedBy === "string") {
+        // Clean up system entries to be more user-friendly
+        if (
+          lead.applicationUpdatedBy.includes("system") ||
+          lead.applicationUpdatedBy.includes("System")
+        ) {
+          return "System";
+        }
+        return lead.applicationUpdatedBy;
+      }
+    }
+
+    // Fallback to lead lastUpdatedBy field (legacy format)
+    if (lead.lastUpdatedBy) {
+      if (typeof lead.lastUpdatedBy === "object") {
+        return (
+          lead.lastUpdatedBy.name ||
+          lead.lastUpdatedBy.email ||
+          lead.lastUpdatedBy.displayName ||
+          "Unknown User"
+        );
+      }
+      if (typeof lead.lastUpdatedBy === "string") {
+        // Clean up system entries to be more user-friendly
+        if (
+          lead.lastUpdatedBy.includes("system") ||
+          lead.lastUpdatedBy.includes("System")
+        ) {
+          return "System";
+        }
+        return lead.lastUpdatedBy;
+      }
+    }
+
+    if (!lead.timeline || !Array.isArray(lead.timeline)) {
+      return getSubmittedBy(lead);
+    }
+
+    // Sort timeline by date (newest first) and find the most recent update
+    const sortedTimeline = [...lead.timeline].sort((a, b) => {
+      try {
+        const dateA = a.date instanceof Date ? a.date : new Date(a.date || 0);
+        const dateB = b.date instanceof Date ? b.date : new Date(b.date || 0);
+        return dateB.getTime() - dateA.getTime();
+      } catch (error) {
+        return 0;
+      }
+    });
+
+    // Look for the most recent timeline entry with updatedBy information (excluding creation)
+    for (const entry of sortedTimeline) {
+      // Skip creation entries unless they're the only entry
+      if (entry.action === "CREATED" && sortedTimeline.length > 1) {
+        continue;
+      }
+
+      // Check metadata first (most common location for updatedBy)
+      if (entry.metadata && entry.metadata.updatedBy) {
+        const updater = entry.metadata.updatedBy;
+        if (typeof updater === "object") {
+          return (
+            updater.name ||
+            updater.email ||
+            updater.displayName ||
+            "Unknown User"
+          );
+        }
+        if (typeof updater === "string") {
+          // Clean up system entries
+          if (updater.includes("system") || updater.includes("System")) {
+            return "System";
+          }
+          return updater;
+        }
+      }
+
+      // Check direct property
+      if (entry.updatedBy) {
+        const updater = entry.updatedBy;
+        if (typeof updater === "object") {
+          return (
+            updater.name ||
+            updater.email ||
+            updater.displayName ||
+            "Unknown User"
+          );
+        }
+        if (typeof updater === "string") {
+          // Clean up system entries
+          if (updater.includes("system") || updater.includes("System")) {
+            return "System";
+          }
+          return updater;
+        }
+      }
+    }
+
+    // If no specific updater found, check if there are any updates at all
+    const hasUpdates = sortedTimeline.some(
+      (entry) =>
+        entry.action === "STATUS_CHANGE" ||
+        entry.action === "UPDATED" ||
+        entry.action === "APPLICATION_SUBMITTED"
+    );
+
+    if (hasUpdates) {
+      return "System";
+    }
+
+    // If no updates found, return the submitter as fallback
+    return getSubmittedBy(lead);
+  };
+
+  // Helper function to get all unique people who have updated the lead
+  const getAllUpdaters = (lead) => {
+    const updaters = new Set();
+
+    // Add the submitter first
+    const submitter = getSubmittedBy(lead);
+    if (submitter && submitter !== "System" && submitter !== "Unknown") {
+      updaters.add(submitter);
+    }
+
+    // Check application update information first (priority for "For You" tab)
+    if (lead.applicationUpdatedBy) {
+      if (typeof lead.applicationUpdatedBy === "object") {
+        const updater =
+          lead.applicationUpdatedBy.name || lead.applicationUpdatedBy.email;
+        if (updater) updaters.add(updater);
+      } else if (typeof lead.applicationUpdatedBy === "string") {
+        updaters.add(lead.applicationUpdatedBy);
+      }
+    }
+
+    if (lead.applicationSubmittedBy) {
+      if (typeof lead.applicationSubmittedBy === "object") {
+        const submitter =
+          lead.applicationSubmittedBy.name || lead.applicationSubmittedBy.email;
+        if (submitter) updaters.add(submitter);
+      } else if (typeof lead.applicationSubmittedBy === "string") {
+        updaters.add(lead.applicationSubmittedBy);
+      }
+    }
+
+    // Check timeline for all updaters
+    if (lead.timeline && Array.isArray(lead.timeline)) {
+      lead.timeline.forEach((entry) => {
+        // Check metadata for updatedBy
+        if (entry.metadata && entry.metadata.updatedBy) {
+          updaters.add(entry.metadata.updatedBy);
+        }
+        // Check direct updatedBy property
+        if (entry.updatedBy) {
+          updaters.add(entry.updatedBy);
+        }
+      });
+    }
+
+    // Check lastUpdatedBy field (fallback)
+    if (lead.lastUpdatedBy) {
+      if (typeof lead.lastUpdatedBy === "object") {
+        const updater = lead.lastUpdatedBy.name || lead.lastUpdatedBy.email;
+        if (updater) updaters.add(updater);
+      } else if (typeof lead.lastUpdatedBy === "string") {
+        updaters.add(lead.lastUpdatedBy);
+      }
+    }
+
+    return Array.from(updaters).filter(
+      (updater) => updater && updater !== "System" && updater !== "Unknown"
+    );
   };
 
   // Action handlers
@@ -1858,6 +2079,13 @@ const DataCenter = () => {
                           <TableCell>Source</TableCell>
                           <TableCell>Program</TableCell>
                           <TableCell>Created Date</TableCell>
+                          {/* Show additional columns only for "For You" tab */}
+                          {filteredTabs[currentTab]?.label === "For You" && (
+                            <>
+                              <TableCell>Submitted By</TableCell>
+                              <TableCell>Last Updated By</TableCell>
+                            </>
+                          )}
                           <TableCell>Status</TableCell>
                           <TableCell>Actions</TableCell>
                         </TableRow>
@@ -1866,7 +2094,12 @@ const DataCenter = () => {
                         {loading || tabSwitching ? (
                           Array.from({ length: 5 }).map((_, index) => (
                             <TableRow key={index}>
-                              {Array.from({ length: 7 }).map((_, cellIndex) => (
+                              {Array.from({
+                                length:
+                                  filteredTabs[currentTab]?.label === "For You"
+                                    ? 9
+                                    : 7,
+                              }).map((_, cellIndex) => (
                                 <TableCell key={cellIndex}>
                                   <Skeleton height={20} />
                                 </TableCell>
@@ -1876,7 +2109,11 @@ const DataCenter = () => {
                         ) : filteredLeads.length === 0 ? (
                           <TableRow>
                             <TableCell
-                              colSpan={6}
+                              colSpan={
+                                filteredTabs[currentTab]?.label === "For You"
+                                  ? 9
+                                  : 7
+                              }
                               align="center"
                               sx={{ py: 4 }}
                             >
@@ -1934,6 +2171,50 @@ const DataCenter = () => {
                                   {formatDate(lead.createdAt)}
                                 </Typography>
                               </TableCell>
+                              {/* Show additional columns only for "For You" tab */}
+                              {filteredTabs[currentTab]?.label ===
+                                "For You" && (
+                                <>
+                                  <TableCell>
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      {getSubmittedBy(lead)}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div>
+                                      <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                      >
+                                        <strong>Last:</strong>{" "}
+                                        {getLastUpdatedBy(lead)}
+                                      </Typography>
+                                      {(() => {
+                                        const allUpdaters =
+                                          getAllUpdaters(lead);
+                                        if (allUpdaters.length > 1) {
+                                          return (
+                                            <Typography
+                                              variant="caption"
+                                              color="text.disabled"
+                                              style={{
+                                                display: "block",
+                                                marginTop: "2px",
+                                              }}
+                                            >
+                                              All: {allUpdaters.join(", ")}
+                                            </Typography>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
+                                    </div>
+                                  </TableCell>
+                                </>
+                              )}
                               <TableCell>
                                 <Chip
                                   size="small"

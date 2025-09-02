@@ -519,7 +519,9 @@ This means your admission process is postponed for now.<br>
                         mb: 0.5,
                       }}
                     >
-                      {msg.sender === "ai" ? "🤖 Miryam" : "👤 Admin"}
+                      {msg.sender === "ai"
+                        ? `🤖 ${msg.senderName || "Miryam"}`
+                        : `👤 ${msg.senderName || "Admin"}`}
                     </Typography>
                   )}
 

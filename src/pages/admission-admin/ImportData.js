@@ -501,7 +501,9 @@ Mark,Johnson,mark.johnson@example.com`;
   if (
     !user ||
     !user.role ||
-    !["admin", "admissionAdmin", "admissionAgent"].includes(user.role)
+    !["superAdmin", "admin", "admissionAdmin", "admissionAgent"].includes(
+      user.role
+    )
   ) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>

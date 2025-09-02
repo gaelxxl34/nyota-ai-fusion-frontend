@@ -155,7 +155,9 @@ function App() {
               <Route
                 path="/admission-admin/*"
                 element={
-                  <ProtectedRoute allowedRoles={["admissionAdmin"]}>
+                  <ProtectedRoute
+                    allowedRoles={["superAdmin", "admissionAdmin"]}
+                  >
                     <Layout>
                       <Routes>
                         <Route
@@ -294,6 +296,7 @@ function App() {
                       element={
                         <ProtectedRoute
                           allowedRoles={[
+                            "superAdmin",
                             "admin",
                             "admissionAdmin",
                             "admissionAgent",
