@@ -3,7 +3,7 @@ import { axiosInstance } from "./axiosConfig";
 const analyticsService = {
   /**
    * Get analytics overview data
-   * @param {string} timeRange - 'daily', 'weekly', or 'monthly'
+   * @param {string} timeRange - 'daily', 'weekly', 'monthly', 'previous_month', or 'all_time'
    */
   async getOverview(timeRange = "daily") {
     try {
@@ -19,7 +19,7 @@ const analyticsService = {
 
   /**
    * Get lead progression data over time
-   * @param {string} timeRange - 'daily', 'weekly', or 'monthly'
+   * @param {string} timeRange - 'daily', 'weekly', 'monthly', 'previous_month', or 'all_time'
    */
   async getLeadProgression(timeRange = "daily") {
     try {
@@ -38,7 +38,7 @@ const analyticsService = {
 
   /**
    * Get agent performance metrics
-   * @param {string} timeRange - 'daily', 'weekly', or 'monthly'
+   * @param {string} timeRange - 'daily', 'weekly', 'monthly', 'previous_month', or 'all_time'
    */
   async getAgentPerformance(timeRange = "daily") {
     try {
@@ -57,7 +57,7 @@ const analyticsService = {
 
   /**
    * Get conversion rates between stages
-   * @param {string} timeRange - 'daily', 'weekly', or 'monthly'
+   * @param {string} timeRange - 'daily', 'weekly', 'monthly', 'previous_month', or 'all_time'
    */
   async getConversionRates(timeRange = "daily") {
     try {
@@ -76,7 +76,7 @@ const analyticsService = {
 
   /**
    * Get all analytics data in one call
-   * @param {string} timeRange - 'daily', 'weekly', or 'monthly'
+   * @param {string} timeRange - 'daily', 'weekly', 'monthly', 'previous_month', or 'all_time'
    */
   async getAllAnalytics(timeRange = "daily") {
     try {
@@ -130,7 +130,7 @@ const analyticsService = {
 
   /**
    * Export analytics data
-   * @param {string} timeRange - 'daily', 'weekly', or 'monthly'
+   * @param {string} timeRange - 'daily', 'weekly', 'monthly', 'previous_month', or 'all_time'
    * @param {string} format - 'csv' or 'json'
    * @param {Object} options - Additional export options (role, stages, etc.)
    */

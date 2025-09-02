@@ -30,6 +30,13 @@ import {
   Select,
   MenuItem,
   Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  InputAdornment,
+  Tooltip,
 } from "@mui/material";
 import {
   TrendingUp as TrendingUpIcon,
@@ -46,6 +53,11 @@ import {
   Insights as InsightsIcon,
   Assessment as ReportIcon,
   BarChart as ChartIcon,
+  Print as PrintIcon,
+  Download as DownloadIcon,
+  Search as SearchIcon,
+  Close as CloseIcon,
+  Filter as FilterIcon,
 } from "@mui/icons-material";
 import {
   BarChart,
@@ -62,6 +74,7 @@ import {
   Area,
 } from "recharts";
 import { analyticsService } from "../../services/analyticsService";
+import { leadService } from "../../services/leadService";
 import { useRolePermissions } from "../../hooks/useRolePermissions";
 import { PERMISSIONS } from "../../config/roles.config";
 
@@ -78,6 +91,14 @@ const Analytics = () => {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState(0);
   const [reportType, setReportType] = useState("overview");
+
+  // New state for list viewing and printing
+  const [showLeadsList, setShowLeadsList] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [leadsList, setLeadsList] = useState([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredLeads, setFilteredLeads] = useState([]);
   const [reportData, setReportData] = useState({
     summary: {
       totalLeads: 0,
@@ -131,6 +152,306 @@ const Analytics = () => {
   // Helper function to format percentage
   const formatPercentage = (num) => {
     return `${Number(num).toFixed(1)}%`;
+  };
+
+  // Helper function to get date range for filtering
+  const getDateRange = (range) => {
+    const now = new Date();
+    let startDate, endDate;
+
+    switch (range) {
+      case "daily":
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        endDate = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() + 1
+        );
+        break;
+      case "weekly":
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - now.getDay());
+        startDate = new Date(
+          weekStart.getFullYear(),
+          weekStart.getMonth(),
+          weekStart.getDate()
+        );
+        endDate = new Date(
+          weekStart.getFullYear(),
+          weekStart.getMonth(),
+          weekStart.getDate() + 7
+        );
+        break;
+      case "monthly":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        break;
+      case "previous_month":
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case "all_time":
+        startDate = new Date(2020, 0, 1); // Arbitrary start date
+        endDate = now;
+        break;
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    }
+
+    return { startDate, endDate };
+  };
+
+  // Function to fetch leads by status
+  const fetchLeadsByStatus = async (status) => {
+    try {
+      setLeadsLoading(true);
+      console.log(
+        `Fetching leads for status: ${status} with timeRange: ${timeRange}`
+      );
+
+      // Use larger limit for all_time to get comprehensive data
+      const limit = timeRange === "all_time" ? 5000 : 1000;
+
+      const response = await leadService.getLeadsByStatus(status, {
+        limit: limit,
+        offset: 0,
+        sortBy: "createdAt",
+        sortOrder: "desc",
+      });
+
+      if (response.success && response.data) {
+        let leads = response.data;
+
+        // Debug: Log the first lead to see structure
+        if (leads.length > 0) {
+          console.log("Sample lead structure:", leads[0]);
+          console.log("Lead fields:", Object.keys(leads[0]));
+        }
+
+        // Only filter by date range if not "all_time"
+        if (timeRange !== "all_time") {
+          const { startDate, endDate } = getDateRange(timeRange);
+          leads = leads.filter((lead) => {
+            const leadDate = new Date(lead.createdAt);
+            return leadDate >= startDate && leadDate < endDate;
+          });
+          console.log(
+            `Filtered ${response.data.length} leads to ${leads.length} for timeRange: ${timeRange}`
+          );
+        } else {
+          console.log(
+            `Showing all ${leads.length} leads for all_time timeRange`
+          );
+        }
+
+        setLeadsList(leads);
+        setFilteredLeads(leads);
+      } else {
+        setLeadsList([]);
+        setFilteredLeads([]);
+      }
+    } catch (error) {
+      console.error("Error fetching leads by status:", error);
+      setError("Failed to fetch leads list");
+      setLeadsList([]);
+      setFilteredLeads([]);
+    } finally {
+      setLeadsLoading(false);
+    }
+  };
+
+  // Function to handle showing leads list
+  const handleShowLeadsList = (status) => {
+    setSelectedStatus(status);
+    setShowLeadsList(true);
+    fetchLeadsByStatus(status);
+  };
+
+  // Function to filter leads based on search term
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredLeads(leadsList);
+    } else {
+      const filtered = leadsList.filter(
+        (lead) =>
+          lead.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          lead.phone?.includes(searchTerm) ||
+          lead.programOfInterest?.name
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          String(lead.programOfInterest)
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          lead.program?.name
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          String(lead.program)
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          // Also check contactInfo structure for backward compatibility
+          lead.contactInfo?.name
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          lead.contactInfo?.email
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          lead.contactInfo?.phone?.includes(searchTerm)
+      );
+      setFilteredLeads(filtered);
+    }
+  }, [searchTerm, leadsList]);
+
+  // Function to print leads list
+  const handlePrintLeadsList = () => {
+    const printWindow = window.open("", "_blank");
+    const statusLabel = selectedStatus.replace(/_/g, " ");
+    const timeLabel =
+      timeRange === "all_time"
+        ? "All Time"
+        : timeRange === "previous_month"
+        ? "Previous Month"
+        : timeRange.charAt(0).toUpperCase() + timeRange.slice(1);
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Leads Report - ${statusLabel}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #7a0000; padding-bottom: 20px; }
+            .header h1 { color: #7a0000; margin: 0; }
+            .header p { margin: 5px 0; color: #666; }
+            .stats { margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #7a0000; color: white; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            .footer { margin-top: 30px; text-align: center; color: #666; font-size: 12px; }
+            @media print { .no-print { display: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>NYOTA AI FUSION - Leads Report</h1>
+            <p>Status: ${statusLabel}</p>
+            <p>Time Period: ${timeLabel}</p>
+            <p>Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+          </div>
+          
+          <div class="stats">
+            <strong>Total Leads: ${filteredLeads.length}</strong>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Program of Interest</th>
+                <th>Source</th>
+                <th>Created Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredLeads
+                .map(
+                  (lead) => `
+                <tr>
+                  <td>${String(
+                    lead.name || lead.contactInfo?.name || "N/A"
+                  )}</td>
+                  <td>${String(
+                    lead.email || lead.contactInfo?.email || "N/A"
+                  )}</td>
+                  <td>${String(
+                    lead.phone || lead.contactInfo?.phone || "N/A"
+                  )}</td>
+                  <td>${String(
+                    lead.programOfInterest?.name ||
+                      lead.programOfInterest ||
+                      lead.program?.name ||
+                      lead.program ||
+                      "N/A"
+                  )}</td>
+                  <td>${String(lead.source?.name || lead.source || "N/A")}</td>
+                  <td>${new Date(lead.createdAt).toLocaleDateString()}</td>
+                </tr>
+              `
+                )
+                .join("")}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <p>This report was generated by NYOTA AI FUSION Analytics System</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  // Function to export leads list as CSV
+  const handleExportLeadsList = () => {
+    const statusLabel = selectedStatus.replace(/_/g, " ");
+    const timeLabel =
+      timeRange === "all_time"
+        ? "All_Time"
+        : timeRange === "previous_month"
+        ? "Previous_Month"
+        : timeRange;
+
+    const csvHeaders = [
+      "Name",
+      "Email",
+      "Phone",
+      "Program of Interest",
+      "Source",
+      "Status",
+      "Created Date",
+    ];
+    const csvRows = filteredLeads.map((lead) => [
+      String(lead.name || lead.contactInfo?.name || ""),
+      String(lead.email || lead.contactInfo?.email || ""),
+      String(lead.phone || lead.contactInfo?.phone || ""),
+      String(
+        lead.programOfInterest?.name ||
+          lead.programOfInterest ||
+          lead.program?.name ||
+          lead.program ||
+          ""
+      ),
+      String(lead.source?.name || lead.source || ""),
+      String(lead.status || ""),
+      new Date(lead.createdAt).toLocaleDateString(),
+    ]);
+
+    const csvContent = [
+      csvHeaders.join(","),
+      ...csvRows.map((row) => row.map((field) => `"${field}"`).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `leads_${statusLabel.replace(/\s+/g, "_")}_${timeLabel}_${
+        new Date().toISOString().split("T")[0]
+      }.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Fetch analytics data
@@ -377,11 +698,17 @@ const Analytics = () => {
       pdf.setFontSize(12);
       pdf.setFont("helvetica", "normal");
       pdf.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-      pdf.text(
-        `Time Range: ${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)}`,
-        20,
-        55
-      );
+
+      const timeRangeLabel =
+        timeRange === "all_time"
+          ? "All Time"
+          : timeRange === "previous_month"
+          ? "Previous Month"
+          : timeRange === "monthly"
+          ? "This Month"
+          : timeRange.charAt(0).toUpperCase() + timeRange.slice(1);
+
+      pdf.text(`Time Range: ${timeRangeLabel}`, 20, 55);
       pdf.text(
         `Report Type: ${
           reportType.charAt(0).toUpperCase() + reportType.slice(1)
@@ -499,8 +826,17 @@ const Analytics = () => {
         yPos += 10;
       });
 
+      const timeRangeForFile =
+        timeRange === "all_time"
+          ? "all-time"
+          : timeRange === "previous_month"
+          ? "previous-month"
+          : timeRange === "monthly"
+          ? "this-month"
+          : timeRange;
+
       pdf.save(
-        `comprehensive-analytics-${reportType}-${timeRange}-${
+        `comprehensive-analytics-${reportType}-${timeRangeForFile}-${
           new Date().toISOString().split("T")[0]
         }.pdf`
       );
@@ -544,7 +880,59 @@ const Analytics = () => {
             <Typography variant="h6" sx={{ fontWeight: "bold" }}>
               Status Distribution
             </Typography>
+            <Tooltip title="Click on status cards below to view and print lists">
+              <IconButton size="small" sx={{ ml: 1 }}>
+                <FilterIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
+
+          {/* Status Cards - Clickable */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {reportData.statusDistribution.map((status, index) => (
+              <Grid item xs={12} sm={6} md={4} key={status.statusCode}>
+                <Card
+                  sx={{
+                    cursor: "pointer",
+                    transition: "all 0.3s ease",
+                    "&:hover": {
+                      transform: "translateY(-2px)",
+                      boxShadow: 3,
+                      backgroundColor: `${
+                        CHART_COLORS[index % CHART_COLORS.length]
+                      }10`,
+                    },
+                  }}
+                  onClick={() => handleShowLeadsList(status.statusCode)}
+                >
+                  <CardContent sx={{ textAlign: "center", py: 2 }}>
+                    <Typography
+                      variant="h4"
+                      sx={{
+                        color: CHART_COLORS[index % CHART_COLORS.length],
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {status.value}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {status.name}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: CHART_COLORS[index % CHART_COLORS.length],
+                        fontWeight: "medium",
+                      }}
+                    >
+                      {status.percentage}%
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -894,7 +1282,7 @@ const Analytics = () => {
     fetchAnalyticsData();
   }, [fetchAnalyticsData]);
 
-  // KPI Card Component
+  // KPI Card Component - Made clickable for status-based KPIs
   const KpiCard = ({
     title,
     value,
@@ -902,8 +1290,30 @@ const Analytics = () => {
     icon: Icon,
     color = "primary",
     trend,
+    statusCode = null,
+    clickable = false,
   }) => (
-    <Card sx={{ height: "100%", position: "relative", overflow: "visible" }}>
+    <Card
+      sx={{
+        height: "100%",
+        position: "relative",
+        overflow: "visible",
+        cursor: clickable ? "pointer" : "default",
+        transition: clickable ? "all 0.3s ease" : "none",
+        "&:hover": clickable
+          ? {
+              transform: "translateY(-2px)",
+              boxShadow: 3,
+              backgroundColor: `${COLORS[color]}05`,
+            }
+          : {},
+      }}
+      onClick={
+        clickable && statusCode
+          ? () => handleShowLeadsList(statusCode)
+          : undefined
+      }
+    >
       <CardContent>
         <Box
           sx={{
@@ -916,6 +1326,13 @@ const Analytics = () => {
           <Box sx={{ flex: 1 }}>
             <Typography color="text.secondary" variant="body2" gutterBottom>
               {title}
+              {clickable && (
+                <Tooltip title="Click to view list">
+                  <FilterIcon
+                    sx={{ ml: 1, fontSize: "0.8rem", color: "text.secondary" }}
+                  />
+                </Tooltip>
+              )}
             </Typography>
             <Typography
               variant="h4"
@@ -1019,6 +1436,8 @@ const Analytics = () => {
               sx={{
                 "& .MuiToggleButton-root": {
                   borderColor: COLORS.primary,
+                  fontSize: "0.75rem",
+                  padding: "4px 8px",
                   "&.Mui-selected": {
                     backgroundColor: COLORS.primary,
                     color: "white",
@@ -1028,7 +1447,9 @@ const Analytics = () => {
             >
               <ToggleButton value="daily">Daily</ToggleButton>
               <ToggleButton value="weekly">Weekly</ToggleButton>
-              <ToggleButton value="monthly">Monthly</ToggleButton>
+              <ToggleButton value="monthly">This Month</ToggleButton>
+              <ToggleButton value="previous_month">Prev Month</ToggleButton>
+              <ToggleButton value="all_time">All Time</ToggleButton>
             </ToggleButtonGroup>
             <IconButton onClick={fetchAnalyticsData} disabled={loading}>
               <RefreshIcon />
@@ -1053,6 +1474,23 @@ const Analytics = () => {
         </Box>
         <Divider />
       </Box>
+
+      {/* Info Alert about new features */}
+      <Alert
+        severity="info"
+        sx={{
+          mb: 3,
+          bgcolor: `${COLORS.primary}08`,
+          borderColor: `${COLORS.primary}30`,
+          "& .MuiAlert-icon": { color: COLORS.primary },
+        }}
+      >
+        <Typography variant="body2">
+          <strong>New Features:</strong> Click on status cards or KPI cards to
+          view and print detailed lists of leads. Use the new time filters
+          (Previous Month, All Time) for comprehensive reporting.
+        </Typography>
+      </Alert>
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -1132,6 +1570,8 @@ const Analytics = () => {
                 subtitle="APPLIED status"
                 icon={AssignmentIcon}
                 color="info"
+                statusCode="APPLIED"
+                clickable={true}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={2}>
@@ -1141,6 +1581,8 @@ const Analytics = () => {
                 subtitle="ADMITTED status"
                 icon={CheckCircleIcon}
                 color="success"
+                statusCode="ADMITTED"
+                clickable={true}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={2}>
@@ -1150,6 +1592,8 @@ const Analytics = () => {
                 subtitle="ENROLLED status"
                 icon={SchoolIcon}
                 color="primary"
+                statusCode="ENROLLED"
+                clickable={true}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={2}>
@@ -1159,15 +1603,19 @@ const Analytics = () => {
                 subtitle="IN_REVIEW status"
                 icon={PendingIcon}
                 color="warning"
+                statusCode="IN_REVIEW"
+                clickable={true}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={2}>
               <KpiCard
-                title="Qualified Status"
-                value={reportData.summary.qualified}
-                subtitle="QUALIFIED status"
+                title="Interested Status"
+                value={reportData.summary.interested}
+                subtitle="INTERESTED status"
                 icon={ReportIcon}
                 color="neutral"
+                statusCode="INTERESTED"
+                clickable={true}
               />
             </Grid>
           </Grid>
@@ -1180,6 +1628,208 @@ const Analytics = () => {
           {activeTab === 4 && renderInsightsTab()}
         </>
       )}
+
+      {/* Leads List Dialog */}
+      <Dialog
+        open={showLeadsList}
+        onClose={() => setShowLeadsList(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: { height: "80vh" },
+        }}
+      >
+        <DialogTitle>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                Leads List - {selectedStatus.replace(/_/g, " ")}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {timeRange === "all_time"
+                  ? "All Time"
+                  : timeRange === "previous_month"
+                  ? "Previous Month"
+                  : timeRange.charAt(0).toUpperCase() + timeRange.slice(1)}{" "}
+                • {filteredLeads.length} leads
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Tooltip title="Print List">
+                <IconButton
+                  onClick={handlePrintLeadsList}
+                  disabled={filteredLeads.length === 0}
+                  sx={{ color: COLORS.primary }}
+                >
+                  <PrintIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Export CSV">
+                <IconButton
+                  onClick={handleExportLeadsList}
+                  disabled={filteredLeads.length === 0}
+                  sx={{ color: COLORS.primary }}
+                >
+                  <DownloadIcon />
+                </IconButton>
+              </Tooltip>
+              <IconButton onClick={() => setShowLeadsList(false)}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent dividers>
+          {/* Search Bar */}
+          <Box sx={{ mb: 3 }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search by name, email, phone, or program..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: searchTerm && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchTerm("")}>
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
+
+          {leadsLoading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : filteredLeads.length === 0 ? (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              {searchTerm
+                ? "No leads found matching your search criteria."
+                : "No leads found for this status and time period."}
+            </Alert>
+          ) : (
+            <TableContainer component={Paper} variant="outlined">
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Contact</TableCell>
+                    <TableCell>Program</TableCell>
+                    <TableCell>Source</TableCell>
+                    <TableCell>Created</TableCell>
+                    <TableCell>Status</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredLeads.map((lead) => (
+                    <TableRow key={lead.id} hover>
+                      <TableCell>
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <Avatar
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              bgcolor: COLORS.primary,
+                              fontSize: "0.8rem",
+                            }}
+                          >
+                            {(lead.name || lead.contactInfo?.name)
+                              ?.charAt(0)
+                              ?.toUpperCase() || "L"}
+                          </Avatar>
+                          <Typography variant="body2" fontWeight="medium">
+                            {String(
+                              lead.name || lead.contactInfo?.name || "N/A"
+                            )}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {String(
+                            lead.email || lead.contactInfo?.email || "N/A"
+                          )}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {String(
+                            lead.phone || lead.contactInfo?.phone || "N/A"
+                          )}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {String(
+                            lead.programOfInterest?.name ||
+                              lead.programOfInterest ||
+                              lead.program?.name ||
+                              lead.program ||
+                              "N/A"
+                          )}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={String(
+                            lead.source?.name || lead.source || "N/A"
+                          )}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontSize: "0.7rem" }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {new Date(lead.createdAt).toLocaleDateString()}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(lead.createdAt).toLocaleTimeString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={
+                            String(lead.status)?.replace(/_/g, " ") || "N/A"
+                          }
+                          size="small"
+                          sx={{
+                            bgcolor: `${COLORS.primary}20`,
+                            color: COLORS.primary,
+                            fontSize: "0.7rem",
+                          }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, bgcolor: "grey.50" }}>
+          <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+            Showing {filteredLeads.length} of {leadsList.length} leads
+          </Typography>
+          <Button onClick={() => setShowLeadsList(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

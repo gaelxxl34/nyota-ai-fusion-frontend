@@ -74,23 +74,69 @@ const ChatInterface = ({
     // Close the menu
     handleTemplateMenuClose();
 
+    // Define template configurations
+    const templateConfigs = {
+      application_followup_iuea: {
+        title: "Send Application Follow-up?",
+        borderColor: "#25D366",
+        preview: `Hi there! 👋<br>
+Just checking in to see how things are going with your IUEA application.<br>
+We'd love to hear from you — if there's anything you need or any challenge you're facing, feel free to let us know. 😊<br>
+We're here to support you and are excited to have you on this journey! 🌟`,
+      },
+      application_in_review: {
+        title: "Send Application Review Status?",
+        borderColor: "#ffc107",
+        preview: `Hello 👋<br>
+Your application is currently under review 📑<br>
+Our admissions team is carefully checking your details and documents.<br>
+👉 Visit your portal anytime for updates: https://applicant.iuea.ac.ug/`,
+      },
+      application_qualified: {
+        title: "Send Application Qualified Message?",
+        borderColor: "#28a745",
+        preview: `Great news🎉<br>
+Your application has met all requirements, and you are qualified for admission.<br>
+👉 Check your portal now for the next steps: https://applicant.iuea.ac.ug/`,
+      },
+      application_admitted: {
+        title: "Send Application Admitted Message?",
+        borderColor: "#28a745",
+        preview: `Congratulations 🎓🎉<br>
+You've been officially admitted to IUEA!<br>
+👉 Download your admission letter and complete enrollment here: https://applicant.iuea.ac.ug/<br>
+Welcome to the IUEA family 🌍`,
+      },
+      application_deferred: {
+        title: "Send Application Deferred Message?",
+        borderColor: "#6c757d",
+        preview: `Hello 👋<br>
+Your application has been deferred to a later intake ⏳<br>
+This means your admission process is postponed for now.<br>
+👉 Stay updated by checking your portal: https://applicant.iuea.ac.ug/`,
+      },
+    };
+
+    const config =
+      templateConfigs[templateName] ||
+      templateConfigs.application_followup_iuea;
+
     // Show confirmation dialog
     const result = await Swal.fire({
-      title: "Send Application Follow-up?",
+      title: config.title,
       html: `
         <div style="text-align: center; margin: 15px 0;">
           <p style="margin: 8px 0; color: #666; font-size: 14px;">
-            Send follow-up message to <strong>${getProfileName(
+            Send template message to <strong>${getProfileName(
               activeConversation
             )}</strong>
           </p>
-          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #25D366; text-align: left;">
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid ${
+            config.borderColor
+          }; text-align: left;">
             <p style="margin: 0; font-size: 13px; color: #666; font-style: italic; text-align: center;">Message Preview:</p>
             <p style="margin: 10px 0 0 0; font-size: 14px; line-height: 1.5; color: #333;">
-              "Hi there! 👋<br>
-              Just checking in to see how things are going with your IUEA application.<br>
-              We'd love to hear from you — if there's anything you need or any challenge you're facing, feel free to let us know. 😊<br>
-              We're here to support you and are excited to have you on this journey! 🌟"
+              "${config.preview}"
             </p>
           </div>
           <p style="font-size: 12px; color: #999; margin: 8px 0 0 0;">
@@ -100,7 +146,7 @@ const ChatInterface = ({
       `,
       icon: "question",
       showCancelButton: true,
-      confirmButtonColor: "#25D366",
+      confirmButtonColor: config.borderColor,
       cancelButtonColor: "#6c757d",
       confirmButtonText: "Send",
       cancelButtonText: "Cancel",
@@ -122,7 +168,7 @@ const ChatInterface = ({
       // Show loading state
       Swal.fire({
         title: "Sending Message...",
-        text: "Please wait while we send your follow-up message.",
+        text: "Please wait while we send your template message.",
         icon: "info",
         allowOutsideClick: false,
         showConfirmButton: false,
@@ -150,7 +196,7 @@ const ChatInterface = ({
           html: `
             <div style="text-align: center;">
               <p style="margin: 10px 0; color: #666; font-size: 14px;">
-                Follow-up message sent to <strong>${getProfileName(
+                Template message sent to <strong>${getProfileName(
                   activeConversation
                 )}</strong>
               </p>
@@ -637,9 +683,6 @@ const ChatInterface = ({
               "&:hover": {
                 bgcolor: "#e9ecef", // Darker gray on hover
               },
-              "&:last-child": {
-                mb: 1,
-              },
             }}
           >
             <ListItemIcon>
@@ -657,6 +700,149 @@ const ChatInterface = ({
               secondaryTypographyProps={{
                 fontSize: "0.8rem",
                 color: "#666666 !important", // Explicit dark gray color with !important
+                sx: { color: "#666666 !important" },
+              }}
+            />
+          </MenuItem>
+
+          <MenuItem
+            onClick={() => handleSendTemplateMessage("application_in_review")}
+            disabled={sendingTemplate}
+            sx={{
+              py: 1.5,
+              px: 2,
+              bgcolor: "#f8f9fa",
+              mb: 0.5,
+              mx: 1,
+              borderRadius: 1,
+              "&:hover": {
+                bgcolor: "#e9ecef",
+              },
+            }}
+          >
+            <ListItemIcon>
+              <ScheduleIcon sx={{ color: "#ffc107" }} />
+            </ListItemIcon>
+            <ListItemText
+              primary="Application In Review"
+              secondary="Notify that application is under review"
+              primaryTypographyProps={{
+                fontSize: "0.9rem",
+                fontWeight: 500,
+                color: "#000000 !important",
+                sx: { color: "#000000 !important" },
+              }}
+              secondaryTypographyProps={{
+                fontSize: "0.8rem",
+                color: "#666666 !important",
+                sx: { color: "#666666 !important" },
+              }}
+            />
+          </MenuItem>
+
+          <MenuItem
+            onClick={() => handleSendTemplateMessage("application_qualified")}
+            disabled={sendingTemplate}
+            sx={{
+              py: 1.5,
+              px: 2,
+              bgcolor: "#f8f9fa",
+              mb: 0.5,
+              mx: 1,
+              borderRadius: 1,
+              "&:hover": {
+                bgcolor: "#e9ecef",
+              },
+            }}
+          >
+            <ListItemIcon>
+              <CheckIcon sx={{ color: "#28a745" }} />
+            </ListItemIcon>
+            <ListItemText
+              primary="Application Qualified"
+              secondary="Great news - application qualified for admission"
+              primaryTypographyProps={{
+                fontSize: "0.9rem",
+                fontWeight: 500,
+                color: "#000000 !important",
+                sx: { color: "#000000 !important" },
+              }}
+              secondaryTypographyProps={{
+                fontSize: "0.8rem",
+                color: "#666666 !important",
+                sx: { color: "#666666 !important" },
+              }}
+            />
+          </MenuItem>
+
+          <MenuItem
+            onClick={() => handleSendTemplateMessage("application_admitted")}
+            disabled={sendingTemplate}
+            sx={{
+              py: 1.5,
+              px: 2,
+              bgcolor: "#f8f9fa",
+              mb: 0.5,
+              mx: 1,
+              borderRadius: 1,
+              "&:hover": {
+                bgcolor: "#e9ecef",
+              },
+            }}
+          >
+            <ListItemIcon>
+              <CampaignIcon sx={{ color: "#28a745" }} />
+            </ListItemIcon>
+            <ListItemText
+              primary="Application Admitted"
+              secondary="Congratulations - officially admitted to IUEA"
+              primaryTypographyProps={{
+                fontSize: "0.9rem",
+                fontWeight: 500,
+                color: "#000000 !important",
+                sx: { color: "#000000 !important" },
+              }}
+              secondaryTypographyProps={{
+                fontSize: "0.8rem",
+                color: "#666666 !important",
+                sx: { color: "#666666 !important" },
+              }}
+            />
+          </MenuItem>
+
+          <MenuItem
+            onClick={() => handleSendTemplateMessage("application_deferred")}
+            disabled={sendingTemplate}
+            sx={{
+              py: 1.5,
+              px: 2,
+              bgcolor: "#f8f9fa",
+              mb: 0.5,
+              mx: 1,
+              borderRadius: 1,
+              "&:hover": {
+                bgcolor: "#e9ecef",
+              },
+              "&:last-child": {
+                mb: 1,
+              },
+            }}
+          >
+            <ListItemIcon>
+              <ScheduleIcon sx={{ color: "#6c757d" }} />
+            </ListItemIcon>
+            <ListItemText
+              primary="Application Deferred"
+              secondary="Application deferred to later intake"
+              primaryTypographyProps={{
+                fontSize: "0.9rem",
+                fontWeight: 500,
+                color: "#000000 !important",
+                sx: { color: "#000000 !important" },
+              }}
+              secondaryTypographyProps={{
+                fontSize: "0.8rem",
+                color: "#666666 !important",
                 sx: { color: "#666666 !important" },
               }}
             />
