@@ -10,7 +10,6 @@ import {
   Chip,
   Tooltip,
   CircularProgress,
-  Button,
   Menu,
   MenuItem,
   ListItemIcon,
@@ -27,7 +26,6 @@ import {
   Schedule as ScheduleIcon,
   Error as ErrorIcon,
   Description as TemplateIcon,
-  MoreVert as MoreVertIcon,
   Campaign as CampaignIcon,
 } from "@mui/icons-material";
 import ChatMessagesSkeleton from "./ChatMessagesSkeleton";
