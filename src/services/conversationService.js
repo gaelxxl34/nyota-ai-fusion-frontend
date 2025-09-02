@@ -520,6 +520,57 @@ class ConversationService {
       throw error;
     }
   }
+
+  /**
+   * Send WhatsApp template message
+   */
+  static async sendTemplateMessage(
+    phoneNumber,
+    templateName = "application_followup_iuea",
+    leadData = null
+  ) {
+    if (!phoneNumber) {
+      throw new Error("Phone number is required");
+    }
+
+    try {
+      console.log(
+        `📤 Sending template message "${templateName}" to ${phoneNumber}`
+      );
+
+      const response = await axiosInstance.post(
+        "/api/whatsapp/send-template-message",
+        {
+          to: phoneNumber,
+          templateName: templateName,
+          leadData: leadData,
+        }
+      );
+
+      if (response.data.success) {
+        console.log("✅ Template message sent successfully:", response.data);
+        return {
+          success: true,
+          messageId: response.data.messageId,
+          equivalentMessage: response.data.equivalentMessage,
+          templateName: response.data.templateName,
+          conversationId: response.data.conversationId,
+          data: response.data,
+        };
+      } else {
+        throw new Error(
+          response.data.error || "Failed to send template message"
+        );
+      }
+    } catch (error) {
+      console.error("❌ Error sending template message:", error);
+      throw new Error(
+        error.response?.data?.error ||
+          error.message ||
+          "Failed to send template message"
+      );
+    }
+  }
 }
 
 export default ConversationService;

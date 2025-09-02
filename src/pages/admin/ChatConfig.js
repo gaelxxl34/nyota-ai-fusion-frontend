@@ -1049,6 +1049,38 @@ const ChatConfig = () => {
     }
   };
 
+  const handleTemplateMessageSent = async (phoneNumber, result) => {
+    try {
+      console.log(
+        `🔄 Template message sent for ${phoneNumber}, refreshing conversation...`
+      );
+
+      // Wait a moment for the message to be processed by the backend
+      setTimeout(async () => {
+        // Refresh the specific conversation messages
+        if (activeConversation === phoneNumber) {
+          await switchConversation(phoneNumber);
+        }
+
+        // Optionally refresh the conversations list to update last message
+        // await fetchConversations(false);
+
+        setSnackbar({
+          open: true,
+          message: `Template message sent to ${getProfileName(phoneNumber)}`,
+          severity: "success",
+        });
+      }, 1000); // 1 second delay to ensure backend processing is complete
+    } catch (error) {
+      console.error("❌ Error handling template message sent:", error);
+      setSnackbar({
+        open: true,
+        message: "Template message sent, but failed to refresh conversation",
+        severity: "warning",
+      });
+    }
+  };
+
   // Load conversations on component mount
   useEffect(() => {
     const loadInitialConversations = async () => {
@@ -1253,6 +1285,7 @@ const ChatConfig = () => {
                   hasMoreConversations={hasMoreConversations}
                   loadingMoreConversations={loadingMoreConversations}
                   onLoadMore={loadMoreConversations}
+                  onTemplateMessageSent={handleTemplateMessageSent}
                 />
               </ErrorBoundary>
             </Box>

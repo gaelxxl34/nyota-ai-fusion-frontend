@@ -41,6 +41,7 @@ const ChatLayout = ({
   hasMoreConversations = false,
   loadingMoreConversations = false,
   onLoadMore,
+  onTemplateMessageSent, // New prop for template message handling
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -163,6 +164,7 @@ const ChatLayout = ({
             userTyping={userTyping}
             messagesLoading={messagesLoading}
             onStartConversation={onStartConversation}
+            onTemplateMessageSent={onTemplateMessageSent}
           />
         </Box>
       </Box>
@@ -222,6 +224,7 @@ const ChatLayout = ({
           userTyping={userTyping}
           messagesLoading={messagesLoading}
           onStartConversation={onStartConversation}
+          onTemplateMessageSent={onTemplateMessageSent}
         />
       </Box>
     </Box>

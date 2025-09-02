@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   Box,
   Paper,
@@ -10,6 +10,11 @@ import {
   Chip,
   Tooltip,
   CircularProgress,
+  Button,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import {
   Send as SendIcon,
@@ -21,9 +26,14 @@ import {
   DoneAll as DoubleCheckIcon,
   Schedule as ScheduleIcon,
   Error as ErrorIcon,
+  Description as TemplateIcon,
+  MoreVert as MoreVertIcon,
+  Campaign as CampaignIcon,
 } from "@mui/icons-material";
 import ChatMessagesSkeleton from "./ChatMessagesSkeleton";
 import EmptyState from "./EmptyState";
+import ConversationService from "../../services/conversationService";
+import Swal from "sweetalert2";
 
 const ChatInterface = ({
   activeConversation,
@@ -40,12 +50,151 @@ const ChatInterface = ({
   userTyping,
   messagesLoading = false,
   onStartConversation,
+  onTemplateMessageSent, // New prop to handle template message sent
 }) => {
   const messagesEndRef = useRef(null);
+  const [templateMenuAnchor, setTemplateMenuAnchor] = useState(null);
+  const [sendingTemplate, setSendingTemplate] = useState(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
+
+  const handleTemplateMenuOpen = (event) => {
+    setTemplateMenuAnchor(event.currentTarget);
+  };
+
+  const handleTemplateMenuClose = () => {
+    setTemplateMenuAnchor(null);
+  };
+
+  const handleSendTemplateMessage = async (
+    templateName = "application_followup_iuea"
+  ) => {
+    if (!activeConversation || sendingTemplate) return;
+
+    // Close the menu
+    handleTemplateMenuClose();
+
+    // Show confirmation dialog
+    const result = await Swal.fire({
+      title: "Send Application Follow-up Message?",
+      html: `
+        <div style="text-align: left; margin: 20px 0;">
+          <p><strong>Template:</strong> Application Follow-up IUEA</p>
+          <p><strong>To:</strong> ${getProfileName(activeConversation)}</p>
+          <br>
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #25D366;">
+            <p style="margin: 0; font-style: italic; color: #666;">Message Preview:</p>
+            <p style="margin: 10px 0 0 0;">
+              "Hi there! 👋<br>
+              Just checking in to see how things are going with your IUEA application.<br>
+              We'd love to hear from you — if there's anything you need or any challenge you're facing, feel free to let us know. 😊<br>
+              We're here to support you and are excited to have you on this journey! 🌟"
+            </p>
+          </div>
+          <br>
+          <p style="font-size: 14px; color: #666;">
+            <strong>Note:</strong> This is a WhatsApp template message that can be sent even outside the 24-hour window.
+          </p>
+        </div>
+      `,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#25D366",
+      cancelButtonColor: "#6c757d",
+      confirmButtonText: "Yes, send it!",
+      cancelButtonText: "Cancel",
+      width: 600,
+      customClass: {
+        popup: "swal2-popup",
+        title: "swal2-title",
+        content: "swal2-content",
+      },
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    setSendingTemplate(true);
+
+    try {
+      // Show loading state
+      Swal.fire({
+        title: "Sending Template Message...",
+        text: "Please wait while we send your follow-up message.",
+        icon: "info",
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
+      // Send template message
+      const result = await ConversationService.sendTemplateMessage(
+        activeConversation,
+        templateName,
+        null // Lead data will be automatically found/created by backend
+      );
+
+      if (result.success) {
+        // Close loading dialog
+        Swal.close();
+
+        // Show success message
+        Swal.fire({
+          title: "Template Message Sent!",
+          html: `
+            <div style="text-align: center;">
+              <p>✅ Your application follow-up message has been sent successfully to <strong>${getProfileName(
+                activeConversation
+              )}</strong>.</p>
+              <br>
+              <p style="font-size: 14px; color: #666;">The message will appear in the conversation once delivered.</p>
+            </div>
+          `,
+          icon: "success",
+          timer: 3000,
+          showConfirmButton: false,
+        });
+
+        // Notify parent component to refresh messages
+        if (onTemplateMessageSent) {
+          onTemplateMessageSent(activeConversation, result);
+        }
+
+        console.log("✅ Template message sent successfully:", result);
+      } else {
+        throw new Error(result.error || "Failed to send template message");
+      }
+    } catch (error) {
+      console.error("❌ Error sending template message:", error);
+
+      // Close loading dialog
+      Swal.close();
+
+      // Show error message
+      Swal.fire({
+        title: "Failed to Send Template Message",
+        html: `
+          <div style="text-align: center;">
+            <p>❌ We couldn't send the template message at this time.</p>
+            <br>
+            <p style="font-size: 14px; color: #666;"><strong>Error:</strong> ${error.message}</p>
+            <br>
+            <p style="font-size: 12px; color: #999;">Please try again later or contact support if the issue persists.</p>
+          </div>
+        `,
+        icon: "error",
+        confirmButtonText: "Understood",
+        confirmButtonColor: "#dc3545",
+      });
+    } finally {
+      setSendingTemplate(false);
+    }
+  };
 
   const formatMessageTime = (timestamp) => {
     if (!timestamp) return "";
@@ -422,6 +571,89 @@ const ChatInterface = ({
           borderTop: "1px solid #e0e0e0",
         }}
       >
+        {/* Template Message Button */}
+        <Tooltip title="Send template message">
+          <IconButton
+            onClick={handleTemplateMenuOpen}
+            disabled={loading || sendingTemplate}
+            sx={{
+              bgcolor: "#128C7E",
+              color: "white",
+              width: 40,
+              height: 40,
+              "&:hover": {
+                bgcolor: "#075E54",
+              },
+              "&.Mui-disabled": {
+                bgcolor: "grey.300",
+              },
+            }}
+          >
+            {sendingTemplate ? (
+              <CircularProgress size={16} color="inherit" />
+            ) : (
+              <TemplateIcon sx={{ fontSize: 18 }} />
+            )}
+          </IconButton>
+        </Tooltip>
+
+        {/* Template Menu */}
+        <Menu
+          anchorEl={templateMenuAnchor}
+          open={Boolean(templateMenuAnchor)}
+          onClose={handleTemplateMenuClose}
+          PaperProps={{
+            sx: {
+              minWidth: 280,
+              maxWidth: 350,
+              bgcolor: "#ffffff", // Explicit white background
+              color: "#000000", // Explicit black text
+              border: "1px solid #e0e0e0",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            },
+          }}
+        >
+          <MenuItem
+            onClick={() =>
+              handleSendTemplateMessage("application_followup_iuea")
+            }
+            disabled={sendingTemplate}
+            sx={{
+              py: 1.5,
+              px: 2,
+              bgcolor: "#f8f9fa", // Light gray background for visibility
+              mb: 0.5,
+              mx: 1,
+              borderRadius: 1,
+              "&:hover": {
+                bgcolor: "#e9ecef", // Darker gray on hover
+              },
+              "&:last-child": {
+                mb: 1,
+              },
+            }}
+          >
+            <ListItemIcon>
+              <CampaignIcon sx={{ color: "#25D366" }} />
+            </ListItemIcon>
+            <ListItemText
+              primary="Application Follow-up"
+              secondary="Check in on IUEA application progress"
+              primaryTypographyProps={{
+                fontSize: "0.9rem",
+                fontWeight: 500,
+                color: "#000000 !important", // Explicit black color with !important
+                sx: { color: "#000000 !important" },
+              }}
+              secondaryTypographyProps={{
+                fontSize: "0.8rem",
+                color: "#666666 !important", // Explicit dark gray color with !important
+                sx: { color: "#666666 !important" },
+              }}
+            />
+          </MenuItem>
+        </Menu>
+
         <TextField
           fullWidth
           multiline
