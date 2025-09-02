@@ -76,24 +76,25 @@ const ChatInterface = ({
 
     // Show confirmation dialog
     const result = await Swal.fire({
-      title: "Send Application Follow-up Message?",
+      title: "Send Application Follow-up?",
       html: `
-        <div style="text-align: left; margin: 20px 0;">
-          <p><strong>Template:</strong> Application Follow-up IUEA</p>
-          <p><strong>To:</strong> ${getProfileName(activeConversation)}</p>
-          <br>
-          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #25D366;">
-            <p style="margin: 0; font-style: italic; color: #666;">Message Preview:</p>
-            <p style="margin: 10px 0 0 0;">
+        <div style="text-align: center; margin: 15px 0;">
+          <p style="margin: 8px 0; color: #666; font-size: 14px;">
+            Send follow-up message to <strong>${getProfileName(
+              activeConversation
+            )}</strong>
+          </p>
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #25D366; text-align: left;">
+            <p style="margin: 0; font-size: 13px; color: #666; font-style: italic; text-align: center;">Message Preview:</p>
+            <p style="margin: 10px 0 0 0; font-size: 14px; line-height: 1.5; color: #333;">
               "Hi there! 👋<br>
               Just checking in to see how things are going with your IUEA application.<br>
               We'd love to hear from you — if there's anything you need or any challenge you're facing, feel free to let us know. 😊<br>
               We're here to support you and are excited to have you on this journey! 🌟"
             </p>
           </div>
-          <br>
-          <p style="font-size: 14px; color: #666;">
-            <strong>Note:</strong> This is a WhatsApp template message that can be sent even outside the 24-hour window.
+          <p style="font-size: 12px; color: #999; margin: 8px 0 0 0;">
+            This template can be sent outside the 24-hour window.
           </p>
         </div>
       `,
@@ -101,13 +102,13 @@ const ChatInterface = ({
       showCancelButton: true,
       confirmButtonColor: "#25D366",
       cancelButtonColor: "#6c757d",
-      confirmButtonText: "Yes, send it!",
+      confirmButtonText: "Send",
       cancelButtonText: "Cancel",
-      width: 600,
+      width: "min(90vw, 500px)", // Responsive width: 90% of viewport width but max 500px
+      padding: "20px",
       customClass: {
-        popup: "swal2-popup",
-        title: "swal2-title",
-        content: "swal2-content",
+        popup: "swal2-responsive-popup",
+        htmlContainer: "swal2-responsive-content",
       },
     });
 
@@ -120,11 +121,13 @@ const ChatInterface = ({
     try {
       // Show loading state
       Swal.fire({
-        title: "Sending Template Message...",
+        title: "Sending Message...",
         text: "Please wait while we send your follow-up message.",
         icon: "info",
         allowOutsideClick: false,
         showConfirmButton: false,
+        width: "min(90vw, 400px)", // Responsive width
+        padding: "20px",
         didOpen: () => {
           Swal.showLoading();
         },
@@ -143,19 +146,24 @@ const ChatInterface = ({
 
         // Show success message
         Swal.fire({
-          title: "Template Message Sent!",
+          title: "Message Sent! ✅",
           html: `
             <div style="text-align: center;">
-              <p>✅ Your application follow-up message has been sent successfully to <strong>${getProfileName(
-                activeConversation
-              )}</strong>.</p>
-              <br>
-              <p style="font-size: 14px; color: #666;">The message will appear in the conversation once delivered.</p>
+              <p style="margin: 10px 0; color: #666; font-size: 14px;">
+                Follow-up message sent to <strong>${getProfileName(
+                  activeConversation
+                )}</strong>
+              </p>
+              <p style="font-size: 12px; color: #999; margin: 8px 0 0 0;">
+                The message will appear in the conversation once delivered.
+              </p>
             </div>
           `,
           icon: "success",
-          timer: 3000,
+          timer: 2500,
           showConfirmButton: false,
+          width: "min(90vw, 450px)", // Responsive width
+          padding: "20px",
         });
 
         // Notify parent component to refresh messages
@@ -175,19 +183,22 @@ const ChatInterface = ({
 
       // Show error message
       Swal.fire({
-        title: "Failed to Send Template Message",
+        title: "Failed to Send",
         html: `
           <div style="text-align: center;">
-            <p>❌ We couldn't send the template message at this time.</p>
-            <br>
-            <p style="font-size: 14px; color: #666;"><strong>Error:</strong> ${error.message}</p>
-            <br>
-            <p style="font-size: 12px; color: #999;">Please try again later or contact support if the issue persists.</p>
+            <p style="margin: 10px 0; color: #666; font-size: 14px;">
+              Couldn't send the template message at this time.
+            </p>
+            <p style="font-size: 12px; color: #999; margin: 8px 0 0 0;">
+              <strong>Error:</strong> ${error.message}
+            </p>
           </div>
         `,
         icon: "error",
-        confirmButtonText: "Understood",
+        confirmButtonText: "OK",
         confirmButtonColor: "#dc3545",
+        width: "min(90vw, 450px)", // Responsive width
+        padding: "20px",
       });
     } finally {
       setSendingTemplate(false);
