@@ -42,6 +42,7 @@ const ChatLayout = ({
   loadingMoreConversations = false,
   onLoadMore,
   onTemplateMessageSent, // New prop for template message handling
+  currentUser, // Current user information
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -165,6 +166,7 @@ const ChatLayout = ({
             messagesLoading={messagesLoading}
             onStartConversation={onStartConversation}
             onTemplateMessageSent={onTemplateMessageSent}
+            currentUser={currentUser}
           />
         </Box>
       </Box>
@@ -225,6 +227,7 @@ const ChatLayout = ({
           messagesLoading={messagesLoading}
           onStartConversation={onStartConversation}
           onTemplateMessageSent={onTemplateMessageSent}
+          currentUser={currentUser}
         />
       </Box>
     </Box>

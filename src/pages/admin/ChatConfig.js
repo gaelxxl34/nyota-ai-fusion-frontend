@@ -34,7 +34,7 @@ import ErrorBoundary from "../../components/chat/ErrorBoundary";
 
 const ChatConfig = () => {
   const { checkLeadStageAccess } = useRolePermissions();
-  const { getUserRole } = useAuth();
+  const { getUserRole, user } = useAuth();
   const userRole = getUserRole();
 
   // All the same state variables from the original file
@@ -226,25 +226,43 @@ const ChatConfig = () => {
       return;
     }
 
+    console.log(`🔄 Switching to conversation: ${phoneNumber}`);
     setMessagesLoading(true);
     setActiveConversation(phoneNumber);
 
     try {
       // Fetch messages only when conversation is selected (lazy loading)
-      const response = await axiosInstance.get(
-        `/api/whatsapp/conversations/${encodeURIComponent(
-          phoneNumber
-        )}/messages?limit=50&offset=0`
-      );
+      const apiUrl = `/api/whatsapp/conversations/${encodeURIComponent(
+        phoneNumber
+      )}/messages?limit=50&offset=0`;
+
+      console.log(`📞 Fetching messages from: ${apiUrl}`);
+
+      const response = await axiosInstance.get(apiUrl);
+
+      console.log(`📥 API Response:`, {
+        success: response.data.success,
+        messagesCount: response.data.messages?.length || 0,
+        messages: response.data.messages,
+        phoneNumber: response.data.phoneNumber,
+        error: response.data.error,
+      });
 
       if (response.data.success) {
-        setChatMessages(response.data.messages || []);
+        const messages = response.data.messages || [];
+        console.log(`✅ Setting ${messages.length} messages for display`);
+        setChatMessages(messages);
       } else {
-        console.error("Failed to fetch messages:", response.data.error);
+        console.error("❌ API returned error:", response.data.error);
         setChatMessages([]);
       }
     } catch (error) {
       console.error("❌ Error fetching messages:", error);
+      console.error("Error details:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
       setChatMessages([]);
     } finally {
       setMessagesLoading(false);
@@ -634,17 +652,22 @@ const ChatConfig = () => {
     }
     setLoading(true);
 
+    // Get current user's display name
+    const currentUserName =
+      user?.name || user?.firstName || user?.email?.split("@")[0] || "Admin";
+    console.log("🔍 Current user sending message:", { user, currentUserName });
+
     // Create optimistic message for immediate UI feedback
     const optimisticMessage = {
       id: `temp_${Date.now()}`,
       content: messageText,
       sender: "admin",
-      senderName: "Admin",
+      senderName: currentUserName,
       timestamp: new Date(),
       status: "sending",
       type: "text",
       phoneNumber: activeConversation,
-      profileName: "Admin",
+      profileName: currentUserName,
       isAI: false,
       isAdmin: true,
     };
@@ -668,13 +691,24 @@ const ChatConfig = () => {
     });
 
     try {
+      // Get current user's display name
+      const currentUserName =
+        user?.name || user?.firstName || user?.email?.split("@")[0] || "Admin";
+
       const response = await axiosInstance.post("/api/whatsapp/send-message", {
         to: activeConversation,
         message: messageText,
         messageType: "text",
+        senderName: currentUserName, // Include sender name in the request
+        leadData: {
+          // Include any additional data that might be needed
+          contactName: getProfileName(activeConversation),
+        },
       });
 
       if (response.data.success) {
+        console.log("✅ Message sent successfully, response:", response.data);
+
         // Remove the optimistic message
         setConversations((prev) => {
           const newConversations = new Map(prev);
@@ -692,7 +726,9 @@ const ChatConfig = () => {
         );
 
         // Refresh the conversation messages to get the real message from server
+        console.log("🔄 Refreshing conversation after message send...");
         setTimeout(() => {
+          console.log("🔄 Calling switchConversation to refresh messages...");
           switchConversation(activeConversation);
         }, 500);
 
@@ -1286,6 +1322,7 @@ const ChatConfig = () => {
                   loadingMoreConversations={loadingMoreConversations}
                   onLoadMore={loadMoreConversations}
                   onTemplateMessageSent={handleTemplateMessageSent}
+                  currentUser={user}
                 />
               </ErrorBoundary>
             </Box>

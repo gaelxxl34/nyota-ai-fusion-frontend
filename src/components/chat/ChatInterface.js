@@ -49,10 +49,21 @@ const ChatInterface = ({
   messagesLoading = false,
   onStartConversation,
   onTemplateMessageSent, // New prop to handle template message sent
+  currentUser, // Current user information
 }) => {
   const messagesEndRef = useRef(null);
   const [templateMenuAnchor, setTemplateMenuAnchor] = useState(null);
   const [sendingTemplate, setSendingTemplate] = useState(false);
+
+  // Debug: Log messages received by ChatInterface
+  useEffect(() => {
+    console.log("💬 ChatInterface received messages:", {
+      activeConversation,
+      messageCount: chatMessages?.length || 0,
+      messages: chatMessages,
+      messagesLoading,
+    });
+  }, [chatMessages, activeConversation, messagesLoading]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -436,180 +447,192 @@ This means your admission process is postponed for now.<br>
         {chatMessages.length === 0 ? (
           <EmptyState type="messages" onAction={onStartConversation} />
         ) : (
-          chatMessages.map((msg, index) => (
-            <Box
-              key={msg.id || index}
-              sx={{
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: getMessageAlignment(msg.sender),
-                gap: 1,
-                mb: 1,
-              }}
-            >
-              {/* Avatar for incoming messages (left side) */}
-              {msg.sender === "customer" && (
-                <Box sx={{ order: 0 }}>{getMessageAvatar(msg)}</Box>
-              )}
+          chatMessages.map((msg, index) => {
+            console.log(`🎨 Rendering message ${index}:`, {
+              id: msg.id,
+              content: msg.content?.substring(0, 50) + "...",
+              sender: msg.sender,
+              senderName: msg.senderName,
+              timestamp: msg.timestamp,
+            });
 
-              {/* Message bubble */}
+            return (
               <Box
+                key={msg.id || index}
                 sx={{
-                  maxWidth: "70%",
                   display: "flex",
-                  flexDirection: "column",
-                  alignItems:
-                    msg.sender === "customer" ? "flex-start" : "flex-end",
-                  order: msg.sender === "customer" ? 1 : 0,
+                  alignItems: "flex-start",
+                  justifyContent: getMessageAlignment(msg.sender),
+                  gap: 1,
+                  mb: 1,
                 }}
               >
-                <Paper
-                  elevation={1}
+                {/* Avatar for incoming messages (left side) */}
+                {msg.sender === "customer" && (
+                  <Box sx={{ order: 0 }}>{getMessageAvatar(msg)}</Box>
+                )}
+
+                {/* Message bubble */}
+                <Box
                   sx={{
-                    p: 1.5,
-                    bgcolor: getMessageColor(msg.sender),
-                    borderRadius: "18px",
-                    borderTopLeftRadius:
-                      msg.sender === "customer" ? "4px" : "18px",
-                    borderTopRightRadius:
-                      msg.sender !== "customer" ? "4px" : "18px",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
-                    border: `1px solid ${getMessageBorderColor(msg.sender)}`,
-                    position: "relative",
-                    // Message tail for better visual distinction
-                    "&::before":
-                      msg.sender === "customer"
-                        ? {
-                            content: '""',
-                            position: "absolute",
-                            top: "0px",
-                            left: "-8px",
-                            width: 0,
-                            height: 0,
-                            borderTop: "8px solid transparent",
-                            borderBottom: "8px solid transparent",
-                            borderRight: `8px solid ${getMessageColor(
-                              msg.sender
-                            )}`,
-                          }
-                        : {
-                            content: '""',
-                            position: "absolute",
-                            top: "0px",
-                            right: "-8px",
-                            width: 0,
-                            height: 0,
-                            borderTop: "8px solid transparent",
-                            borderBottom: "8px solid transparent",
-                            borderLeft: `8px solid ${getMessageColor(
-                              msg.sender
-                            )}`,
-                          },
+                    maxWidth: "70%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems:
+                      msg.sender === "customer" ? "flex-start" : "flex-end",
+                    order: msg.sender === "customer" ? 1 : 0,
                   }}
                 >
-                  {/* Sender name for outgoing messages */}
-                  {msg.sender !== "customer" && (
+                  <Paper
+                    elevation={1}
+                    sx={{
+                      p: 1.5,
+                      bgcolor: getMessageColor(msg.sender),
+                      borderRadius: "18px",
+                      borderTopLeftRadius:
+                        msg.sender === "customer" ? "4px" : "18px",
+                      borderTopRightRadius:
+                        msg.sender !== "customer" ? "4px" : "18px",
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                      border: `1px solid ${getMessageBorderColor(msg.sender)}`,
+                      position: "relative",
+                      // Message tail for better visual distinction
+                      "&::before":
+                        msg.sender === "customer"
+                          ? {
+                              content: '""',
+                              position: "absolute",
+                              top: "0px",
+                              left: "-8px",
+                              width: 0,
+                              height: 0,
+                              borderTop: "8px solid transparent",
+                              borderBottom: "8px solid transparent",
+                              borderRight: `8px solid ${getMessageColor(
+                                msg.sender
+                              )}`,
+                            }
+                          : {
+                              content: '""',
+                              position: "absolute",
+                              top: "0px",
+                              right: "-8px",
+                              width: 0,
+                              height: 0,
+                              borderTop: "8px solid transparent",
+                              borderBottom: "8px solid transparent",
+                              borderLeft: `8px solid ${getMessageColor(
+                                msg.sender
+                              )}`,
+                            },
+                    }}
+                  >
+                    {/* Sender name for outgoing messages */}
+                    {msg.sender !== "customer" && (
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: msg.sender === "ai" ? "#2e7d32" : "#1565c0",
+                          fontSize: "0.75rem",
+                          fontWeight: "bold",
+                          display: "block",
+                          mb: 0.5,
+                        }}
+                      >
+                        {msg.sender === "ai"
+                          ? `🤖 ${msg.senderName || "Miryam"}`
+                          : `👤 ${msg.senderName || "Admin"}`}
+                      </Typography>
+                    )}
+
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        whiteSpace: "pre-wrap",
+                        color: "#000000",
+                        fontSize: "0.9rem",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {msg.content}
+                    </Typography>
+                  </Paper>
+
+                  {/* Message metadata */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      mt: 0.5,
+                      justifyContent:
+                        msg.sender === "customer" ? "flex-start" : "flex-end",
+                    }}
+                  >
                     <Typography
                       variant="caption"
                       sx={{
-                        color: msg.sender === "ai" ? "#2e7d32" : "#1565c0",
+                        color: "text.secondary",
                         fontSize: "0.75rem",
-                        fontWeight: "bold",
-                        display: "block",
-                        mb: 0.5,
                       }}
                     >
-                      {msg.sender === "ai"
-                        ? `🤖 ${msg.senderName || "Miryam"}`
-                        : `👤 ${msg.senderName || "Admin"}`}
+                      {formatMessageTime(msg.timestamp)}
                     </Typography>
-                  )}
 
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      whiteSpace: "pre-wrap",
-                      color: "#000000",
-                      fontSize: "0.9rem",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {msg.content}
-                  </Typography>
-                </Paper>
+                    {/* Message status indicators for sent messages */}
+                    {msg.sender !== "customer" && (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                      >
+                        {msg.sender === "ai" && (
+                          <Tooltip title="AI Response">
+                            <AIIcon sx={{ fontSize: 10, color: "#4caf50" }} />
+                          </Tooltip>
+                        )}
 
-                {/* Message metadata */}
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    mt: 0.5,
-                    justifyContent:
-                      msg.sender === "customer" ? "flex-start" : "flex-end",
-                  }}
-                >
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: "text.secondary",
-                      fontSize: "0.75rem",
-                    }}
-                  >
-                    {formatMessageTime(msg.timestamp)}
-                  </Typography>
+                        {msg.status === "sending" && (
+                          <Tooltip title="Sending...">
+                            <ScheduleIcon
+                              sx={{ fontSize: 12, color: "#919191" }}
+                            />
+                          </Tooltip>
+                        )}
 
-                  {/* Message status indicators for sent messages */}
-                  {msg.sender !== "customer" && (
-                    <Box
-                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                    >
-                      {msg.sender === "ai" && (
-                        <Tooltip title="AI Response">
-                          <AIIcon sx={{ fontSize: 10, color: "#4caf50" }} />
-                        </Tooltip>
-                      )}
+                        {msg.status === "failed" && (
+                          <Tooltip title="Failed to send">
+                            <ErrorIcon
+                              sx={{ fontSize: 12, color: "#f44336" }}
+                            />
+                          </Tooltip>
+                        )}
 
-                      {msg.status === "sending" && (
-                        <Tooltip title="Sending...">
-                          <ScheduleIcon
+                        {msg.status === "sent" && (
+                          <CheckIcon sx={{ fontSize: 12, color: "#919191" }} />
+                        )}
+
+                        {msg.status === "delivered" && (
+                          <DoubleCheckIcon
                             sx={{ fontSize: 12, color: "#919191" }}
                           />
-                        </Tooltip>
-                      )}
+                        )}
 
-                      {msg.status === "failed" && (
-                        <Tooltip title="Failed to send">
-                          <ErrorIcon sx={{ fontSize: 12, color: "#f44336" }} />
-                        </Tooltip>
-                      )}
-
-                      {msg.status === "sent" && (
-                        <CheckIcon sx={{ fontSize: 12, color: "#919191" }} />
-                      )}
-
-                      {msg.status === "delivered" && (
-                        <DoubleCheckIcon
-                          sx={{ fontSize: 12, color: "#919191" }}
-                        />
-                      )}
-
-                      {msg.status === "read" && (
-                        <DoubleCheckIcon
-                          sx={{ fontSize: 12, color: "#25D366" }}
-                        />
-                      )}
-                    </Box>
-                  )}
+                        {msg.status === "read" && (
+                          <DoubleCheckIcon
+                            sx={{ fontSize: 12, color: "#25D366" }}
+                          />
+                        )}
+                      </Box>
+                    )}
+                  </Box>
                 </Box>
-              </Box>
 
-              {/* Avatar for outgoing messages (right side) */}
-              {msg.sender !== "customer" && (
-                <Box sx={{ order: 1 }}>{getMessageAvatar(msg)}</Box>
-              )}
-            </Box>
-          ))
+                {/* Avatar for outgoing messages (right side) */}
+                {msg.sender !== "customer" && (
+                  <Box sx={{ order: 1 }}>{getMessageAvatar(msg)}</Box>
+                )}
+              </Box>
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </Box>
