@@ -295,13 +295,18 @@ export const useLeadManagement = ({
   const getStatusColor = useCallback((status) => {
     const colors = {
       INQUIRY: "primary",
-      PRE_QUALIFIED: "warning",
+      INTERESTED: "warning", // Current status system
+      PRE_QUALIFIED: "warning", // Legacy status for backward compatibility
       APPLIED: "info",
+      MISSING_DOCUMENT: "error",
+      IN_REVIEW: "primary",
       QUALIFIED: "success",
       ADMITTED: "secondary",
       ENROLLED: "success",
-      REJECTED: "error",
-      NURTURE: "warning",
+      DEFERRED: "warning",
+      EXPIRED: "error",
+      REJECTED: "error", // Legacy status
+      NURTURE: "warning", // Legacy status
     };
     return colors[status] || "default";
   }, []);

@@ -251,13 +251,19 @@ const LeadDetailsDialog = ({
   // Get status color and progress
   const getStatusInfo = (status) => {
     const statusMap = {
-      PRE_QUALIFIED: { color: "warning", progress: 40, label: "Interested" },
+      INTERESTED: { color: "warning", progress: 30, label: "Interested" },
       APPLIED: { color: "info", progress: 60, label: "Applied" },
+      MISSING_DOCUMENT: {
+        color: "error",
+        progress: 50,
+        label: "Missing Document",
+      },
+      IN_REVIEW: { color: "primary", progress: 70, label: "In Review" },
       QUALIFIED: { color: "success", progress: 75, label: "Qualified" },
       ADMITTED: { color: "secondary", progress: 85, label: "Admitted" },
       ENROLLED: { color: "success", progress: 100, label: "Enrolled" },
-      REJECTED: { color: "error", progress: 0, label: "Rejected" },
-      NURTURE: { color: "warning", progress: 20, label: "Nurture" },
+      DEFERRED: { color: "warning", progress: 40, label: "Deferred" },
+      EXPIRED: { color: "error", progress: 0, label: "Expired" },
     };
     return (
       statusMap[status] || { color: "default", progress: 0, label: status }
@@ -663,13 +669,17 @@ const LeadDetailsDialog = ({
                           }
                           disabled={!editing}
                         >
-                          <MenuItem value="PRE_QUALIFIED">Interested</MenuItem>
+                          <MenuItem value="INTERESTED">Interested</MenuItem>
                           <MenuItem value="APPLIED">Applied</MenuItem>
+                          <MenuItem value="MISSING_DOCUMENT">
+                            Missing Document
+                          </MenuItem>
+                          <MenuItem value="IN_REVIEW">In Review</MenuItem>
                           <MenuItem value="QUALIFIED">Qualified</MenuItem>
                           <MenuItem value="ADMITTED">Admitted</MenuItem>
                           <MenuItem value="ENROLLED">Enrolled</MenuItem>
-                          <MenuItem value="REJECTED">Rejected</MenuItem>
-                          <MenuItem value="NURTURE">Nurture</MenuItem>
+                          <MenuItem value="DEFERRED">Deferred</MenuItem>
+                          <MenuItem value="EXPIRED">Expired</MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>

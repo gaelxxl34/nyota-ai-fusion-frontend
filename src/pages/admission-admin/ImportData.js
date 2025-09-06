@@ -32,6 +32,7 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  CircularProgress,
 } from "@mui/material";
 import {
   CloudUpload as UploadIcon,
@@ -58,11 +59,13 @@ const ImportData = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState(null);
   const [emailReportData, setEmailReportData] = useState(null); // Store CSV data for email campaigns
+  const [tagUpdateReport, setTagUpdateReport] = useState(null); // Store detailed tag update results
   const [previewData, setPreviewData] = useState(null);
   const [fullData, setFullData] = useState(null);
   const [completeData, setCompleteData] = useState(null); // Store all data
   const [showPreview, setShowPreview] = useState(false);
   const [showFullData, setShowFullData] = useState(false);
+  const [showDetailedReport, setShowDetailedReport] = useState(false); // For detailed update results
   const [validationErrors, setValidationErrors] = useState([]);
   const [importHistory, setImportHistory] = useState([]);
   const [processingFile, setProcessingFile] = useState(false);
@@ -341,6 +344,13 @@ const ImportData = () => {
         setEmailReportData(result.csvData);
       }
 
+      // Store detailed tag update report data
+      if (importType === "tags" && result.updateDetails) {
+        console.log("Tag update details received:", result.updateDetails);
+        setTagUpdateReport(result.updateDetails);
+        setShowDetailedReport(true); // Automatically show the report
+      }
+
       // Add to history
       setImportHistory((prev) => [
         {
@@ -353,6 +363,15 @@ const ImportData = () => {
         },
         ...prev,
       ]);
+
+      // If it's a tag update, ensure we have an empty tag report structure if none is provided
+      if (importType === "tags" && !result.updateDetails) {
+        setTagUpdateReport({
+          successful: [],
+          failed: [],
+          notFound: [],
+        });
+      }
     } catch (error) {
       console.error("Upload error:", error);
       setUploadResult({
@@ -399,6 +418,8 @@ const ImportData = () => {
     setFullData(null);
     setCompleteData(null);
     setUploadResult(null);
+    setTagUpdateReport(null); // Clear tag update report
+    setShowDetailedReport(false); // Hide detailed report
     setValidationErrors([]);
     setUploadProgress(0);
     setShowFullData(false);
@@ -416,11 +437,12 @@ const ImportData = () => {
     let filename = "";
 
     if (importType === "tags") {
-      // Template for tag updates
-      csvContent = `Reg No.,Tags
-REG001,green
-REG002,red
-REG003,yellow`;
+      // Template for tag updates with expanded explanations for different tag types
+      csvContent = `Reg No.,Tags,Note
+REG001,green,Green tags update ADMITTED status to ENROLLED
+REG002,yellow,Yellow tags update application status to DEFERRED
+REG003,red,Red tags update application status to EXPIRED
+REG004,green,All status updates are tracked in application timeline`;
       filename = "tag_update_template.csv";
     } else if (importType === "emails") {
       // Template for email campaigns
@@ -488,6 +510,102 @@ Mark,Johnson,mark.johnson@example.com`;
 
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
     const filename = `email-campaign-report-${timestamp}.csv`;
+
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Download tag update report as CSV
+  const handleDownloadTagReport = () => {
+    if (!tagUpdateReport) {
+      console.error("No tag update report data available");
+      return;
+    }
+
+    // Build combined data from all categories for CSV
+    const allRecords = [];
+
+    // Add successful updates
+    if (tagUpdateReport.successful && tagUpdateReport.successful.length > 0) {
+      tagUpdateReport.successful.forEach((item) => {
+        allRecords.push({
+          regNo: item.regNo || "N/A",
+          name: item.name || "N/A",
+          tag: item.tag || "N/A",
+          previousStatus: item.previousStatus || "N/A",
+          newStatus: item.newStatus || "N/A",
+          updatedAt: item.updatedAt
+            ? new Date(item.updatedAt).toLocaleString()
+            : "N/A",
+          result: "SUCCESS",
+        });
+      });
+    }
+
+    // Add failed updates
+    if (tagUpdateReport.failed && tagUpdateReport.failed.length > 0) {
+      tagUpdateReport.failed.forEach((item) => {
+        allRecords.push({
+          regNo: item.regNo || "N/A",
+          name: "N/A",
+          tag: item.tag || "N/A",
+          previousStatus: "N/A",
+          newStatus: "N/A",
+          updatedAt: new Date().toLocaleString(),
+          result: "FAILED",
+          reason: item.reason || "Unknown error",
+        });
+      });
+    }
+
+    // Add not found records
+    if (tagUpdateReport.notFound && tagUpdateReport.notFound.length > 0) {
+      tagUpdateReport.notFound.forEach((item) => {
+        allRecords.push({
+          regNo: item.regNo || "N/A",
+          name: "N/A",
+          tag: item.tag || "N/A",
+          previousStatus: "N/A",
+          newStatus: "N/A",
+          updatedAt: new Date().toLocaleString(),
+          result: "NOT_FOUND",
+          reason: "Registration number not found",
+        });
+      });
+    }
+
+    // If no records, return
+    if (allRecords.length === 0) {
+      console.error("No records to export");
+      return;
+    }
+
+    // Convert to CSV
+    const headers = Object.keys(allRecords[0]);
+    let csvContent = headers.join(",") + "\n";
+
+    csvContent += allRecords
+      .map((row) =>
+        headers
+          .map((header) => {
+            const value = row[header] || "";
+            return `"${String(value).replace(/"/g, '""')}"`;
+          })
+          .join(",")
+      )
+      .join("\n");
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+    const filename = `tag-update-report-${timestamp}.csv`;
 
     link.href = url;
     link.download = filename;
@@ -572,8 +690,8 @@ Mark,Johnson,mark.johnson@example.com`;
                           Tag Updates Import
                         </Typography>
                         <Typography variant="body2" color="textSecondary">
-                          Update existing applications with tags (green tags
-                          promote ADMITTED to ENROLLED)
+                          Update existing applications with color-coded tags:
+                          green (ENROLLED), yellow (DEFERRED), red (EXPIRED)
                         </Typography>
                       </Box>
                     }
@@ -751,6 +869,27 @@ Mark,Johnson,mark.johnson@example.com`;
                             Download Report
                           </Button>
                         )}
+                        {importType === "tags" && (
+                          <>
+                            <Button
+                              color="inherit"
+                              size="small"
+                              onClick={() => setShowDetailedReport(true)}
+                              startIcon={<TableViewIcon />}
+                            >
+                              View Detailed Report
+                            </Button>
+                            <Button
+                              color="inherit"
+                              size="small"
+                              onClick={handleDownloadTagReport}
+                              startIcon={<CloudDownloadIcon />}
+                              disabled={!tagUpdateReport}
+                            >
+                              Download CSV
+                            </Button>
+                          </>
+                        )}
                         <Button
                           color="inherit"
                           size="small"
@@ -774,14 +913,96 @@ Mark,Johnson,mark.johnson@example.com`;
                           {uploadResult.stats.failed} | Duplicates:{" "}
                           {uploadResult.stats.duplicates}
                         </Typography>
-                      ) : importType === "tag-updates" ? (
-                        <Typography variant="body2">
-                          Total Records: {uploadResult.stats.total} | Updated:{" "}
-                          {uploadResult.stats.updated} | Enrolled:{" "}
-                          {uploadResult.stats.enrolled} | Not Found:{" "}
-                          {uploadResult.stats.notFound} | Failed:{" "}
-                          {uploadResult.stats.failed}
-                        </Typography>
+                      ) : importType === "tags" ? (
+                        <Box>
+                          <Typography variant="body2" sx={{ mb: 1 }}>
+                            <strong>Total Records:</strong>{" "}
+                            {uploadResult.stats.total} |{" "}
+                            <strong>Updated:</strong>{" "}
+                            {uploadResult.stats.updated} |{" "}
+                            <strong>Failed:</strong> {uploadResult.stats.failed}{" "}
+                            | <strong>Not Found:</strong>{" "}
+                            {uploadResult.stats.notFound}
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              gap: 2,
+                              flexWrap: "wrap",
+                              p: 1,
+                              bgcolor: "grey.100",
+                              borderRadius: 1,
+                              mt: 1,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Box
+                                component="span"
+                                sx={{
+                                  bgcolor: "#4caf50",
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: "50%",
+                                  display: "inline-block",
+                                }}
+                              ></Box>
+                              <Typography variant="body2">
+                                <strong>Enrolled:</strong>{" "}
+                                {uploadResult.stats.enrolled || 0}
+                              </Typography>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Box
+                                component="span"
+                                sx={{
+                                  bgcolor: "#ffeb3b",
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: "50%",
+                                  display: "inline-block",
+                                }}
+                              ></Box>
+                              <Typography variant="body2">
+                                <strong>Deferred:</strong>{" "}
+                                {uploadResult.stats.deferred || 0}
+                              </Typography>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Box
+                                component="span"
+                                sx={{
+                                  bgcolor: "#f44336",
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: "50%",
+                                  display: "inline-block",
+                                }}
+                              ></Box>
+                              <Typography variant="body2">
+                                <strong>Expired:</strong>{" "}
+                                {uploadResult.stats.expired || 0}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
                       ) : (
                         <Typography variant="body2">
                           Total Recipients: {uploadResult.stats.total} | Sent:{" "}
@@ -894,7 +1115,7 @@ Mark,Johnson,mark.johnson@example.com`;
                   {importType === "applications"
                     ? "Import Applications"
                     : importType === "tags"
-                    ? "Update Tags"
+                    ? "Update Status Tags"
                     : "Send Emails"}
                 </Button>
               </CardActions>
@@ -1181,7 +1402,32 @@ Mark,Johnson,mark.johnson@example.com`;
                       </Typography>
                     </ListItemIcon>
                     <ListItemText
-                      primary="Use 'green' tag to promote ADMITTED status to ENROLLED"
+                      primary="Use color-coded tags to update application status:"
+                      secondary={
+                        <Box sx={{ mt: 0.5 }}>
+                          <Typography
+                            variant="body2"
+                            color="success.main"
+                            sx={{ fontWeight: "medium" }}
+                          >
+                            • Green: Updates to ENROLLED status
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color="warning.main"
+                            sx={{ fontWeight: "medium" }}
+                          >
+                            • Yellow: Updates to DEFERRED status
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color="error.main"
+                            sx={{ fontWeight: "medium" }}
+                          >
+                            • Red: Updates to EXPIRED status
+                          </Typography>
+                        </Box>
+                      }
                       sx={{
                         "& .MuiListItemText-primary": {
                           color: "text.primary",
@@ -1356,8 +1602,71 @@ Mark,Johnson,mark.johnson@example.com`;
                       <CheckCircle color="success" />
                     </ListItemIcon>
                     <ListItemText
-                      primary="Green tag promotion"
-                      secondary="Green tags change ADMITTED to ENROLLED status"
+                      primary="Color-coded status updates"
+                      secondary={
+                        <Box sx={{ mt: 0.5 }}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <Box
+                              component="span"
+                              sx={{
+                                bgcolor: "#4caf50",
+                                width: 12,
+                                height: 12,
+                                borderRadius: "50%",
+                                display: "inline-block",
+                              }}
+                            ></Box>
+                            Green: ADMITTED → ENROLLED
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <Box
+                              component="span"
+                              sx={{
+                                bgcolor: "#ffeb3b",
+                                width: 12,
+                                height: 12,
+                                borderRadius: "50%",
+                                display: "inline-block",
+                              }}
+                            ></Box>
+                            Yellow: Application DEFERRED
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <Box
+                              component="span"
+                              sx={{
+                                bgcolor: "#f44336",
+                                width: 12,
+                                height: 12,
+                                borderRadius: "50%",
+                                display: "inline-block",
+                              }}
+                            ></Box>
+                            Red: Application EXPIRED
+                          </Typography>
+                        </Box>
+                      }
                       sx={{
                         "& .MuiListItemText-primary": {
                           color: "text.primary",
@@ -1450,6 +1759,408 @@ Mark,Johnson,mark.johnson@example.com`;
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowPreview(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Detailed Tag Update Report Dialog */}
+      <Dialog
+        open={showDetailedReport && importType === "tags" && tagUpdateReport}
+        onClose={() => setShowDetailedReport(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Typography variant="h6">Detailed Tag Update Results</Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setShowDetailedReport(false)}
+            >
+              Close
+            </Button>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {tagUpdateReport ? (
+            <>
+              <Box sx={{ mb: 3 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    gap: 2,
+                    flexWrap: "wrap",
+                    p: 2,
+                    bgcolor: "grey.100",
+                    borderRadius: 1,
+                    mb: 2,
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box
+                      component="span"
+                      sx={{
+                        bgcolor: "#4caf50",
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        display: "inline-block",
+                      }}
+                    ></Box>
+                    <Typography variant="body2">
+                      <strong>Enrolled:</strong>{" "}
+                      {uploadResult?.stats?.enrolled || 0}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box
+                      component="span"
+                      sx={{
+                        bgcolor: "#ffeb3b",
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        display: "inline-block",
+                      }}
+                    ></Box>
+                    <Typography variant="body2">
+                      <strong>Deferred:</strong>{" "}
+                      {uploadResult?.stats?.deferred || 0}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box
+                      component="span"
+                      sx={{
+                        bgcolor: "#f44336",
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        display: "inline-block",
+                      }}
+                    ></Box>
+                    <Typography variant="body2">
+                      <strong>Expired:</strong>{" "}
+                      {uploadResult?.stats?.expired || 0}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box
+                      component="span"
+                      sx={{
+                        bgcolor: "#f5f5f5",
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        display: "inline-block",
+                        border: "1px solid #ccc",
+                      }}
+                    ></Box>
+                    <Typography variant="body2">
+                      <strong>Not Found:</strong>{" "}
+                      {uploadResult?.stats?.notFound || 0}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box
+                      component="span"
+                      sx={{
+                        bgcolor: "#e0e0e0",
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        display: "inline-block",
+                        border: "1px solid #ccc",
+                      }}
+                    ></Box>
+                    <Typography variant="body2">
+                      <strong>Failed:</strong>{" "}
+                      {uploadResult?.stats?.failed || 0}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+
+              {/* Successful Updates Table */}
+              {tagUpdateReport.successful &&
+                tagUpdateReport.successful.length > 0 && (
+                  <Box sx={{ mb: 4 }}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        mb: 1,
+                        fontWeight: "bold",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      <CheckCircle color="success" sx={{ mr: 1 }} />
+                      Successful Updates ({tagUpdateReport.successful.length})
+                    </Typography>
+                    <TableContainer
+                      sx={{
+                        maxHeight: 300,
+                        border: "1px solid #e0e0e0",
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Table stickyHeader size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Reg No.
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Name
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Previous Status
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              New Status
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Tag
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Updated At
+                            </TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {tagUpdateReport.successful.map((item, index) => (
+                            <TableRow key={index} hover>
+                              <TableCell>{item.regNo || "N/A"}</TableCell>
+                              <TableCell>{item.name || "N/A"}</TableCell>
+                              <TableCell>
+                                {item.previousStatus || "N/A"}
+                              </TableCell>
+                              <TableCell
+                                sx={{
+                                  fontWeight: "medium",
+                                  color:
+                                    item.newStatus === "ENROLLED"
+                                      ? "#2e7d32"
+                                      : item.newStatus === "DEFERRED"
+                                      ? "#f57c00"
+                                      : item.newStatus === "EXPIRED"
+                                      ? "#c62828"
+                                      : "inherit",
+                                }}
+                              >
+                                {item.newStatus || "N/A"}
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={item.tag || "N/A"}
+                                  size="small"
+                                  sx={{
+                                    bgcolor:
+                                      item.tag === "green"
+                                        ? "#e8f5e9"
+                                        : item.tag === "yellow"
+                                        ? "#fffde7"
+                                        : item.tag === "red"
+                                        ? "#ffebee"
+                                        : "#f5f5f5",
+                                    color:
+                                      item.tag === "green"
+                                        ? "#2e7d32"
+                                        : item.tag === "yellow"
+                                        ? "#f57c00"
+                                        : item.tag === "red"
+                                        ? "#c62828"
+                                        : "inherit",
+                                    borderColor:
+                                      item.tag === "green"
+                                        ? "#a5d6a7"
+                                        : item.tag === "yellow"
+                                        ? "#fff59d"
+                                        : item.tag === "red"
+                                        ? "#ef9a9a"
+                                        : "#e0e0e0",
+                                    border: "1px solid",
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                {new Date(item.updatedAt).toLocaleString() ||
+                                  "N/A"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
+              {/* Failed Updates Table */}
+              {tagUpdateReport.failed && tagUpdateReport.failed.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      mb: 1,
+                      fontWeight: "bold",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    <ErrorIcon color="error" sx={{ mr: 1 }} />
+                    Failed Updates ({tagUpdateReport.failed.length})
+                  </Typography>
+                  <TableContainer
+                    sx={{
+                      maxHeight: 300,
+                      border: "1px solid #e0e0e0",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Table stickyHeader size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell
+                            sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                          >
+                            Reg No.
+                          </TableCell>
+                          <TableCell
+                            sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                          >
+                            Tag
+                          </TableCell>
+                          <TableCell
+                            sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                          >
+                            Error Reason
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {tagUpdateReport.failed.map((item, index) => (
+                          <TableRow key={index} hover>
+                            <TableCell>{item.regNo || "N/A"}</TableCell>
+                            <TableCell>{item.tag || "N/A"}</TableCell>
+                            <TableCell sx={{ color: "#c62828" }}>
+                              {item.reason || "Unknown error"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
+
+              {/* Not Found Records */}
+              {tagUpdateReport.notFound &&
+                tagUpdateReport.notFound.length > 0 && (
+                  <Box>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        mb: 1,
+                        fontWeight: "bold",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      <WarningIcon color="warning" sx={{ mr: 1 }} />
+                      Records Not Found ({tagUpdateReport.notFound.length})
+                    </Typography>
+                    <TableContainer
+                      sx={{
+                        maxHeight: 200,
+                        border: "1px solid #e0e0e0",
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Table stickyHeader size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Reg No.
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Tag
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Reason
+                            </TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {tagUpdateReport.notFound.map((item, index) => (
+                            <TableRow key={index} hover>
+                              <TableCell>{item.regNo || "N/A"}</TableCell>
+                              <TableCell>{item.tag || "N/A"}</TableCell>
+                              <TableCell>
+                                Registration number not found in the system
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
+              {/* No Data Scenario */}
+              {(!tagUpdateReport.successful ||
+                tagUpdateReport.successful.length === 0) &&
+                (!tagUpdateReport.failed ||
+                  tagUpdateReport.failed.length === 0) &&
+                (!tagUpdateReport.notFound ||
+                  tagUpdateReport.notFound.length === 0) && (
+                  <Box sx={{ textAlign: "center", py: 5 }}>
+                    <Typography variant="subtitle1" color="text.secondary">
+                      No detailed report data available
+                    </Typography>
+                  </Box>
+                )}
+            </>
+          ) : (
+            <Box sx={{ textAlign: "center", py: 5 }}>
+              <CircularProgress size={40} />
+              <Typography variant="subtitle1" sx={{ mt: 2 }}>
+                Loading report data...
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            startIcon={<CloudDownloadIcon />}
+            onClick={handleDownloadTagReport}
+            color="primary"
+            disabled={!tagUpdateReport}
+          >
+            Download Report
+          </Button>
+          <Button onClick={() => setShowDetailedReport(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Container>

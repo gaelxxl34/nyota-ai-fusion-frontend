@@ -1048,11 +1048,21 @@ const ApplicationDetailsDialog = ({
           uid: user?.uid || null,
         };
 
+        // Prepare the status note - use missing documents note if status is MISSING_DOCUMENT
+        let statusNote =
+          formData.statusNote || `Status updated to ${formData.status}`;
+        if (
+          formData.status === "MISSING_DOCUMENT" &&
+          formData.missingDocumentsNote
+        ) {
+          statusNote = formData.missingDocumentsNote;
+        }
+
         const statusUpdateResponse =
           await applicationService.updateApplicationStatus(
             applicationId,
             formData.status,
-            formData.statusNote || `Status updated to ${formData.status}`,
+            statusNote,
             updatedBy
           );
 
@@ -2164,6 +2174,9 @@ const ApplicationDetailsDialog = ({
                         >
                           <MenuItem value="INTERESTED">Interested</MenuItem>
                           <MenuItem value="APPLIED">Applied</MenuItem>
+                          <MenuItem value="MISSING_DOCUMENT">
+                            Missing Document
+                          </MenuItem>
                           <MenuItem value="IN_REVIEW">In Review</MenuItem>
                           <MenuItem value="QUALIFIED">Qualified</MenuItem>
                           <MenuItem value="ADMITTED">Admitted</MenuItem>
@@ -2173,6 +2186,25 @@ const ApplicationDetailsDialog = ({
                         </Select>
                       </FormControl>
                     </Grid>
+
+                    {/* Missing Documents Input - Shows when MISSING_DOCUMENT is selected */}
+                    {formData.status === "MISSING_DOCUMENT" && (
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          margin="normal"
+                          label="Missing Documents Details"
+                          name="missingDocumentsNote"
+                          value={formData.missingDocumentsNote || ""}
+                          onChange={handleInputChange}
+                          multiline
+                          rows={3}
+                          placeholder="Please specify which documents are missing or required (e.g., Academic transcripts, ID copy, passport photos, etc.)"
+                          helperText="This message will be included in the email to the applicant"
+                          variant="outlined"
+                        />
+                      </Grid>
+                    )}
 
                     <Grid item xs={12} sm={6}>
                       <FormControl fullWidth margin="normal">

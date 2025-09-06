@@ -502,6 +502,11 @@ const Analytics = () => {
             description: "Leads who submitted applications",
           },
           {
+            stage: "Missing Documents",
+            count: data.overview?.statusCounts?.MISSING_DOCUMENT || 0,
+            description: "Applications missing required documents",
+          },
+          {
             stage: "In Review",
             count: data.overview?.statusCounts?.IN_REVIEW || 0,
             description: "Applications under review",

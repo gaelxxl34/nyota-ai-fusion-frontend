@@ -115,6 +115,7 @@ const ConversationFilters = ({
               <MenuItem value="no_lead">No Lead</MenuItem>
               <MenuItem value="INTERESTED">Interested</MenuItem>
               <MenuItem value="APPLIED">Applied</MenuItem>
+              <MenuItem value="MISSING_DOCUMENT">Missing Document</MenuItem>
               <MenuItem value="IN_REVIEW">In Review</MenuItem>
               <MenuItem value="QUALIFIED">Qualified</MenuItem>
               <MenuItem value="ADMITTED">Admitted</MenuItem>

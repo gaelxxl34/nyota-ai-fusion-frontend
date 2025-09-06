@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   Box,
   Typography,
@@ -118,23 +124,33 @@ const DataCenter = () => {
 
   // Optimized search handlers using useCallback to prevent input focus loss
   const handleSearchNameChange = useCallback((e) => {
-    setSearchName(e.target.value);
+    const value = e.target.value;
+    console.log("🔍 Name search changed:", value);
+    setSearchName(value);
   }, []);
 
   const handleSearchEmailChange = useCallback((e) => {
-    setSearchEmail(e.target.value);
+    const value = e.target.value;
+    console.log("🔍 Email search changed:", value);
+    setSearchEmail(value);
   }, []);
 
   const handleSearchPhoneChange = useCallback((e) => {
-    setSearchPhone(e.target.value);
+    const value = e.target.value;
+    console.log("🔍 Phone search changed:", value);
+    setSearchPhone(value);
   }, []);
 
   const handleSearchProgramChange = useCallback((e) => {
-    setSearchProgram(e.target.value);
+    const value = e.target.value;
+    console.log("🔍 Program search changed:", value);
+    setSearchProgram(value);
   }, []);
 
   const handleSearchSourceChange = useCallback((e) => {
-    setSearchSource(e.target.value);
+    const value = e.target.value;
+    console.log("🔍 Source search changed:", value);
+    setSearchSource(value);
   }, []);
 
   // Helper function to check if user role is restricted for applied leads
@@ -154,7 +170,7 @@ const DataCenter = () => {
   });
   const [pagination, setPagination] = useState({
     page: 0,
-    rowsPerPage: 50,
+    rowsPerPage: 200,
     total: 0,
   });
   // State for action menu and dialogs
@@ -176,6 +192,7 @@ const DataCenter = () => {
         statuses: [
           "INTERESTED",
           "APPLIED",
+          "MISSING_DOCUMENT",
           "IN_REVIEW",
           "QUALIFIED",
           "ADMITTED",
@@ -204,6 +221,12 @@ const DataCenter = () => {
         statuses: ["APPLIED"],
         icon: AssignmentIcon,
         color: "warning",
+      },
+      {
+        label: "Missing Documents",
+        statuses: ["MISSING_DOCUMENT"],
+        icon: AssignmentIcon,
+        color: "error",
       },
       {
         label: "In Review",
@@ -386,6 +409,42 @@ const DataCenter = () => {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
+  // Search loading state
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Track previous search state to detect when search is cleared
+  const prevSearchStateRef = useRef({
+    hasActiveSearch: false,
+    hasActiveFilters: false,
+  });
+
+  // Abort controller for cancelling previous search requests
+  const searchAbortController = useRef(null);
+
+  // Check if any search criteria is active (minimum 2 characters for performance)
+  const hasActiveSearch = useMemo(() => {
+    return (
+      showAdvancedSearch &&
+      (searchName?.length >= 2 ||
+        searchEmail?.length >= 2 ||
+        searchPhone?.length >= 2 ||
+        searchProgram?.length >= 2 ||
+        searchSource?.length >= 2)
+    );
+  }, [
+    showAdvancedSearch,
+    searchName,
+    searchEmail,
+    searchPhone,
+    searchProgram,
+    searchSource,
+  ]);
+
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return Object.values(filters).some(Boolean);
+  }, [filters]);
+
   // Clear all filters
   const clearAllFilters = useCallback(() => {
     setFilters({
@@ -432,6 +491,77 @@ const DataCenter = () => {
     [currentTab, clearAllFilters]
   );
 
+  // Effect to handle search/filter changes with optimized debouncing
+  useEffect(() => {
+    // Cancel any previous search request
+    if (searchAbortController.current) {
+      searchAbortController.current.abort();
+    }
+
+    // Check if search/filters were previously active but now cleared
+    const wasSearchActive = prevSearchStateRef.current.hasActiveSearch;
+    const wasFiltersActive = prevSearchStateRef.current.hasActiveFilters;
+    const searchWasCleared = wasSearchActive && !hasActiveSearch;
+    const filtersWereCleared = wasFiltersActive && !hasActiveFilters;
+
+    // Update the previous state ref
+    prevSearchStateRef.current = { hasActiveSearch, hasActiveFilters };
+
+    // If neither search nor filters are active AND they weren't just cleared, don't trigger search
+    if (
+      !hasActiveSearch &&
+      !hasActiveFilters &&
+      !searchWasCleared &&
+      !filtersWereCleared
+    ) {
+      setSearchLoading(false);
+      return;
+    }
+
+    // Show search loading immediately for better UX
+    setSearchLoading(true);
+
+    // Debounce search/filter changes to avoid excessive API calls
+    const timeoutId = setTimeout(() => {
+      console.log("🔍 Search/filter triggered with criteria:", {
+        hasActiveSearch,
+        hasActiveFilters,
+        searchWasCleared,
+        filtersWereCleared,
+        searchFields: {
+          name: searchName,
+          email: searchEmail,
+          phone: searchPhone,
+          program: searchProgram,
+          source: searchSource,
+        },
+        filters,
+      });
+
+      // Reset pagination to first page when searching or when search is cleared
+      setPagination((prev) => ({ ...prev, page: 0 }));
+      // Trigger data refresh
+      setRefreshTrigger((prev) => prev + 1);
+    }, 300); // Reduced debounce to 300ms for better responsiveness
+
+    return () => {
+      clearTimeout(timeoutId);
+      setSearchLoading(false);
+    };
+  }, [
+    hasActiveSearch,
+    hasActiveFilters,
+    searchName,
+    searchEmail,
+    searchPhone,
+    searchProgram,
+    searchSource,
+    filters.source,
+    filters.program,
+    filters.dateRange,
+    filters, // Added to fix the missing dependency warning
+  ]);
+
   // Fetch initial data only once on component mount
   useEffect(() => {
     console.log("🏁 Component mounted - fetching initial data once");
@@ -465,6 +595,8 @@ const DataCenter = () => {
         currentTab,
         filteredTabsLength: filteredTabs.length,
         userRole,
+        hasActiveSearch,
+        hasActiveFilters,
       });
 
       // Early exit if no user role (not authenticated)
@@ -501,131 +633,190 @@ const DataCenter = () => {
         setLoading(true);
         setError("");
 
+        // Cancel previous search if exists
+        if (searchAbortController.current) {
+          searchAbortController.current.abort();
+        }
+
+        // Create new abort controller for this request
+        searchAbortController.current = new AbortController();
+
         const limit = pagination.rowsPerPage;
         const offset = pagination.page * pagination.rowsPerPage;
+        const searchParams = buildSearchParams();
+
         console.log(
           `📊 Fetching ${currentTabConfig.label} data (page ${
             pagination.page + 1
-          }, limit ${limit})`
+          }, limit ${limit}) with search:`,
+          searchParams
         );
 
         let leadsResponse;
 
         if (currentTabConfig.label === "For You") {
           // Special handling for "For You" tab - fetch personal submissions
-          // Always fetch ALL personal leads (server caps internally) so user can see everything
-          // Ignore table pagination for fetching; we'll paginate client-side if needed
-          leadsResponse = await leadService.getMySubmittedLeads({
-            limit: 10000, // request a large number; backend will cap safely
-            page: 1,
+          // For search, limit results to prevent performance issues
+          const myLeadsParams = {
+            limit: hasActiveSearch || hasActiveFilters ? 500 : limit, // Reduced from 10000
+            page: hasActiveSearch || hasActiveFilters ? 1 : pagination.page + 1,
             sortBy: "createdAt",
             sortOrder: "desc",
-            all: true,
-          });
+            all: hasActiveSearch || hasActiveFilters ? false : false, // Always paginate
+            ...searchParams, // Include search parameters
+          };
+
+          leadsResponse = await leadService.getMySubmittedLeads(myLeadsParams);
           const allPersonal = leadsResponse.data || [];
           setPersonalLeads(allPersonal);
+
           // Adjust pagination total
           setPagination((prev) => ({
             ...prev,
-            total: allPersonal.length,
-            // If current rowsPerPage exceeds total, keep it; else leave as is
+            total: leadsResponse.pagination?.total || allPersonal.length,
           }));
         } else if (currentTabConfig.label === "All Leads") {
-          // Fetch all leads and let the backend handle any role-based filtering
-          leadsResponse = await leadService.getAllLeads({
-            limit,
-            offset,
+          // Fetch all leads with search parameters - optimized for large datasets
+          const allLeadsParams = {
+            limit: hasActiveSearch || hasActiveFilters ? 500 : limit, // Reduced from 10000
+            offset: hasActiveSearch || hasActiveFilters ? 0 : offset,
             sortBy: "createdAt",
             sortOrder: "desc",
-          });
+            ...searchParams,
+          };
 
-          // Update total count for pagination using stats
-          const totalCount = currentTabConfig.statuses.reduce(
-            (total, status) => {
-              return total + (leadStats.byStatus[status] || 0);
-            },
-            0
-          );
+          leadsResponse = await leadService.getAllLeads(allLeadsParams);
+
+          // Update total count - if searching, use the returned count, otherwise use stats
+          const totalCount =
+            hasActiveSearch || hasActiveFilters
+              ? leadsResponse.pagination?.total ||
+                leadsResponse.data?.length ||
+                0
+              : currentTabConfig.statuses.reduce((total, status) => {
+                  return total + (leadStats.byStatus[status] || 0);
+                }, 0);
+
           setPagination((prev) => ({
             ...prev,
             total: totalCount,
           }));
         } else {
           if (currentTabConfig.statuses.length === 1) {
-            // Single status - use optimized status endpoint
+            // Single status - use optimized status endpoint with search
+            const statusParams = {
+              limit: hasActiveSearch || hasActiveFilters ? 500 : limit, // Reduced from 10000
+              offset: hasActiveSearch || hasActiveFilters ? 0 : offset,
+              sortBy: "createdAt",
+              sortOrder: "desc",
+              ...searchParams,
+            };
+
             leadsResponse = await leadService.getLeadsByStatus(
               currentTabConfig.statuses[0],
-              {
-                limit,
-                offset,
+              statusParams
+            );
+
+            // Update total count
+            const totalCount =
+              hasActiveSearch || hasActiveFilters
+                ? leadsResponse.pagination?.total ||
+                  leadsResponse.data?.length ||
+                  0
+                : leadStats.byStatus[currentTabConfig.statuses[0]] || 0;
+
+            setPagination((prev) => ({
+              ...prev,
+              total: totalCount,
+            }));
+          } else {
+            // Multiple statuses - handle efficiently
+            if (hasActiveSearch || hasActiveFilters) {
+              // For search across multiple statuses, get all leads and let backend filter
+              const multiStatusParams = {
+                limit: 500, // Reduced from 10000
+                offset: 0,
                 sortBy: "createdAt",
                 sortOrder: "desc",
-              }
-            );
-          } else {
-            // Multiple statuses - use getAllLeads and let backend filter by status if possible
-            // For now, we'll fetch each status separately and combine results
-            const statusPromises = currentTabConfig.statuses.map(
-              async (status) => {
-                const statusResponse = await leadService.getLeadsByStatus(
-                  status,
-                  {
-                    limit:
-                      Math.ceil(limit / currentTabConfig.statuses.length) + 5, // Get a bit more to ensure good distribution
-                    offset: Math.floor(
-                      offset / currentTabConfig.statuses.length
-                    ),
-                    sortBy: "createdAt",
-                    sortOrder: "desc",
-                  }
-                );
-                return statusResponse.data || [];
-              }
-            );
+                status: currentTabConfig.statuses.join(","), // Send statuses as comma-separated
+                ...searchParams,
+              };
 
-            const statusResults = await Promise.all(statusPromises);
+              leadsResponse = await leadService.getAllLeads(multiStatusParams);
 
-            // Combine all results and sort by createdAt desc to maintain consistency
-            const allStatusLeads = statusResults.flat();
-            allStatusLeads.sort((a, b) => {
-              const dateA =
-                a.createdAt instanceof Date
-                  ? a.createdAt
-                  : new Date(a.createdAt || 0);
-              const dateB =
-                b.createdAt instanceof Date
-                  ? b.createdAt
-                  : new Date(b.createdAt || 0);
-              return dateB - dateA; // desc order (newest first)
-            });
+              // Update total count with search results
+              setPagination((prev) => ({
+                ...prev,
+                total:
+                  leadsResponse.pagination?.total ||
+                  leadsResponse.data?.length ||
+                  0,
+              }));
+            } else {
+              // No search - use the existing optimized logic
+              const statusPromises = currentTabConfig.statuses.map(
+                async (status) => {
+                  const statusResponse = await leadService.getLeadsByStatus(
+                    status,
+                    {
+                      limit:
+                        Math.ceil(limit / currentTabConfig.statuses.length) + 5,
+                      offset: Math.floor(
+                        offset / currentTabConfig.statuses.length
+                      ),
+                      sortBy: "createdAt",
+                      sortOrder: "desc",
+                    }
+                  );
+                  return statusResponse.data || [];
+                }
+              );
 
-            // Take only the required number after sorting
-            leadsResponse = {
-              data: allStatusLeads.slice(0, limit),
-              pagination: {
-                hasMore: allStatusLeads.length > limit,
-                total: allStatusLeads.length,
-              },
-            };
+              const statusResults = await Promise.all(statusPromises);
+
+              // Combine all results and sort by createdAt desc
+              const allStatusLeads = statusResults.flat();
+              allStatusLeads.sort((a, b) => {
+                const dateA =
+                  a.createdAt instanceof Date
+                    ? a.createdAt
+                    : new Date(a.createdAt || 0);
+                const dateB =
+                  b.createdAt instanceof Date
+                    ? b.createdAt
+                    : new Date(b.createdAt || 0);
+                return dateB - dateA;
+              });
+
+              leadsResponse = {
+                data: allStatusLeads.slice(0, limit),
+                pagination: {
+                  hasMore: allStatusLeads.length > limit,
+                  total: allStatusLeads.length,
+                },
+              };
+
+              // Update total count using stats
+              const totalCount = currentTabConfig.statuses.reduce(
+                (total, status) => {
+                  return total + (leadStats.byStatus[status] || 0);
+                },
+                0
+              );
+              setPagination((prev) => ({
+                ...prev,
+                total: totalCount,
+              }));
+            }
           }
-
-          // Update total count for pagination using stats
-          const totalCount = currentTabConfig.statuses.reduce(
-            (total, status) => {
-              return total + (leadStats.byStatus[status] || 0);
-            },
-            0
-          );
-          setPagination((prev) => ({
-            ...prev,
-            total: totalCount,
-          }));
         }
-
         const newLeads = leadsResponse.data || [];
 
         console.log(
-          `📊 Received ${newLeads.length} leads for page ${pagination.page + 1}`
+          `📊 Received ${newLeads.length} leads for page ${
+            pagination.page + 1
+          }`,
+          hasActiveSearch || hasActiveFilters ? "(filtered)" : "(unfiltered)"
         );
 
         // Log the first few leads to verify sort order
@@ -643,11 +834,15 @@ const DataCenter = () => {
 
         setLeads(newLeads);
       } catch (err) {
-        console.error(`Error fetching leads:`, err);
-        setError(err.message);
+        // Only log error if request wasn't cancelled
+        if (err.name !== "AbortError") {
+          console.error(`Error fetching leads:`, err);
+          setError(err.message);
+        }
       } finally {
         setLoading(false);
         setTabSwitching(false);
+        setSearchLoading(false);
       }
     };
 
@@ -662,15 +857,24 @@ const DataCenter = () => {
     leadStats,
   ]);
 
-  // Auto-refresh every 5 minutes (300 seconds) - only refreshes leads, not stats
+  // Cleanup effect for abort controller
   useEffect(() => {
-    const interval = setInterval(() => {
-      console.log("🔄 Auto-refreshing current tab leads only...");
-      setRefreshTrigger((prev) => prev + 1);
-    }, 300000); // Changed to 300000 (5 minutes)
+    return () => {
+      // Cancel any pending search requests when component unmounts
+      if (searchAbortController.current) {
+        searchAbortController.current.abort();
+      }
+    };
+  }, []);
 
-    return () => clearInterval(interval);
-  }, []); // No dependencies needed
+  // Auto-refresh disabled - was causing performance issues and user annoyance
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     console.log("🔄 Auto-refreshing current tab leads only...");
+  //     setRefreshTrigger((prev) => prev + 1);
+  //   }, 300000); // 5 minutes
+  //   return () => clearInterval(interval);
+  // }, []);
 
   // Handle messages from the iframe (for signup success notifications)
   useEffect(() => {
@@ -726,7 +930,13 @@ const DataCenter = () => {
   const getVisibleTotal = useMemo(() => {
     if (userRole === "admissionAdmin") {
       // Only count Applied, Qualified, Admitted, Enrolled
-      const allowedStatuses = ["APPLIED", "QUALIFIED", "ADMITTED", "ENROLLED"];
+      const allowedStatuses = [
+        "APPLIED",
+        "MISSING_DOCUMENT",
+        "QUALIFIED",
+        "ADMITTED",
+        "ENROLLED",
+      ];
       return allowedStatuses.reduce((total, status) => {
         return total + (leadStats.byStatus[status] || 0);
       }, 0);
@@ -753,13 +963,6 @@ const DataCenter = () => {
         color: "warning",
       },
       {
-        key: "qualified",
-        status: "QUALIFIED",
-        label: "Qualified",
-        icon: AssessmentIcon,
-        color: "success",
-      },
-      {
         key: "applied",
         status: "APPLIED",
         label: "Applied",
@@ -767,11 +970,25 @@ const DataCenter = () => {
         color: "info",
       },
       {
+        key: "missing_document",
+        status: "MISSING_DOCUMENT",
+        label: "Missing Documents",
+        icon: AssignmentIcon,
+        color: "error",
+      },
+      {
         key: "in_review",
         status: "IN_REVIEW",
         label: "In Review",
         icon: AssessmentIcon,
         color: "info",
+      },
+      {
+        key: "qualified",
+        status: "QUALIFIED",
+        label: "Qualified",
+        icon: AssessmentIcon,
+        color: "success",
       },
       {
         key: "admitted",
@@ -809,6 +1026,7 @@ const DataCenter = () => {
         [
           "total",
           "applied",
+          "missing_document",
           "in_review",
           "qualified",
           "admitted",
@@ -906,117 +1124,54 @@ const DataCenter = () => {
     }
   };
 
-  // Enhanced filter and search functionality
-  const filteredLeads = useMemo(() => {
-    let tabLeads = getCurrentTabLeads;
+  // Build search parameters for API calls
+  const buildSearchParams = useCallback(() => {
+    const searchParams = {};
 
-    // Apply filters first
-    if (filters.source) {
-      tabLeads = tabLeads.filter((lead) => lead.source === filters.source);
+    // Add advanced search parameters
+    if (hasActiveSearch) {
+      if (searchName) searchParams.name = searchName;
+      if (searchEmail) searchParams.email = searchEmail;
+      if (searchPhone) searchParams.phone = searchPhone;
+      if (searchProgram) searchParams.program = searchProgram;
+      if (searchSource) searchParams.source = searchSource;
     }
 
-    if (filters.program) {
-      tabLeads = tabLeads.filter((lead) => {
-        if (typeof lead.program === "string") {
-          return lead.program === filters.program;
-        } else if (typeof lead.program === "object" && lead.program !== null) {
-          return (
-            lead.program.name === filters.program ||
-            lead.program.code === filters.program
-          );
-        }
-        return false;
-      });
+    // Add filter parameters
+    if (filters.source && !searchParams.source) {
+      searchParams.source = filters.source;
     }
-
+    if (filters.program && !searchParams.program) {
+      searchParams.program = filters.program;
+    }
     if (filters.dateRange) {
-      const now = new Date();
-      let startDate;
-
-      switch (filters.dateRange) {
-        case "today":
-          startDate = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate()
-          );
-          break;
-        case "week":
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case "month":
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          break;
-        case "quarter":
-          const quarter = Math.floor(now.getMonth() / 3);
-          startDate = new Date(now.getFullYear(), quarter * 3, 1);
-          break;
-        default:
-          startDate = null;
-      }
-
-      if (startDate) {
-        tabLeads = tabLeads.filter((lead) => {
-          const leadDate = lead.createdAt?.toDate
-            ? lead.createdAt.toDate()
-            : new Date(lead.createdAt);
-          return leadDate >= startDate;
-        });
-      }
+      searchParams.dateRange = filters.dateRange;
     }
 
-    // Apply advanced search if active
-    if (showAdvancedSearch) {
-      // Advanced search
-      return tabLeads.filter((lead) => {
-        const matchName =
-          !searchName ||
-          lead.name?.toLowerCase().includes(searchName.toLowerCase());
+    console.log("🔍 buildSearchParams result:", {
+      hasActiveSearch,
+      hasActiveFilters: Object.values(filters).some(Boolean),
+      searchParams,
+      filters,
+    });
 
-        const matchEmail =
-          !searchEmail ||
-          lead.email?.toLowerCase().includes(searchEmail.toLowerCase());
-
-        const matchPhone =
-          !searchPhone ||
-          lead.phone?.toLowerCase().includes(searchPhone.toLowerCase());
-
-        const matchProgram =
-          !searchProgram ||
-          (typeof lead.program === "string" &&
-            lead.program
-              ?.toLowerCase()
-              .includes(searchProgram.toLowerCase())) ||
-          (typeof lead.program === "object" &&
-            lead.program !== null &&
-            (lead.program.name
-              ?.toLowerCase()
-              .includes(searchProgram.toLowerCase()) ||
-              lead.program.code
-                ?.toLowerCase()
-                .includes(searchProgram.toLowerCase())));
-
-        const matchSource =
-          !searchSource ||
-          lead.source?.toLowerCase().includes(searchSource.toLowerCase());
-
-        return (
-          matchName && matchEmail && matchPhone && matchProgram && matchSource
-        );
-      });
-    }
-
-    return tabLeads;
+    return searchParams;
   }, [
-    getCurrentTabLeads,
-    filters,
-    showAdvancedSearch,
+    hasActiveSearch,
     searchName,
     searchEmail,
     searchPhone,
     searchProgram,
     searchSource,
+    filters,
   ]);
+
+  // For displaying filtered results (now just returns the loaded leads since filtering is done server-side)
+  const filteredLeads = useMemo(() => {
+    // Since filtering is now done server-side, we just return the current leads
+    // The only client-side filtering we might want to keep is for edge cases
+    return getCurrentTabLeads;
+  }, [getCurrentTabLeads]);
 
   // Get unique values for filters
   const getUniqueValues = useMemo(() => {
@@ -1049,6 +1204,8 @@ const DataCenter = () => {
         return "warning";
       case "APPLIED":
         return "info";
+      case "MISSING_DOCUMENT":
+        return "error";
       case "IN_REVIEW":
         return "primary";
       case "QUALIFIED":
@@ -1549,6 +1706,8 @@ const DataCenter = () => {
                     {card.key === "interested" && "Showing interest"}
                     {card.key === "qualified" && "Ready for admission"}
                     {card.key === "applied" && "Submitted applications"}
+                    {card.key === "missing_document" &&
+                      "Need additional documents"}
                     {card.key === "in_review" && "Under review"}
                     {card.key === "admitted" && "Accepted for admission"}
                     {card.key === "enrolled" && "Successfully enrolled"}
@@ -1842,7 +2001,15 @@ const DataCenter = () => {
                     sx={{ display: "flex", alignItems: "center", gap: 1 }}
                   >
                     <tab.icon />
-                    {tab.label} ({getTabCount(tab.statuses, tab.label)})
+                    {tab.label} (
+                    {hasActiveSearch || hasActiveFilters ? (
+                      <span style={{ color: "#1976d2", fontWeight: "bold" }}>
+                        {filteredLeads.length} filtered
+                      </span>
+                    ) : (
+                      getTabCount(tab.statuses, tab.label)
+                    )}
+                    )
                   </Typography>
                   <Typography
                     variant="body2"
@@ -1904,8 +2071,28 @@ const DataCenter = () => {
                           setShowAdvancedSearch(!showAdvancedSearch)
                         }
                         size="small"
+                        color={hasActiveSearch ? "primary" : "inherit"}
                       >
                         Advanced Search
+                        {hasActiveSearch && (
+                          <Chip
+                            size="small"
+                            label={
+                              Object.values({
+                                name: searchName,
+                                email: searchEmail,
+                                phone: searchPhone,
+                                program: searchProgram,
+                                source: searchSource,
+                              }).filter((val) => val?.length >= 2).length
+                            }
+                            sx={{ ml: 1, height: 20 }}
+                            color="primary"
+                          />
+                        )}
+                        {searchLoading && (
+                          <CircularProgress size={16} sx={{ ml: 1 }} />
+                        )}
                       </Button>
 
                       <Button
@@ -1986,9 +2173,14 @@ const DataCenter = () => {
                           console.log("Manual refresh triggered");
                           refreshCurrentTab();
                         }}
+                        disabled={loading || searchLoading}
                         title="Refresh Data"
                       >
-                        <RefreshIcon />
+                        {loading || searchLoading ? (
+                          <CircularProgress size={20} />
+                        ) : (
+                          <RefreshIcon />
+                        )}
                       </IconButton>
                       {checkPermission(PERMISSIONS.EXPORT_DATA) && (
                         <Button variant="outlined" startIcon={<DownloadIcon />}>
@@ -2001,9 +2193,35 @@ const DataCenter = () => {
                   {/* Advanced Search Panel */}
                   <Collapse in={showAdvancedSearch}>
                     <Paper sx={{ p: 2, mb: 2, bgcolor: "grey.50" }}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Advanced Search
-                      </Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          mb: 2,
+                        }}
+                      >
+                        <Typography variant="subtitle2">
+                          Advanced Search - Search across all data (minimum 2
+                          characters)
+                        </Typography>
+                        {hasActiveSearch && (
+                          <Button
+                            size="small"
+                            startIcon={<ClearIcon />}
+                            onClick={() => {
+                              setSearchName("");
+                              setSearchEmail("");
+                              setSearchPhone("");
+                              setSearchProgram("");
+                              setSearchSource("");
+                            }}
+                            color="secondary"
+                          >
+                            Clear Search
+                          </Button>
+                        )}
+                      </Box>
                       <Grid container spacing={2}>
                         <Grid item xs={12} sm={6} md={2.4}>
                           <TextField
@@ -2013,8 +2231,29 @@ const DataCenter = () => {
                             size="small"
                             fullWidth
                             variant="outlined"
-                            placeholder="Search by name..."
+                            placeholder="Min 2 characters..."
                             InputLabelProps={{ shrink: true }}
+                            InputProps={{
+                              endAdornment: (
+                                <>
+                                  {searchLoading && searchName && (
+                                    <CircularProgress
+                                      size={16}
+                                      sx={{ mr: 1 }}
+                                    />
+                                  )}
+                                  {searchName && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => setSearchName("")}
+                                      edge="end"
+                                    >
+                                      <ClearIcon fontSize="small" />
+                                    </IconButton>
+                                  )}
+                                </>
+                              ),
+                            }}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6} md={2.4}>
@@ -2025,8 +2264,29 @@ const DataCenter = () => {
                             size="small"
                             fullWidth
                             variant="outlined"
-                            placeholder="Search by email..."
+                            placeholder="Min 2 characters..."
                             InputLabelProps={{ shrink: true }}
+                            InputProps={{
+                              endAdornment: (
+                                <>
+                                  {searchLoading && searchEmail && (
+                                    <CircularProgress
+                                      size={16}
+                                      sx={{ mr: 1 }}
+                                    />
+                                  )}
+                                  {searchEmail && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => setSearchEmail("")}
+                                      edge="end"
+                                    >
+                                      <ClearIcon fontSize="small" />
+                                    </IconButton>
+                                  )}
+                                </>
+                              ),
+                            }}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6} md={2.4}>
@@ -2037,8 +2297,19 @@ const DataCenter = () => {
                             size="small"
                             fullWidth
                             variant="outlined"
-                            placeholder="Search by phone..."
+                            placeholder="Min 2 characters..."
                             InputLabelProps={{ shrink: true }}
+                            InputProps={{
+                              endAdornment: searchPhone && (
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setSearchPhone("")}
+                                  edge="end"
+                                >
+                                  <ClearIcon fontSize="small" />
+                                </IconButton>
+                              ),
+                            }}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6} md={2.4}>
@@ -2049,8 +2320,19 @@ const DataCenter = () => {
                             size="small"
                             fullWidth
                             variant="outlined"
-                            placeholder="Search by program..."
+                            placeholder="Min 2 characters..."
                             InputLabelProps={{ shrink: true }}
+                            InputProps={{
+                              endAdornment: searchProgram && (
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setSearchProgram("")}
+                                  edge="end"
+                                >
+                                  <ClearIcon fontSize="small" />
+                                </IconButton>
+                              ),
+                            }}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6} md={2.4}>
@@ -2061,8 +2343,19 @@ const DataCenter = () => {
                             size="small"
                             fullWidth
                             variant="outlined"
-                            placeholder="Search by source..."
+                            placeholder="Min 2 characters..."
                             InputLabelProps={{ shrink: true }}
+                            InputProps={{
+                              endAdornment: searchSource && (
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setSearchSource("")}
+                                  edge="end"
+                                >
+                                  <ClearIcon fontSize="small" />
+                                </IconButton>
+                              ),
+                            }}
                           />
                         </Grid>
                       </Grid>
@@ -2297,21 +2590,47 @@ const DataCenter = () => {
                   </TableContainer>
 
                   {/* Pagination */}
-                  <TablePagination
-                    rowsPerPageOptions={[25, 50, 100]}
-                    component="div"
-                    count={pagination.total}
-                    rowsPerPage={pagination.rowsPerPage}
-                    page={pagination.page}
-                    onPageChange={handleChangePage}
-                    onRowsPerPageChange={handleChangeRowsPerPage}
-                    labelRowsPerPage="Leads per page:"
-                    labelDisplayedRows={({ from, to, count }) =>
-                      `${from}-${to} of ${
-                        count !== -1 ? count : `more than ${to}`
-                      }`
-                    }
-                  />
+                  {!hasActiveSearch && !hasActiveFilters ? (
+                    // Normal pagination for unfiltered results
+                    <TablePagination
+                      rowsPerPageOptions={[200, 400, 1000]}
+                      component="div"
+                      count={pagination.total}
+                      rowsPerPage={pagination.rowsPerPage}
+                      page={pagination.page}
+                      onPageChange={handleChangePage}
+                      onRowsPerPageChange={handleChangeRowsPerPage}
+                      labelRowsPerPage="Leads per page:"
+                      labelDisplayedRows={({ from, to, count }) =>
+                        `${from}-${to} of ${
+                          count !== -1 ? count : `more than ${to}`
+                        }`
+                      }
+                    />
+                  ) : (
+                    // Simple display for search/filter results (no pagination needed since all results are shown)
+                    <Box
+                      sx={{
+                        p: 2,
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        Showing all {filteredLeads.length} matching results
+                        {filteredLeads.length > 100 && (
+                          <Typography
+                            component="span"
+                            sx={{ fontStyle: "italic", ml: 1 }}
+                          >
+                            (Consider narrowing your search criteria for better
+                            performance)
+                          </Typography>
+                        )}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </TabPanel>
             ))}

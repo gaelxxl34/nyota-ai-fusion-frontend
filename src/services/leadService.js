@@ -10,6 +10,11 @@ export const leadService = {
         status,
         source,
         search,
+        name,
+        email,
+        phone,
+        program,
+        dateRange,
         sortBy = "createdAt",
         sortOrder = "desc",
       } = options;
@@ -27,6 +32,13 @@ export const leadService = {
       if (status) params.status = status;
       if (source) params.source = source;
       if (search?.trim()) params.search = search.trim();
+
+      // Advanced search parameters
+      if (name?.trim()) params.name = name.trim();
+      if (email?.trim()) params.email = email.trim();
+      if (phone?.trim()) params.phone = phone.trim();
+      if (program?.trim()) params.program = program.trim();
+      if (dateRange) params.dateRange = dateRange;
 
       const response = await axiosInstance.get("/api/leads", { params });
 
@@ -47,21 +59,35 @@ export const leadService = {
       const {
         limit = 50,
         offset = 0,
+        name,
+        email,
+        phone,
+        program,
+        source,
+        dateRange,
         sortBy = "createdAt",
         sortOrder = "desc",
       } = options;
 
       console.log(`🔄 Fetching leads by status: ${status}`);
 
-      const response = await axiosInstance.get("/api/leads", {
-        params: {
-          status,
-          limit,
-          offset,
-          sortBy,
-          sortOrder,
-        },
-      });
+      const params = {
+        status,
+        limit,
+        offset,
+        sortBy,
+        sortOrder,
+      };
+
+      // Add search parameters
+      if (name?.trim()) params.name = name.trim();
+      if (email?.trim()) params.email = email.trim();
+      if (phone?.trim()) params.phone = phone.trim();
+      if (program?.trim()) params.program = program.trim();
+      if (source?.trim()) params.source = source.trim();
+      if (dateRange) params.dateRange = dateRange;
+
+      const response = await axiosInstance.get("/api/leads", { params });
 
       console.log(
         `📡 Status-filtered leads: ${response.data.data?.length || 0} leads`
@@ -410,6 +436,12 @@ export const leadService = {
         page = 1,
         limit = 50,
         status,
+        name,
+        email,
+        phone,
+        program,
+        source,
+        dateRange,
         sortBy = "createdAt",
         sortOrder = "desc",
         all = false,
@@ -420,6 +452,14 @@ export const leadService = {
       if (status) {
         params.status = status;
       }
+
+      // Add search parameters
+      if (name?.trim()) params.name = name.trim();
+      if (email?.trim()) params.email = email.trim();
+      if (phone?.trim()) params.phone = phone.trim();
+      if (program?.trim()) params.program = program.trim();
+      if (source?.trim()) params.source = source.trim();
+      if (dateRange) params.dateRange = dateRange;
 
       const response = await axiosInstance.get("/api/leads/my-submissions", {
         params,
