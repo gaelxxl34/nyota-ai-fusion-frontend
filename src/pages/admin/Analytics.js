@@ -237,7 +237,9 @@ const Analytics = () => {
             return leadDate >= startDate && leadDate < endDate;
           });
           console.log(
-            `Filtered ${response.data.length} leads to ${leads.length} for timeRange: ${timeRange}`
+            `Filtered ${response?.data?.length || 0} leads to ${
+              leads.length
+            } for timeRange: ${timeRange}`
           );
         } else {
           console.log(

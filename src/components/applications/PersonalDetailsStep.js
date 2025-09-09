@@ -168,6 +168,22 @@ export const PersonalDetailsStep = ({
         </Grid>
 
         <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label="Date of Birth"
+            type="date"
+            value={formData.dateOfBirth || ""}
+            onChange={handleInputChange("dateOfBirth")}
+            error={!!errors.dateOfBirth}
+            helperText={errors.dateOfBirth}
+            InputLabelProps={{
+              shrink: true,
+            }}
+            required
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6}>
           <FormControl fullWidth error={!!errors.gender} required>
             <InputLabel>Gender</InputLabel>
             <Select

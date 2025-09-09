@@ -256,6 +256,7 @@ const DataCenter = () => {
           const allowedTabs = [
             "All Leads",
             "Applied",
+            "Missing Documents",
             "In Review",
             "Qualified",
             "Admitted",
@@ -291,6 +292,7 @@ const DataCenter = () => {
             allowedStatuses = tab.statuses.filter((status) =>
               [
                 "APPLIED",
+                "MISSING_DOCUMENT",
                 "IN_REVIEW",
                 "QUALIFIED",
                 "ADMITTED",
@@ -410,9 +412,9 @@ const DataCenter = () => {
           leadService.getLeadStats(),
         ]);
 
-        setApplications(applicationsResponse.data || []);
+        setApplications(applicationsResponse?.data || []);
         setLeadStats(
-          statsResponse.data || { total: 0, byStatus: {}, bySource: {} }
+          statsResponse?.data || { total: 0, byStatus: {}, bySource: {} }
         );
       } catch (err) {
         console.error("Error fetching initial data:", err);
@@ -483,7 +485,7 @@ const DataCenter = () => {
           };
 
           leadsResponse = await leadService.getMySubmittedLeads(myLeadsParams);
-          const allPersonal = leadsResponse.data || [];
+          const allPersonal = leadsResponse?.data || [];
 
           // Store ALL personal leads for filtering
           setAllPersonalLeadsData(allPersonal);
@@ -502,21 +504,28 @@ const DataCenter = () => {
           // Fetch ALL leads for all allowed statuses and combine them
           const statusPromises = currentTabConfig.statuses.map(
             async (status) => {
-              const statusResponse = await leadService.getLeadsByStatus(
-                status,
-                {
-                  limit: 10000, // Get all leads for each status
-                  offset: 0,
-                  sortBy: "createdAt",
-                  sortOrder: "desc",
-                }
-              );
-              console.log(
-                `📊 Fetched ${
-                  statusResponse.data?.length || 0
-                } leads for status: ${status}`
-              );
-              return statusResponse.data || [];
+              try {
+                const statusResponse = await leadService.getLeadsByStatus(
+                  status,
+                  {
+                    limit: 10000, // Get all leads for each status
+                    offset: 0,
+                    sortBy: "createdAt",
+                    sortOrder: "desc",
+                  }
+                );
+                const leads = statusResponse?.data || [];
+                console.log(
+                  `📊 Fetched ${leads.length} leads for status: ${status}`
+                );
+                return leads;
+              } catch (error) {
+                console.error(
+                  `❌ Error fetching leads for status ${status}:`,
+                  error
+                );
+                return []; // Return empty array on error
+              }
             }
           );
 
@@ -563,7 +572,7 @@ const DataCenter = () => {
               statusParams
             );
 
-            const allStatusLeads = leadsResponse.data || [];
+            const allStatusLeads = leadsResponse?.data || [];
 
             // Store ALL leads for filtering
             setAllLeadsData(allStatusLeads);
@@ -577,16 +586,24 @@ const DataCenter = () => {
             // Multiple statuses - get ALL leads for each status and combine
             const statusPromises = currentTabConfig.statuses.map(
               async (status) => {
-                const statusResponse = await leadService.getLeadsByStatus(
-                  status,
-                  {
-                    limit: 10000, // Get all leads for each status
-                    offset: 0,
-                    sortBy: "createdAt",
-                    sortOrder: "desc",
-                  }
-                );
-                return statusResponse.data || [];
+                try {
+                  const statusResponse = await leadService.getLeadsByStatus(
+                    status,
+                    {
+                      limit: 10000, // Get all leads for each status
+                      offset: 0,
+                      sortBy: "createdAt",
+                      sortOrder: "desc",
+                    }
+                  );
+                  return statusResponse?.data || [];
+                } catch (error) {
+                  console.error(
+                    `❌ Error fetching leads for status ${status}:`,
+                    error
+                  );
+                  return []; // Return empty array on error
+                }
               }
             );
 
@@ -620,8 +637,9 @@ const DataCenter = () => {
         console.log(
           `📊 Loaded ${
             currentTabConfig.label === "For You"
-              ? allPersonalLeadsData.length || (leadsResponse.data || []).length
-              : allLeadsData.length || (leadsResponse.data || []).length
+              ? allPersonalLeadsData.length ||
+                (leadsResponse?.data || []).length
+              : allLeadsData.length || (leadsResponse?.data || []).length
           } leads for ${currentTabConfig.label} tab`
         );
       } catch (err) {
@@ -680,14 +698,17 @@ const DataCenter = () => {
 
   // Get visible total count based on user role
   const getVisibleTotal = useMemo(() => {
-    if (userRole === "admissionAdmin") {
-      // Only count Applied, Qualified, Admitted, Enrolled
+    if (userRole === "admissionAdmin" || userRole === "admissionAgent") {
+      // Only count Applied, Missing Documents, In Review, Qualified, Admitted, Enrolled, Deferred, Expired
       const allowedStatuses = [
         "APPLIED",
         "MISSING_DOCUMENT",
+        "IN_REVIEW",
         "QUALIFIED",
         "ADMITTED",
         "ENROLLED",
+        "DEFERRED",
+        "EXPIRED",
       ];
       return allowedStatuses.reduce((total, status) => {
         return total + (leadStats.byStatus[status] || 0);

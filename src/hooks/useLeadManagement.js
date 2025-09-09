@@ -95,19 +95,25 @@ export const useLeadManagement = ({
 
         // Fetch or update stats
         if (!loadMore || forceRefresh) {
-          const statsResponse = await leadService.getLeadStats();
-          if (statsResponse?.data) {
-            const statsData = statsResponse.data;
-            const conversionRate = statsData.total
-              ? Math.round(
-                  ((statsData.byStatus?.ENROLLED || 0) / statsData.total) * 100
-                )
-              : 0;
+          try {
+            const statsResponse = await leadService.getLeadStats();
+            if (statsResponse?.data) {
+              const statsData = statsResponse.data;
+              const conversionRate = statsData.total
+                ? Math.round(
+                    ((statsData.byStatus?.ENROLLED || 0) / statsData.total) *
+                      100
+                  )
+                : 0;
 
-            setStats({
-              ...statsData,
-              conversionRate,
-            });
+              setStats({
+                ...statsData,
+                conversionRate,
+              });
+            }
+          } catch (statsError) {
+            console.error("❌ Error fetching stats:", statsError);
+            // Don't fail the entire operation if stats fail
           }
         }
 

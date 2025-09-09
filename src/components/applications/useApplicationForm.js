@@ -30,6 +30,7 @@ const initialFormData = {
   email: "",
   phone: "",
   countryOfBirth: "",
+  dateOfBirth: "",
   gender: "",
   postalAddress: "",
   passportPhoto: null,
@@ -75,6 +76,7 @@ export const useApplicationForm = () => {
           email: appData.email || "",
           phone: appData.phoneNumber || "",
           countryOfBirth: appData.countryOfBirth || "",
+          dateOfBirth: appData.dateOfBirth || "",
           gender: appData.gender || "",
           postalAddress: appData.postalAddress || "",
           passportPhoto: appData.passportPhoto || null,
@@ -148,6 +150,8 @@ export const useApplicationForm = () => {
         if (!data.phone?.trim()) stepErrors.phone = "Phone number is required";
         if (!data.countryOfBirth?.trim())
           stepErrors.countryOfBirth = "Country of birth is required";
+        if (!data.dateOfBirth?.trim())
+          stepErrors.dateOfBirth = "Date of birth is required";
         if (!data.gender?.trim()) stepErrors.gender = "Gender is required";
         if (!data.postalAddress?.trim())
           stepErrors.postalAddress = "Physical address is required";
@@ -203,6 +207,7 @@ export const useApplicationForm = () => {
           email: processedFormData.email,
           phoneNumber: formatPhoneNumber(processedFormData.phone),
           countryOfBirth: processedFormData.countryOfBirth,
+          dateOfBirth: processedFormData.dateOfBirth,
           gender: processedFormData.gender.toLowerCase(), // Ensure lowercase for gender
           postalAddress: processedFormData.postalAddress,
           passportPhoto: processedFormData.passportPhoto, // Keep as File object

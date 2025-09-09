@@ -32,14 +32,27 @@ axiosInstance.interceptors.response.use(
   (response) => {
     if (process.env.NODE_ENV === "development") {
       console.log(
-        `Response from ${response.config.url}: Status ${response.status}`
+        `Response from ${response?.config?.url}: Status ${response?.status}`
       );
     }
+
+    // Ensure response object structure is valid
+    if (!response) {
+      console.error("❌ Null response received");
+      return Promise.reject(new Error("No response received from server"));
+    }
+
+    // Ensure data property exists
+    if (response.data === undefined) {
+      console.warn("⚠️ Response data is undefined, setting to empty object");
+      response.data = {};
+    }
+
     return response;
   },
   (error) => {
-    console.error("Response error:", error.response?.status, error.message);
-    if (error.response?.status === 401) {
+    console.error("Response error:", error?.response?.status, error?.message);
+    if (error?.response?.status === 401) {
       // Token expired or invalid
       localStorage.removeItem("token");
       localStorage.removeItem("user");

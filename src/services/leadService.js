@@ -42,8 +42,12 @@ export const leadService = {
 
       const response = await axiosInstance.get("/api/leads", { params });
 
+      if (!response) {
+        throw new Error("Network error: No response received from server");
+      }
+
       console.log(
-        `📡 Leads API Response: ${response.data.data?.length || 0} leads`
+        `📡 Leads API Response: ${response?.data?.data?.length || 0} leads`
       );
 
       return response.data;
@@ -89,8 +93,12 @@ export const leadService = {
 
       const response = await axiosInstance.get("/api/leads", { params });
 
+      if (!response) {
+        throw new Error("Network error: No response received from server");
+      }
+
       console.log(
-        `📡 Status-filtered leads: ${response.data.data?.length || 0} leads`
+        `📡 Status-filtered leads: ${response?.data?.data?.length || 0} leads`
       );
 
       return response.data;
@@ -219,6 +227,11 @@ export const leadService = {
       const response = await axiosInstance.get(`/api/leads/stats`, {
         params: { timeFrame },
       });
+
+      if (!response) {
+        throw new Error("Network error: No response received from server");
+      }
+
       return response.data;
     } catch (error) {
       throw new Error(
@@ -421,6 +434,11 @@ export const leadService = {
       const response = await axiosInstance.get("/api/applications", {
         params: filters,
       });
+
+      if (!response) {
+        throw new Error("Network error: No response received from server");
+      }
+
       return response.data;
     } catch (error) {
       throw new Error(
@@ -464,6 +482,11 @@ export const leadService = {
       const response = await axiosInstance.get("/api/leads/my-submissions", {
         params,
       });
+
+      if (!response) {
+        throw new Error("Network error: No response received from server");
+      }
+
       return response.data;
     } catch (error) {
       throw new Error(
