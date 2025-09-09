@@ -10,6 +10,8 @@ import {
   MenuItem,
   FormHelperText,
 } from "@mui/material";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 export const AdditionalDataStep = ({
   formData,
@@ -23,54 +25,168 @@ export const AdditionalDataStep = ({
   return (
     <Box sx={{ py: 2 }}>
       <Typography variant="h6" gutterBottom>
-        Additional Data
+        Additional Information
       </Typography>
 
       <Grid container spacing={3}>
+        {/* Sponsorship Information Section */}
         <Grid item xs={12}>
           <Typography
             variant="subtitle1"
             gutterBottom
             sx={{ fontWeight: 600, mt: 2 }}
           >
-            Sponsorship Information
+            Sponsorship Information{" "}
+            <Typography component="span" variant="body2" color="text.secondary">
+              (Optional)
+            </Typography>
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Please provide sponsor contact details if applicable. This could be
+            a parent, guardian, employer, or scholarship provider.
           </Typography>
         </Grid>
 
         <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Sponsor Telephone"
-            value={formData.sponsorTelephone || ""}
-            onChange={handleInputChange("sponsorTelephone")}
-            helperText="Phone number of sponsor or parent/guardian"
-            error={!!errors.sponsorTelephone}
-          />
-          {errors.sponsorTelephone && (
-            <Typography variant="caption" color="error">
-              {errors.sponsorTelephone}
+          <Box>
+            <Typography
+              variant="body2"
+              sx={{
+                mb: 0.5,
+                fontSize: "0.75rem",
+                color: errors.sponsorTelephone
+                  ? "#d32f2f"
+                  : "rgba(0, 0, 0, 0.6)",
+              }}
+            >
+              Sponsor Telephone
             </Typography>
-          )}
+            <PhoneInput
+              international
+              defaultCountry="UG"
+              value={formData.sponsorTelephone || ""}
+              onChange={(value) => updateFormData({ sponsorTelephone: value })}
+              placeholder="Enter sponsor phone number"
+              style={{
+                "--PhoneInputCountrySelectArrow-color": "#666",
+                "--PhoneInputCountrySelectArrow-opacity": "0.8",
+              }}
+              className={`phone-input-custom ${
+                errors.sponsorTelephone ? "error" : ""
+              }`}
+            />
+            {errors.sponsorTelephone && (
+              <Typography
+                variant="caption"
+                color="error"
+                sx={{ mt: 0.5, display: "block" }}
+              >
+                {errors.sponsorTelephone}
+              </Typography>
+            )}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 0.5, display: "block" }}
+            >
+              Phone number of sponsor or parent/guardian
+            </Typography>
+            <style jsx>{`
+              .phone-input-custom {
+                width: 100%;
+                border: 1px solid #c4c4c4;
+                border-radius: 4px;
+                padding: 16.5px 14px;
+                font-size: 16px;
+                font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+                background-color: #fff;
+                transition: border-color 0.15s ease-in-out;
+              }
+              .phone-input-custom:hover {
+                border-color: #000;
+              }
+              .phone-input-custom:focus-within {
+                border-color: #1976d2;
+                border-width: 2px;
+                outline: none;
+              }
+              .phone-input-custom.error {
+                border-color: #d32f2f;
+              }
+              .phone-input-custom .PhoneInputInput {
+                border: none;
+                outline: none;
+                font-size: 16px;
+                font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+                background: transparent;
+                flex: 1;
+                margin-left: 8px;
+              }
+              .phone-input-custom .PhoneInputCountrySelect {
+                border: none;
+                background: transparent;
+                margin-right: 8px;
+              }
+              .phone-input-custom .PhoneInputCountrySelectArrow {
+                border-top-color: var(--PhoneInputCountrySelectArrow-color);
+                opacity: var(--PhoneInputCountrySelectArrow-opacity);
+              }
+              .phone-input-custom .PhoneInputCountryIcon {
+                width: 24px;
+                height: 18px;
+              }
+            `}</style>
+          </Box>
         </Grid>
 
         <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Sponsor Email"
-            type="email"
-            value={formData.sponsorEmail || ""}
-            onChange={handleInputChange("sponsorEmail")}
-            helperText="Email address of sponsor or parent/guardian"
-            error={!!errors.sponsorEmail}
-          />
-          {errors.sponsorEmail && (
-            <Typography variant="caption" color="error">
-              {errors.sponsorEmail}
+          <Box>
+            <Typography
+              variant="body2"
+              sx={{
+                mb: 0.5,
+                fontSize: "0.75rem",
+                color: errors.sponsorEmail ? "#d32f2f" : "rgba(0, 0, 0, 0.6)",
+              }}
+            >
+              Sponsor Email
             </Typography>
-          )}
+            <TextField
+              fullWidth
+              type="email"
+              value={formData.sponsorEmail || ""}
+              onChange={handleInputChange("sponsorEmail")}
+              error={!!errors.sponsorEmail}
+              placeholder="sponsor@example.com"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  "& fieldset": {
+                    borderColor: errors.sponsorEmail ? "#d32f2f" : "#c4c4c4",
+                  },
+                },
+              }}
+            />
+            {errors.sponsorEmail && (
+              <Typography
+                variant="caption"
+                color="error"
+                sx={{ mt: 0.5, display: "block" }}
+              >
+                {errors.sponsorEmail}
+              </Typography>
+            )}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 0.5, display: "block" }}
+            >
+              Valid email address of sponsor or parent/guardian
+            </Typography>
+          </Box>
         </Grid>
 
-        <Grid item xs={12} sm={6}>
+        {/* How did you hear about the university */}
+        <Grid item xs={12}>
           <FormControl fullWidth error={!!errors.howDidYouHear} required>
             <InputLabel>How did you hear about the university?</InputLabel>
             <Select
@@ -78,6 +194,7 @@ export const AdditionalDataStep = ({
               onChange={handleInputChange("howDidYouHear")}
               label="How did you hear about the university?"
             >
+              <MenuItem value="">Select Option</MenuItem>
               <MenuItem value="social-media">
                 Social Media (Facebook, Instagram, Twitter)
               </MenuItem>
@@ -104,6 +221,7 @@ export const AdditionalDataStep = ({
           </FormControl>
         </Grid>
 
+        {/* Additional Notes */}
         <Grid item xs={12}>
           <TextField
             fullWidth

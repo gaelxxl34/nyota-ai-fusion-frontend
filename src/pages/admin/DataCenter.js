@@ -1971,7 +1971,16 @@ const DataCenter = () => {
                         </Button>
                       )}
                     </Stack>
-                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 1,
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        justifyContent: "flex-start",
+                      }}
+                    >
+                      {/* Add New Lead Button - for Marketing Agents primarily */}
                       {userRole !== "admissionAdmin" &&
                         userRole !== "admissionAgent" && (
                           <Button
@@ -1979,26 +1988,38 @@ const DataCenter = () => {
                             startIcon={<WhatsAppIcon />}
                             onClick={() => setInquiryDialogOpen(true)}
                             color="success"
+                            size={
+                              userRole === "marketingAgent" ? "small" : "medium"
+                            }
                           >
                             Add New Lead
                           </Button>
                         )}
-                      {(userRole === "admissionAdmin" ||
-                        userRole === "admissionAgent") && (
+
+                      {/* Add Applicant Button - for all roles with CREATE_APPLICATION permission */}
+                      {checkPermission(PERMISSIONS.CREATE_APPLICATION) && (
                         <Button
                           variant="contained"
                           startIcon={<AssignmentIcon />}
                           onClick={() => setApplicationDialogOpen(true)}
                           color="primary"
+                          size={
+                            userRole === "marketingAgent" ? "small" : "medium"
+                          }
                         >
                           Add Applicant
                         </Button>
                       )}
+
+                      {/* Create Account Button */}
                       <Button
                         variant="contained"
                         startIcon={<PersonAddIcon />}
                         onClick={() => setCreateAccountDialogOpen(true)}
                         color="secondary"
+                        size={
+                          userRole === "marketingAgent" ? "small" : "medium"
+                        }
                         sx={{
                           backgroundColor: "#7a0000",
                           "&:hover": {
@@ -2008,6 +2029,8 @@ const DataCenter = () => {
                       >
                         Create Account For
                       </Button>
+
+                      {/* Refresh Button */}
                       <IconButton
                         onClick={() => {
                           console.log("Manual refresh triggered");
@@ -2015,6 +2038,9 @@ const DataCenter = () => {
                         }}
                         disabled={loading}
                         title="Refresh Data"
+                        size={
+                          userRole === "marketingAgent" ? "small" : "medium"
+                        }
                       >
                         {loading ? (
                           <CircularProgress size={20} />
@@ -2022,8 +2048,16 @@ const DataCenter = () => {
                           <RefreshIcon />
                         )}
                       </IconButton>
+
+                      {/* Export Button - for roles with EXPORT_DATA permission */}
                       {checkPermission(PERMISSIONS.EXPORT_DATA) && (
-                        <Button variant="outlined" startIcon={<DownloadIcon />}>
+                        <Button
+                          variant="outlined"
+                          startIcon={<DownloadIcon />}
+                          size={
+                            userRole === "marketingAgent" ? "small" : "medium"
+                          }
+                        >
                           Export
                         </Button>
                       )}

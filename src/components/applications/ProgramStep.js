@@ -12,9 +12,153 @@ import {
 } from "@mui/material";
 import { Upload } from "@mui/icons-material";
 
+// Program data structure - simplified without school hierarchy
+const PROGRAM_DATA = {
+  "On Campus": {
+    January: [
+      "Bachelor of Business Administration",
+      "Bachelor of Public Administration",
+      "Bachelor of Procurement and Logistics Management",
+      "Bachelor of Tourism and Hotel Management",
+      "Bachelor of Human Resource Management",
+      "Bachelor of Journalism and Communication Studies",
+      "Bachelor of Information Technology",
+      "Bachelor of Science in Computer Science",
+      "Bachelor of Science in Software Engineering",
+      "Bachelor of Science in Climate Smart Agriculture",
+      "Bachelor of Science in Environmental Science and Management",
+      "Bachelor of Science in Electrical Engineering",
+      "Bachelor of Science in Civil Engineering",
+      "Bachelor of Architecture",
+      "Bachelor of Science in Petroleum Engineering",
+      "Bachelor of Science in Mechatronics and Robotics",
+      "Bachelor of Science in Communications Engineering",
+      "Bachelor of Science in Mining Engineering",
+      "Bachelor of Laws",
+      "Bachelor of International Relations and Diplomatic Studies",
+      "Diploma in Electrical Engineering",
+      "Diploma in Civil Engineering",
+      "Diploma in Architecture",
+      "Master of Business Administration",
+      "Master of Information Technology",
+      "Master of International Relations and Diplomatic Studies",
+    ],
+    May: [
+      "Bachelor of Business Administration",
+      "Bachelor of Public Administration",
+      "Bachelor of Procurement and Logistics Management",
+      "Bachelor of Tourism and Hotel Management",
+      "Bachelor of Human Resource Management",
+      "Bachelor of Journalism and Communication Studies",
+      "Bachelor of Information Technology",
+      "Bachelor of Science in Computer Science",
+      "Bachelor of Science in Software Engineering",
+      "Bachelor of Science in Climate Smart Agriculture",
+      "Bachelor of Science in Environmental Science and Management",
+      "Bachelor of Science in Electrical Engineering",
+      "Bachelor of Science in Civil Engineering",
+      "Bachelor of Architecture",
+      "Bachelor of Science in Petroleum Engineering",
+      "Bachelor of Science in Mechatronics and Robotics",
+      "Bachelor of Science in Communications Engineering",
+      "Bachelor of Science in Mining Engineering",
+      "Bachelor of Laws",
+      "Bachelor of International Relations and Diplomatic Studies",
+      "Diploma in Electrical Engineering",
+      "Diploma in Civil Engineering",
+      "Diploma in Architecture",
+      "Master of Business Administration",
+      "Master of Information Technology",
+      "Master of International Relations and Diplomatic Studies",
+    ],
+    August: [
+      "Bachelor of Business Administration",
+      "Bachelor of Public Administration",
+      "Bachelor of Procurement and Logistics Management",
+      "Bachelor of Tourism and Hotel Management",
+      "Bachelor of Human Resource Management",
+      "Bachelor of Journalism and Communication Studies",
+      "Bachelor of Information Technology",
+      "Bachelor of Science in Computer Science",
+      "Bachelor of Science in Software Engineering",
+      "Bachelor of Science in Climate Smart Agriculture",
+      "Bachelor of Science in Environmental Science and Management",
+      "Bachelor of Science in Electrical Engineering",
+      "Bachelor of Science in Civil Engineering",
+      "Bachelor of Architecture",
+      "Bachelor of Science in Petroleum Engineering",
+      "Bachelor of Science in Mechatronics and Robotics",
+      "Bachelor of Science in Communications Engineering",
+      "Bachelor of Science in Mining Engineering",
+      "Bachelor of Laws",
+      "Bachelor of International Relations and Diplomatic Studies",
+      "Diploma in Electrical Engineering",
+      "Diploma in Civil Engineering",
+      "Diploma in Architecture",
+      "Master of Business Administration",
+      "Master of Information Technology",
+      "Master of International Relations and Diplomatic Studies",
+    ],
+  },
+  Online: {
+    January: [
+      "Bachelor of Business Administration",
+      "Bachelor of Public Administration",
+      "Bachelor of Procurement and Logistics Management",
+      "Bachelor of Tourism and Hotel Management",
+      "Bachelor of Human Resource Management",
+      "Bachelor of Information Technology",
+      "Bachelor of Science in Computer Science",
+      "Bachelor of Science in Software Engineering",
+      "Master of Business Administration",
+      "Master of Information Technology",
+    ],
+    May: [
+      "Bachelor of Business Administration",
+      "Bachelor of Public Administration",
+      "Bachelor of Procurement and Logistics Management",
+      "Bachelor of Tourism and Hotel Management",
+      "Bachelor of Human Resource Management",
+      "Bachelor of Information Technology",
+      "Bachelor of Science in Computer Science",
+      "Bachelor of Science in Software Engineering",
+      "Master of Business Administration",
+      "Master of Information Technology",
+    ],
+    August: [
+      "Bachelor of Business Administration",
+      "Bachelor of Public Administration",
+      "Bachelor of Procurement and Logistics Management",
+      "Bachelor of Tourism and Hotel Management",
+      "Bachelor of Human Resource Management",
+      "Bachelor of Information Technology",
+      "Bachelor of Science in Computer Science",
+      "Bachelor of Science in Software Engineering",
+      "Master of Business Administration",
+      "Master of Information Technology",
+    ],
+  },
+};
+
 export const ProgramStep = ({ formData, updateFormData, errors = {} }) => {
   const handleInputChange = (field) => (event) => {
-    updateFormData({ [field]: event.target.value });
+    const value = event.target.value;
+
+    // Clear dependent fields when parent selections change
+    if (field === "modeOfStudy") {
+      updateFormData({
+        [field]: value,
+        intake: "",
+        program: "",
+      });
+    } else if (field === "intake") {
+      updateFormData({
+        [field]: value,
+        program: "",
+      });
+    } else {
+      updateFormData({ [field]: value });
+    }
   };
 
   const handleFileChange = (field) => async (event) => {
@@ -27,10 +171,16 @@ export const ProgramStep = ({ formData, updateFormData, errors = {} }) => {
     }
   };
 
+  // Get available programs based on mode of study and intake
+  const getAvailablePrograms = () => {
+    if (!formData.modeOfStudy || !formData.intake) return [];
+    return PROGRAM_DATA[formData.modeOfStudy]?.[formData.intake] || [];
+  };
+
   return (
     <Box sx={{ py: 2 }}>
       <Typography variant="h6" gutterBottom>
-        Program
+        Program Selection
       </Typography>
 
       <Grid container spacing={3}>
@@ -68,108 +218,25 @@ export const ProgramStep = ({ formData, updateFormData, errors = {} }) => {
           </FormControl>
         </Grid>
 
-        {/* Program selection below */}
+        {/* Program selection */}
         <Grid item xs={12}>
-          <FormControl fullWidth error={!!errors.program} required>
+          <FormControl
+            fullWidth
+            error={!!errors.program}
+            required
+            disabled={!formData.modeOfStudy || !formData.intake}
+          >
             <InputLabel>Program</InputLabel>
             <Select
               value={formData.program || ""}
               onChange={handleInputChange("program")}
               label="Program"
             >
-              {/* Business and Management Programs */}
-              <MenuItem value="Bachelor of Business Administration">
-                Bachelor of Business Administration
-              </MenuItem>
-              <MenuItem value="Bachelor of Public Administration">
-                Bachelor of Public Administration
-              </MenuItem>
-              <MenuItem value="Bachelor of Procurement and Logistics Management">
-                Bachelor of Procurement and Logistics Management
-              </MenuItem>
-              <MenuItem value="Bachelor of Tourism and Hotel Management">
-                Bachelor of Tourism and Hotel Management
-              </MenuItem>
-              <MenuItem value="Bachelor of Human Resource Management">
-                Bachelor of Human Resource Management
-              </MenuItem>
-              <MenuItem value="Bachelor of Journalism and Communication Studies">
-                Bachelor of Journalism and Communication Studies
-              </MenuItem>
-              <MenuItem value="Master of Business Administration">
-                Master of Business Administration (MBA)
-              </MenuItem>
-
-              {/* Science and Technology Programs */}
-              <MenuItem value="Bachelor of Science in Computer Science">
-                Bachelor of Science in Computer Science
-              </MenuItem>
-              <MenuItem value="Bachelor of Information Technology">
-                Bachelor of Information Technology
-              </MenuItem>
-              <MenuItem value="Bachelor of Science in Software Engineering">
-                Bachelor of Science in Software Engineering
-              </MenuItem>
-              <MenuItem value="Bachelor of Science in Climate Smart Agriculture">
-                Bachelor of Science in Climate Smart Agriculture
-              </MenuItem>
-              <MenuItem value="Bachelor of Science in Environmental Science and Management">
-                Bachelor of Science in Environmental Science and Management
-              </MenuItem>
-              <MenuItem value="Master of Information Technology">
-                Master of Information Technology
-              </MenuItem>
-
-              {/* Engineering Programs */}
-              <MenuItem value="Bachelor of Science in Electrical Engineering">
-                Bachelor of Science in Electrical Engineering
-              </MenuItem>
-              <MenuItem value="Bachelor of Science in Civil Engineering">
-                Bachelor of Science in Civil Engineering
-              </MenuItem>
-              <MenuItem value="Bachelor of Architecture">
-                Bachelor of Architecture
-              </MenuItem>
-              <MenuItem value="Bachelor of Science in Petroleum Engineering">
-                Bachelor of Science in Petroleum Engineering
-              </MenuItem>
-              <MenuItem value="Bachelor of Science in Mechatronics and Robotics">
-                Bachelor of Science in Mechatronics and Robotics
-              </MenuItem>
-              <MenuItem value="Bachelor of Science in Communications Engineering">
-                Bachelor of Science in Communications Engineering
-              </MenuItem>
-              <MenuItem value="Bachelor of Science in Mining Engineering">
-                Bachelor of Science in Mining Engineering
-              </MenuItem>
-              <MenuItem value="Diploma in Electrical Engineering">
-                Diploma in Electrical Engineering
-              </MenuItem>
-              <MenuItem value="Diploma in Civil Engineering">
-                Diploma in Civil Engineering
-              </MenuItem>
-              <MenuItem value="Diploma in Architecture">
-                Diploma in Architecture
-              </MenuItem>
-
-              {/* Law and Humanities Programs */}
-              <MenuItem value="Bachelor of Laws">
-                Bachelor of Laws (LLB)
-              </MenuItem>
-              <MenuItem value="Bachelor of International Relations and Diplomatic Studies">
-                Bachelor of International Relations and Diplomatic Studies
-              </MenuItem>
-              <MenuItem value="Master of International Relations and Diplomatic Studies">
-                Master of International Relations and Diplomatic Studies
-              </MenuItem>
-
-              {/* Certificate Programs */}
-              <MenuItem value="Higher Education Access Programme - Arts">
-                Higher Education Access Programme - Arts
-              </MenuItem>
-              <MenuItem value="Higher Education Access Programme - Sciences">
-                Higher Education Access Programme - Sciences
-              </MenuItem>
+              {getAvailablePrograms().map((program) => (
+                <MenuItem key={program} value={program}>
+                  {program}
+                </MenuItem>
+              ))}
             </Select>
             {errors.program && (
               <FormHelperText>{errors.program}</FormHelperText>

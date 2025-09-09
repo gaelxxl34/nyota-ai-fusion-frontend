@@ -667,10 +667,20 @@ const ApplicationDetailsDialog = ({
     const { name, value } = e.target;
     console.log(`Form field changed: ${name} = ${value}`);
 
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    // Clear program selections when mode of study or intake changes
+    if (name === "modeOfStudy" || name === "preferredIntake") {
+      setFormData({
+        ...formData,
+        [name]: value,
+        preferredProgram: "", // Clear program selection
+        secondaryProgram: "", // Clear alternative program selection
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value,
+      });
+    }
 
     // Clear error for this field if any
     if (formErrors[name]) {
@@ -1208,6 +1218,228 @@ const ApplicationDetailsDialog = ({
     }
 
     return "Unknown Program";
+  };
+
+  // Program data organized by faculty, mode, and intake - matching student portal structure
+  const programData = {
+    "On Campus": {
+      January: {
+        "Faculty of Business Management (FBM)": [
+          "Bachelor of Business Administration",
+          "Bachelor of Public Administration",
+          "Bachelor of Procurement & Logistics Management",
+          "Bachelor of Human Resource Management",
+          "Bachelor of Tourism & Hotel Management",
+          "Master of Business Administration (MBA)",
+        ],
+        "Faculty of Science and Technology (FST)": [
+          "CISCO (3 months)",
+          "Bachelor of Information Technology",
+          "Bachelor of Science in Computer Science",
+          "Bachelor of Science in Environmental Science & Management",
+          "Bachelor of Science in Software Engineering",
+          "Bachelor of Science in Climate-Smart Agriculture",
+          "Master of Information Technology (MIT)",
+        ],
+        "Faculty of Engineering (FOE)": [
+          "Diploma in Architecture",
+          "Diploma in Civil Engineering",
+          "Diploma in Electrical Engineering",
+          "Bachelor of Architecture",
+          "Bachelor of Science in Civil Engineering",
+          "Bachelor of Science in Electrical Engineering",
+          "Bachelor of Science in Petroleum Engineering",
+          "Bachelor of Science in Mining Engineering",
+          "Bachelor of Science in Mechatronics & Robotics Engineering",
+          "Bachelor of Science in Communications Engineering",
+        ],
+        "Faculty of Law and Humanities (FLH)": [
+          "Bachelor of Laws",
+          "Bachelor of International Relations & Diplomatic Studies",
+          "Bachelor of Journalism & Communication Studies",
+          "Master of International Relations & Diplomatic Studies",
+        ],
+        "International Foundation Programme (IFP)": [
+          "Higher Education Access Programme in Physical Science",
+          "Higher Education Access Programme in Humanities",
+        ],
+      },
+      May: {
+        "Faculty of Business Management (FBM)": [
+          "Bachelor of Business Administration",
+          "Bachelor of Public Administration",
+          "Bachelor of Procurement & Logistics Management",
+          "Bachelor of Human Resource Management",
+          "Bachelor of Tourism & Hotel Management",
+          "Master of Business Administration (MBA)",
+        ],
+        "Faculty of Science and Technology (FST)": [
+          "CISCO (3 months)",
+          "Bachelor of Information Technology",
+          "Bachelor of Science in Computer Science",
+          "Bachelor of Science in Environmental Science & Management",
+          "Bachelor of Science in Software Engineering",
+          "Bachelor of Science in Climate-Smart Agriculture",
+          "Master of Information Technology (MIT)",
+        ],
+      },
+      August: {
+        "Faculty of Business Management (FBM)": [
+          "Bachelor of Business Administration",
+          "Bachelor of Public Administration",
+          "Bachelor of Procurement & Logistics Management",
+          "Bachelor of Human Resource Management",
+          "Bachelor of Tourism & Hotel Management",
+          "Master of Business Administration (MBA)",
+        ],
+        "Faculty of Science and Technology (FST)": [
+          "CISCO (3 months)",
+          "Bachelor of Information Technology",
+          "Bachelor of Science in Computer Science",
+          "Bachelor of Science in Environmental Science & Management",
+          "Bachelor of Science in Software Engineering",
+          "Bachelor of Science in Climate-Smart Agriculture",
+          "Master of Information Technology (MIT)",
+        ],
+        "Faculty of Engineering (FOE)": [
+          "Diploma in Architecture",
+          "Diploma in Civil Engineering",
+          "Diploma in Electrical Engineering",
+          "Bachelor of Architecture",
+          "Bachelor of Science in Civil Engineering",
+          "Bachelor of Science in Electrical Engineering",
+          "Bachelor of Science in Petroleum Engineering",
+          "Bachelor of Science in Mining Engineering",
+          "Bachelor of Science in Mechatronics & Robotics Engineering",
+          "Bachelor of Science in Communications Engineering",
+        ],
+        "Faculty of Law and Humanities (FLH)": [
+          "Bachelor of Laws",
+          "Bachelor of International Relations & Diplomatic Studies",
+          "Bachelor of Journalism & Communication Studies",
+          "Master of International Relations & Diplomatic Studies",
+        ],
+        "International Foundation Programme (IFP)": [
+          "Higher Education Access Programme in Physical Science",
+          "Higher Education Access Programme in Humanities",
+        ],
+      },
+    },
+    Online: {
+      January: {
+        "Faculty of Business Management (FBM)": [
+          "Bachelor of Business Administration",
+          "Master of Business Administration (MBA)",
+        ],
+        "Faculty of Science and Technology (FST)": [
+          "Bachelor of Information Technology",
+        ],
+        "Faculty of Law and Humanities (FLH)": ["Bachelor of Laws (LLB)"],
+        "International Foundation Programme (IFP)": [
+          "International Foundation Programme (Physical Science)",
+          "International Foundation Programme (Humanities)",
+        ],
+      },
+      May: {
+        "Faculty of Business Management (FBM)": [
+          "Bachelor of Business Administration",
+          "Master of Business Administration (MBA)",
+        ],
+        "Faculty of Science and Technology (FST)": [
+          "Bachelor of Information Technology",
+        ],
+      },
+      August: {
+        "Faculty of Business Management (FBM)": [
+          "Bachelor of Business Administration",
+          "Master of Business Administration (MBA)",
+        ],
+        "Faculty of Science and Technology (FST)": [
+          "Bachelor of Information Technology",
+        ],
+        "Faculty of Law and Humanities (FLH)": ["Bachelor of Laws (LLB)"],
+        "International Foundation Programme (IFP)": [
+          "International Foundation Programme (Physical Science)",
+          "International Foundation Programme (Humanities)",
+        ],
+      },
+    },
+  };
+
+  // Get available programs grouped by faculty based on mode of study and intake
+  const getAvailablePrograms = (modeOfStudy, intake) => {
+    if (!modeOfStudy || !intake) {
+      return {};
+    }
+    return programData[modeOfStudy]?.[intake] || {};
+  };
+
+  // Get all programs for backward compatibility with existing applications
+  const getAllPrograms = () => {
+    const allPrograms = new Set();
+
+    // Collect all programs from all modes, intakes, and faculties
+    Object.values(programData).forEach((modeData) => {
+      Object.values(modeData).forEach((intakeData) => {
+        Object.values(intakeData).forEach((facultyPrograms) => {
+          facultyPrograms.forEach((program) => allPrograms.add(program));
+        });
+      });
+    });
+
+    return Array.from(allPrograms).sort();
+  };
+
+  // Render program options for select dropdowns
+  const renderProgramOptions = (
+    modeOfStudy = null,
+    intake = null,
+    includeEmpty = true
+  ) => {
+    const options = [];
+
+    if (includeEmpty) {
+      options.push(
+        <MenuItem key="empty" value="">
+          <em>Select Program</em>
+        </MenuItem>
+      );
+    }
+
+    if (modeOfStudy && intake) {
+      // Show programs organized by faculty for specific mode and intake
+      const availablePrograms = getAvailablePrograms(modeOfStudy, intake);
+      Object.entries(availablePrograms).forEach(([faculty, programs]) => {
+        options.push(
+          <MenuItem
+            key={faculty}
+            disabled
+            sx={{ fontWeight: "bold", backgroundColor: "#f5f5f5" }}
+          >
+            {faculty}
+          </MenuItem>
+        );
+        programs.forEach((program) => {
+          options.push(
+            <MenuItem key={program} value={program} sx={{ pl: 4 }}>
+              {program}
+            </MenuItem>
+          );
+        });
+      });
+    } else {
+      // Show all programs as flat list for backward compatibility
+      const allPrograms = getAllPrograms();
+      allPrograms.forEach((program) => {
+        options.push(
+          <MenuItem key={program} value={program}>
+            {program}
+          </MenuItem>
+        );
+      });
+    }
+
+    return options;
   };
 
   // Helper function to get the formatted program name
@@ -1849,102 +2081,11 @@ const ApplicationDetailsDialog = ({
                           onChange={handleInputChange}
                           label="Preferred Program"
                         >
-                          {/* Business and Management Programs */}
-                          <MenuItem value="Bachelor of Business Administration">
-                            Bachelor of Business Administration
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Public Administration">
-                            Bachelor of Public Administration
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Procurement and Logistics Management">
-                            Bachelor of Procurement and Logistics Management
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Tourism and Hotel Management">
-                            Bachelor of Tourism and Hotel Management
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Human Resource Management">
-                            Bachelor of Human Resource Management
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Journalism and Communication Studies">
-                            Bachelor of Journalism and Communication Studies
-                          </MenuItem>
-                          <MenuItem value="Master of Business Administration (MBA)">
-                            Master of Business Administration (MBA)
-                          </MenuItem>
-
-                          {/* Science and Technology Programs */}
-                          <MenuItem value="Bachelor of Science in Computer Science">
-                            Bachelor of Science in Computer Science
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Information Technology">
-                            Bachelor of Information Technology
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Software Engineering">
-                            Bachelor of Science in Software Engineering
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Climate Smart Agriculture">
-                            Bachelor of Science in Climate Smart Agriculture
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Environmental Science and Management">
-                            Bachelor of Science in Environmental Science and
-                            Management
-                          </MenuItem>
-                          <MenuItem value="Master of Information Technology">
-                            Master of Information Technology
-                          </MenuItem>
-
-                          {/* Engineering Programs */}
-                          <MenuItem value="Bachelor of Science in Electrical Engineering">
-                            Bachelor of Science in Electrical Engineering
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Civil Engineering">
-                            Bachelor of Science in Civil Engineering
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Architecture">
-                            Bachelor of Architecture
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Petroleum Engineering">
-                            Bachelor of Science in Petroleum Engineering
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Mechatronics and Robotics">
-                            Bachelor of Science in Mechatronics and Robotics
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Communications Engineering">
-                            Bachelor of Science in Communications Engineering
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Mining Engineering">
-                            Bachelor of Science in Mining Engineering
-                          </MenuItem>
-                          <MenuItem value="Diploma in Electrical Engineering">
-                            Diploma in Electrical Engineering
-                          </MenuItem>
-                          <MenuItem value="Diploma in Civil Engineering">
-                            Diploma in Civil Engineering
-                          </MenuItem>
-                          <MenuItem value="Diploma in Architecture">
-                            Diploma in Architecture
-                          </MenuItem>
-
-                          {/* Law and Humanities Programs */}
-                          <MenuItem value="Bachelor of Laws (LLB)">
-                            Bachelor of Laws (LLB)
-                          </MenuItem>
-                          <MenuItem value="Bachelor of International Relations and Diplomatic Studies">
-                            Bachelor of International Relations and Diplomatic
-                            Studies
-                          </MenuItem>
-                          <MenuItem value="Master of International Relations and Diplomatic Studies">
-                            Master of International Relations and Diplomatic
-                            Studies
-                          </MenuItem>
-
-                          {/* Certificate Programs */}
-                          <MenuItem value="Higher Education Access Programme - Arts">
-                            Higher Education Access Programme - Arts
-                          </MenuItem>
-                          <MenuItem value="Higher Education Access Programme - Sciences">
-                            Higher Education Access Programme - Sciences
-                          </MenuItem>
+                          {renderProgramOptions(
+                            formData.modeOfStudy,
+                            formData.preferredIntake,
+                            true
+                          )}
                         </Select>
                         {formErrors.preferredProgram && (
                           <FormHelperText>
@@ -1968,102 +2109,11 @@ const ApplicationDetailsDialog = ({
                           <MenuItem value="">
                             <em>None</em>
                           </MenuItem>
-                          {/* Business and Management Programs */}
-                          <MenuItem value="Bachelor of Business Administration">
-                            Bachelor of Business Administration
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Public Administration">
-                            Bachelor of Public Administration
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Procurement and Logistics Management">
-                            Bachelor of Procurement and Logistics Management
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Tourism and Hotel Management">
-                            Bachelor of Tourism and Hotel Management
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Human Resource Management">
-                            Bachelor of Human Resource Management
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Journalism and Communication Studies">
-                            Bachelor of Journalism and Communication Studies
-                          </MenuItem>
-                          <MenuItem value="Master of Business Administration">
-                            Master of Business Administration (MBA)
-                          </MenuItem>
-
-                          {/* Science and Technology Programs */}
-                          <MenuItem value="Bachelor of Science in Computer Science">
-                            Bachelor of Science in Computer Science
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Information Technology">
-                            Bachelor of Information Technology
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Software Engineering">
-                            Bachelor of Science in Software Engineering
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Climate Smart Agriculture">
-                            Bachelor of Science in Climate Smart Agriculture
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Environmental Science and Management">
-                            Bachelor of Science in Environmental Science and
-                            Management
-                          </MenuItem>
-                          <MenuItem value="Master of Information Technology">
-                            Master of Information Technology
-                          </MenuItem>
-
-                          {/* Engineering Programs */}
-                          <MenuItem value="Bachelor of Science in Electrical Engineering">
-                            Bachelor of Science in Electrical Engineering
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Civil Engineering">
-                            Bachelor of Science in Civil Engineering
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Architecture">
-                            Bachelor of Architecture
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Petroleum Engineering">
-                            Bachelor of Science in Petroleum Engineering
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Mechatronics and Robotics">
-                            Bachelor of Science in Mechatronics and Robotics
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Communications Engineering">
-                            Bachelor of Science in Communications Engineering
-                          </MenuItem>
-                          <MenuItem value="Bachelor of Science in Mining Engineering">
-                            Bachelor of Science in Mining Engineering
-                          </MenuItem>
-                          <MenuItem value="Diploma in Electrical Engineering">
-                            Diploma in Electrical Engineering
-                          </MenuItem>
-                          <MenuItem value="Diploma in Civil Engineering">
-                            Diploma in Civil Engineering
-                          </MenuItem>
-                          <MenuItem value="Diploma in Architecture">
-                            Diploma in Architecture
-                          </MenuItem>
-
-                          {/* Law and Humanities Programs */}
-                          <MenuItem value="Bachelor of Laws">
-                            Bachelor of Laws (LLB)
-                          </MenuItem>
-                          <MenuItem value="Bachelor of International Relations and Diplomatic Studies">
-                            Bachelor of International Relations and Diplomatic
-                            Studies
-                          </MenuItem>
-                          <MenuItem value="Master of International Relations and Diplomatic Studies">
-                            Master of International Relations and Diplomatic
-                            Studies
-                          </MenuItem>
-
-                          {/* Certificate Programs */}
-                          <MenuItem value="Higher Education Access Programme - Arts">
-                            Higher Education Access Programme - Arts
-                          </MenuItem>
-                          <MenuItem value="Higher Education Access Programme - Sciences">
-                            Higher Education Access Programme - Sciences
-                          </MenuItem>
+                          {renderProgramOptions(
+                            formData.modeOfStudy,
+                            formData.preferredIntake,
+                            false
+                          )}
                         </Select>
                       </FormControl>
                     </Grid>

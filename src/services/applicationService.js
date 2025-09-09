@@ -140,8 +140,31 @@ class ApplicationService {
         applicationData.passportPhoto instanceof File ||
         applicationData.academicDocuments instanceof File ||
         applicationData.identificationDocuments instanceof File ||
-        Array.isArray(applicationData.academicDocuments) ||
-        Array.isArray(applicationData.identificationDocuments);
+        (Array.isArray(applicationData.academicDocuments) &&
+          applicationData.academicDocuments.length > 0) ||
+        (Array.isArray(applicationData.identificationDocuments) &&
+          applicationData.identificationDocuments.length > 0);
+
+      console.log("=== FILE UPLOAD DEBUG ===");
+      console.log(
+        "passportPhoto:",
+        applicationData.passportPhoto,
+        typeof applicationData.passportPhoto
+      );
+      console.log(
+        "academicDocuments:",
+        applicationData.academicDocuments,
+        typeof applicationData.academicDocuments,
+        Array.isArray(applicationData.academicDocuments)
+      );
+      console.log(
+        "identificationDocuments:",
+        applicationData.identificationDocuments,
+        typeof applicationData.identificationDocuments,
+        Array.isArray(applicationData.identificationDocuments)
+      );
+      console.log("hasFiles:", hasFiles);
+      console.log("========================");
 
       let requestData;
       let config = {};
@@ -159,43 +182,81 @@ class ApplicationService {
             !(value instanceof File) &&
             !Array.isArray(value)
           ) {
+            console.log(`Adding non-file field ${key}:`, value, typeof value);
             formData.append(key, value.toString());
+          } else if (value === null || value === undefined) {
+            console.log(`Skipping null/undefined field ${key}:`, value);
+          } else if (Array.isArray(value)) {
+            console.log(
+              `Skipping array field ${key} (will handle separately):`,
+              value.length,
+              "items"
+            );
+          } else if (value instanceof File) {
+            console.log(
+              `Skipping file field ${key} (will handle separately):`,
+              value.name
+            );
           }
         });
 
         // Add file fields
         if (applicationData.passportPhoto instanceof File) {
+          console.log(
+            "Adding passportPhoto file:",
+            applicationData.passportPhoto.name
+          );
           formData.append("passportPhoto", applicationData.passportPhoto);
         }
 
+        // Handle academicDocuments (can be single file or array)
         if (applicationData.academicDocuments instanceof File) {
+          console.log(
+            "Adding single academicDocuments file:",
+            applicationData.academicDocuments.name
+          );
           formData.append(
             "academicDocuments",
             applicationData.academicDocuments
           );
         } else if (
           Array.isArray(applicationData.academicDocuments) &&
-          applicationData.academicDocuments[0] instanceof File
+          applicationData.academicDocuments.length > 0
         ) {
-          formData.append(
-            "academicDocuments",
-            applicationData.academicDocuments[0]
-          );
+          // For now, only send the first file to match backend expectations
+          const firstFile = applicationData.academicDocuments[0];
+          if (firstFile instanceof File) {
+            console.log(
+              "Adding academicDocuments file from array:",
+              firstFile.name
+            );
+            formData.append("academicDocuments", firstFile);
+          }
         }
 
+        // Handle identificationDocuments (can be single file or array)
         if (applicationData.identificationDocuments instanceof File) {
+          console.log(
+            "Adding single identificationDocument file:",
+            applicationData.identificationDocuments.name
+          );
           formData.append(
             "identificationDocument",
             applicationData.identificationDocuments
           );
         } else if (
           Array.isArray(applicationData.identificationDocuments) &&
-          applicationData.identificationDocuments[0] instanceof File
+          applicationData.identificationDocuments.length > 0
         ) {
-          formData.append(
-            "identificationDocument",
-            applicationData.identificationDocuments[0]
-          );
+          // For now, only send the first file to match backend expectations
+          const firstFile = applicationData.identificationDocuments[0];
+          if (firstFile instanceof File) {
+            console.log(
+              "Adding identificationDocument file from array:",
+              firstFile.name
+            );
+            formData.append("identificationDocument", firstFile);
+          }
         }
 
         // Add metadata
@@ -214,6 +275,19 @@ class ApplicationService {
             })
           );
         }
+
+        // Log FormData contents for debugging
+        console.log("=== FormData Contents ===");
+        for (let [key, value] of formData.entries()) {
+          if (value instanceof File) {
+            console.log(
+              `${key}: File(${value.name}, ${value.size} bytes, ${value.type})`
+            );
+          } else {
+            console.log(`${key}: ${value}`);
+          }
+        }
+        console.log("========================");
 
         requestData = formData;
         config = {

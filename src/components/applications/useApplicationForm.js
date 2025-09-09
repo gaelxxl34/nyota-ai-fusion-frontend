@@ -117,6 +117,25 @@ export const useApplicationForm = () => {
 
   const updateFormData = useCallback((newData) => {
     console.log("Updating form data with:", newData);
+
+    // Log file updates specifically
+    Object.keys(newData).forEach((key) => {
+      if (
+        [
+          "passportPhoto",
+          "academicDocuments",
+          "identificationDocuments",
+        ].includes(key)
+      ) {
+        console.log(
+          `File field update - ${key}:`,
+          newData[key],
+          typeof newData[key],
+          Array.isArray(newData[key])
+        );
+      }
+    });
+
     setFormData((prev) => {
       const updated = { ...prev, ...newData };
       console.log("New form data state:", updated);
@@ -243,10 +262,65 @@ export const useApplicationForm = () => {
           formattedData
         );
 
-        // Add comprehensive debugging
+        // Add comprehensive debugging including file field specific checks
         console.log("=== DEBUGGING FORM SUBMISSION ===");
         console.log("Original form data:", formData);
         console.log("Processed form data:", processedFormData);
+        console.log("File fields debug:");
+        console.log(
+          "- passportPhoto:",
+          processedFormData.passportPhoto,
+          typeof processedFormData.passportPhoto
+        );
+        console.log(
+          "- academicDocuments:",
+          processedFormData.academicDocuments,
+          typeof processedFormData.academicDocuments,
+          Array.isArray(processedFormData.academicDocuments)
+        );
+        console.log(
+          "- identificationDocuments:",
+          processedFormData.identificationDocuments,
+          typeof processedFormData.identificationDocuments,
+          Array.isArray(processedFormData.identificationDocuments)
+        );
+
+        // Check if files are actually File objects
+        if (processedFormData.passportPhoto) {
+          console.log(
+            "  - passportPhoto is File:",
+            processedFormData.passportPhoto instanceof File
+          );
+        }
+        if (processedFormData.academicDocuments) {
+          if (Array.isArray(processedFormData.academicDocuments)) {
+            console.log(
+              "  - academicDocuments array items are Files:",
+              processedFormData.academicDocuments.map((f) => f instanceof File)
+            );
+          } else {
+            console.log(
+              "  - academicDocuments is File:",
+              processedFormData.academicDocuments instanceof File
+            );
+          }
+        }
+        if (processedFormData.identificationDocuments) {
+          if (Array.isArray(processedFormData.identificationDocuments)) {
+            console.log(
+              "  - identificationDocuments array items are Files:",
+              processedFormData.identificationDocuments.map(
+                (f) => f instanceof File
+              )
+            );
+          } else {
+            console.log(
+              "  - identificationDocuments is File:",
+              processedFormData.identificationDocuments instanceof File
+            );
+          }
+        }
+
         console.log(
           "Final formatted data:",
           JSON.stringify(formattedData, null, 2)
