@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box,
   Paper,
@@ -253,6 +253,7 @@ const LeadStatusTab = ({
 const BulkActions = () => {
   const [tabValue, setTabValue] = useState(0);
   const [leadsData, setLeadsData] = useState({
+    contacted: [],
     interested: [],
     in_review: [],
     admitted: [],
@@ -267,6 +268,10 @@ const BulkActions = () => {
   const [refreshInterval, setRefreshInterval] = useState(null);
   const [selectedLeadStatus, setSelectedLeadStatus] = useState("interested");
 
+  // Use refs to prevent infinite loops
+  const isLoadingRef = useRef(false);
+  const hasFetchedInitialDataRef = useRef(false);
+
   const [campaignForm, setCampaignForm] = useState({
     name: "",
     description: "",
@@ -274,64 +279,78 @@ const BulkActions = () => {
 
   const { enqueueSnackbar } = useSnackbar();
 
-  // Fetch leads by status
-  const fetchLeadsByStatus = useCallback(
-    async (status) => {
-      try {
-        setLoading(true);
-        // For now, only interested leads have an API endpoint
-        // Other statuses will be implemented later
-        if (status === "interested") {
-          const response = await superAdminService.getInterestedLeads();
-          let leads = response.leads || [];
+  // Fetch leads by status - simplified without useCallback to prevent dependency issues
+  const fetchLeadsByStatus = async (status) => {
+    // Prevent multiple simultaneous calls
+    if (isLoadingRef.current) return;
 
-          // Sort leads by creation date (latest first) - same as Data Center
-          leads.sort((a, b) => {
-            const dateA =
-              a.createdAt instanceof Date
-                ? a.createdAt
-                : new Date(a.createdAt || 0);
-            const dateB =
-              b.createdAt instanceof Date
-                ? b.createdAt
-                : new Date(b.createdAt || 0);
-            return dateB - dateA; // desc order (newest first)
-          });
+    try {
+      isLoadingRef.current = true;
+      setLoading(true);
 
-          setLeadsData((prev) => ({
-            ...prev,
-            interested: leads,
-          }));
-        } else {
-          // Placeholder for other statuses - will be implemented later
-          setLeadsData((prev) => ({
-            ...prev,
-            [status]: [], // Empty array for now
-          }));
-          enqueueSnackbar(`${status} leads functionality coming soon!`, {
-            variant: "info",
-          });
-        }
-      } catch (error) {
-        console.error(`Error fetching ${status} leads:`, error);
-        enqueueSnackbar(`Failed to fetch ${status} leads`, {
-          variant: "error",
+      // Call appropriate API endpoint based on status
+      let response;
+      if (status === "interested") {
+        response = await superAdminService.getInterestedLeads();
+      } else if (status === "contacted") {
+        response = await superAdminService.getContactedLeads();
+      } else {
+        // Placeholder for other statuses - will be implemented later
+        setLeadsData((prev) => ({
+          ...prev,
+          [status]: [], // Empty array for now
+        }));
+        enqueueSnackbar(`${status} leads functionality coming soon!`, {
+          variant: "info",
         });
-      } finally {
-        setLoading(false);
+        return;
       }
-    },
-    [enqueueSnackbar]
-  );
 
-  // Fetch all lead statuses
-  const fetchAllLeads = useCallback(async () => {
-    await fetchLeadsByStatus("interested");
-    // Other statuses will be fetched when their APIs are ready
-  }, [fetchLeadsByStatus]);
+      let leads = response.leads || [];
 
-  // Fetch campaigns
-  const fetchCampaigns = useCallback(async () => {
+      // Sort leads by creation date (latest first) - same as Data Center
+      leads.sort((a, b) => {
+        const dateA =
+          a.createdAt instanceof Date
+            ? a.createdAt
+            : new Date(a.createdAt || 0);
+        const dateB =
+          b.createdAt instanceof Date
+            ? b.createdAt
+            : new Date(b.createdAt || 0);
+        return dateB - dateA; // desc order (newest first)
+      });
+
+      setLeadsData((prev) => ({
+        ...prev,
+        [status]: leads,
+      }));
+    } catch (error) {
+      console.error(`Error fetching ${status} leads:`, error);
+      enqueueSnackbar(`Failed to fetch ${status} leads`, {
+        variant: "error",
+      });
+    } finally {
+      isLoadingRef.current = false;
+      setLoading(false);
+    }
+  };
+
+  // Fetch all lead statuses - simplified
+  const fetchAllLeads = async () => {
+    try {
+      // Fetch leads in parallel to reduce loading time
+      await Promise.all([
+        fetchLeadsByStatus("contacted"),
+        fetchLeadsByStatus("interested"),
+      ]);
+    } catch (error) {
+      console.error("Error in fetchAllLeads:", error);
+    }
+  };
+
+  // Fetch campaigns - simplified
+  const fetchCampaigns = async () => {
     try {
       setCampaignLoading(true);
       const response = await superAdminService.getAllCampaigns();
@@ -342,7 +361,7 @@ const BulkActions = () => {
     } finally {
       setCampaignLoading(false);
     }
-  }, [enqueueSnackbar]);
+  };
 
   // Fetch specific campaign details
   const fetchCampaignDetails = useCallback(
@@ -368,36 +387,45 @@ const BulkActions = () => {
     [enqueueSnackbar]
   );
 
-  // Start auto-refresh for running campaigns
-  const startAutoRefresh = useCallback(() => {
-    if (refreshInterval) clearInterval(refreshInterval);
+  // Start auto-refresh for running campaigns - simplified
+  const startAutoRefresh = () => {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+    }
 
     const interval = setInterval(() => {
-      const runningCampaigns = campaigns.filter((c) => c.status === "running");
-      if (runningCampaigns.length > 0) {
-        runningCampaigns.forEach((campaign) => {
-          fetchCampaignDetails(campaign.id);
-        });
-      }
+      fetchCampaigns(); // Refetch all campaigns instead of individual ones
     }, 5000); // Refresh every 5 seconds
 
     setRefreshInterval(interval);
-  }, [refreshInterval, campaigns, fetchCampaignDetails]);
+  };
 
   // Stop auto-refresh
-  const stopAutoRefresh = useCallback(() => {
+  const stopAutoRefresh = () => {
     if (refreshInterval) {
       clearInterval(refreshInterval);
       setRefreshInterval(null);
     }
-  }, [refreshInterval]);
+  };
 
+  // Initial load effect
   useEffect(() => {
-    fetchAllLeads();
-    fetchCampaigns();
+    // Only fetch once when component mounts
+    if (!hasFetchedInitialDataRef.current) {
+      hasFetchedInitialDataRef.current = true;
+      fetchAllLeads();
+      fetchCampaigns();
+    }
 
-    return () => stopAutoRefresh();
-  }, [fetchAllLeads, fetchCampaigns, stopAutoRefresh]);
+    // Cleanup on unmount
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, []); // Empty dependency array to run only on mount
+
+  // Auto-refresh effect for running campaigns
   useEffect(() => {
     const runningCampaigns = campaigns.filter((c) => c.status === "running");
     if (runningCampaigns.length > 0) {
@@ -405,7 +433,7 @@ const BulkActions = () => {
     } else {
       stopAutoRefresh();
     }
-  }, [campaigns, startAutoRefresh, stopAutoRefresh]);
+  }, [campaigns]);
 
   // Handle form input changes
   const handleFormChange = (field, value) => {
@@ -449,14 +477,13 @@ const BulkActions = () => {
       return;
     }
 
-    if (selectedLeadStatus !== "interested") {
+    if (!["interested", "contacted"].includes(selectedLeadStatus)) {
       enqueueSnackbar(
         `Campaigns for "${selectedLeadStatus}" leads are not yet implemented`,
         { variant: "warning" }
       );
       return;
     }
-
     try {
       setLoading(true);
       await superAdminService.startBulkMessaging({
@@ -632,11 +659,61 @@ const BulkActions = () => {
     return "Invalid Date";
   };
 
-  // Generate email content preview for interested leads
-  const generateEmailContent = (leadName = "Prospective Student") => {
-    const subject = "How's your IUEA application going? We're here to help! 🌟";
+  // Generate email content preview for different lead statuses
+  const generateEmailContent = (
+    leadName = "Prospective Student",
+    status = "interested"
+  ) => {
+    if (status === "contacted") {
+      const subject = "Welcome to IUEA! Your journey to success starts here 🎓";
 
-    const text = `Dear ${leadName},
+      const text = `Dear ${leadName},
+
+Welcome to the International University of East Africa (IUEA)! 🎓
+
+Thank you for your interest in joining our university. We're thrilled that you've chosen IUEA for your higher education journey. As one of East Africa's leading universities, we're committed to providing quality education that prepares students for successful careers.
+
+Your journey to success starts here, and we're excited to guide you every step of the way!
+
+🎯 Why Choose IUEA?
+✓ Internationally recognized programs
+✓ Modern facilities and technology
+✓ Experienced faculty and industry experts
+✓ Strong alumni network and career support
+✓ Flexible learning options
+
+📋 Ready to Start Your Application?
+Create your student portal account now to begin your application process. From your portal, you can:
+- Complete your application online
+- Upload required documents
+- Track your application status
+- Receive important updates
+
+🎯 Visit Student Portal: https://applicant.iuea.ac.ug/login
+
+💬 Need Help?
+Our admissions team is ready to guide you through the application process, answer questions about programs, fees, and scholarships.
+
+Don't hesitate to reach out - we're here to help you achieve your academic goals!
+
+Best regards,
+IUEA Admissions Team
+International University of East Africa
+
+📞 Contact Information:
+Phone: +256 706 026496
+WhatsApp: +256 705 722 300
+Email: apply@iuea.ac.ug
+Website: www.iuea.ac.ug
+Address: Kansanga, Kampala, Uganda`;
+
+      return { subject, text };
+    } else {
+      // Original interested leads content
+      const subject =
+        "How's your IUEA application going? We're here to help! 🌟";
+
+      const text = `Dear ${leadName},
 
 We hope this email finds you well! 😊 We're just checking in to see how things are going with your IUEA application.
 
@@ -669,15 +746,31 @@ Email: apply@iuea.ac.ug
 Website: www.iuea.ac.ug
 Address: Kansanga, Kampala, Uganda`;
 
-    return { subject, text };
+      return { subject, text };
+    }
   };
 
   // Generate WhatsApp message content preview
-  const generateWhatsAppContent = () => {
-    return `Hi there! 👋
+  const generateWhatsAppContent = (status = "interested") => {
+    if (status === "contacted") {
+      return `Hello! 👋 
+
+Welcome to IUEA! 🎓 Thank you for your interest in the International University of East Africa.
+
+We're excited to have you start your journey with us. The first step is to create your student portal account where you can complete your application and track your progress.
+
+Ready to get started? Click here to access your portal: https://applicant.iuea.ac.ug/login
+
+If you need any help or have questions, feel free to chat with us. We're here to support you every step of the way! 😊
+
+IUEA Admissions Team`;
+    } else {
+      // Original interested leads content
+      return `Hi there! 👋
 Just checking in to see how things are going with your IUEA application.
 We'd love to hear from you — if there's anything you need or any challenge you're facing, feel free to let us know. 😊
 We're here to support you and are excited to have you on this journey! 🌟`;
+    }
   };
 
   return (
@@ -696,6 +789,11 @@ We're here to support you and are excited to have you on this journey! 🌟`;
           variant="scrollable"
           scrollButtons="auto"
         >
+          <Tab
+            label="Contacted Leads"
+            icon={<PeopleIcon />}
+            iconPosition="start"
+          />
           <Tab
             label="Interested Leads"
             icon={<PeopleIcon />}
@@ -720,8 +818,22 @@ We're here to support you and are excited to have you on this journey! 🌟`;
         </Tabs>
       </Box>
 
-      {/* Interested Leads Tab */}
+      {/* Contacted Leads Tab */}
       <TabPanel value={tabValue} index={0}>
+        <LeadStatusTab
+          leads={leadsData.contacted}
+          statusName="contacted"
+          statusDisplayName="Contacted"
+          loading={loading}
+          onRefresh={handleRefreshLeads}
+          onStartCampaign={handleStartCampaign}
+          onPreviewMessages={handlePreviewMessages}
+          formatDate={formatDate}
+        />
+      </TabPanel>
+
+      {/* Interested Leads Tab */}
+      <TabPanel value={tabValue} index={1}>
         <LeadStatusTab
           leads={leadsData.interested}
           statusName="interested"
@@ -735,7 +847,7 @@ We're here to support you and are excited to have you on this journey! 🌟`;
       </TabPanel>
 
       {/* In Review Leads Tab */}
-      <TabPanel value={tabValue} index={1}>
+      <TabPanel value={tabValue} index={2}>
         <LeadStatusTab
           leads={leadsData.in_review}
           statusName="in_review"
@@ -749,7 +861,7 @@ We're here to support you and are excited to have you on this journey! 🌟`;
       </TabPanel>
 
       {/* Admitted Leads Tab */}
-      <TabPanel value={tabValue} index={2}>
+      <TabPanel value={tabValue} index={3}>
         <LeadStatusTab
           leads={leadsData.admitted}
           statusName="admitted"
@@ -763,7 +875,7 @@ We're here to support you and are excited to have you on this journey! 🌟`;
       </TabPanel>
 
       {/* Enrolled Leads Tab */}
-      <TabPanel value={tabValue} index={3}>
+      <TabPanel value={tabValue} index={4}>
         <LeadStatusTab
           leads={leadsData.enrolled}
           statusName="enrolled"
@@ -777,7 +889,7 @@ We're here to support you and are excited to have you on this journey! 🌟`;
       </TabPanel>
 
       {/* Campaigns Tab */}
-      <TabPanel value={tabValue} index={4}>
+      <TabPanel value={tabValue} index={5}>
         <Box
           sx={{
             mb: 3,
@@ -1068,7 +1180,8 @@ We're here to support you and are excited to have you on this journey! 🌟`;
                 variant="subtitle1"
                 sx={{ mb: 2, fontWeight: "bold" }}
               >
-                Subject: {generateEmailContent().subject}
+                Subject:{" "}
+                {generateEmailContent("John Doe", selectedLeadStatus).subject}
               </Typography>
               <Typography
                 variant="body2"
@@ -1084,7 +1197,7 @@ We're here to support you and are excited to have you on this journey! 🌟`;
                   borderRadius: 1,
                 }}
               >
-                {generateEmailContent("John Doe").text}
+                {generateEmailContent("John Doe", selectedLeadStatus).text}
               </Typography>
             </Box>
           </Paper>
@@ -1109,7 +1222,10 @@ We're here to support you and are excited to have you on this journey! 🌟`;
                 variant="subtitle2"
                 sx={{ mb: 2, color: "text.secondary" }}
               >
-                Template: application_followup_iuea
+                Template:{" "}
+                {selectedLeadStatus === "contacted"
+                  ? "nurturing_lead_portal_signup"
+                  : "application_followup_iuea"}
               </Typography>
               <Typography
                 variant="body2"
@@ -1124,7 +1240,7 @@ We're here to support you and are excited to have you on this journey! 🌟`;
                   border: "1px solid #c8e6c9",
                 }}
               >
-                {generateWhatsAppContent()}
+                {generateWhatsAppContent(selectedLeadStatus)}
               </Typography>
             </Box>
           </Paper>
@@ -1176,15 +1292,16 @@ We're here to support you and are excited to have you on this journey! 🌟`;
             leads. This action cannot be undone.
           </Alert>
 
-          {selectedLeadStatus !== "interested" && (
-            <Alert severity="info" sx={{ mb: 3 }}>
-              <Typography variant="body2">
-                <strong>Note:</strong> Currently, only "interested" leads
-                campaigns are fully implemented. Other lead statuses will be
-                supported in future updates.
-              </Typography>
-            </Alert>
-          )}
+          {selectedLeadStatus !== "interested" &&
+            selectedLeadStatus !== "contacted" && (
+              <Alert severity="info" sx={{ mb: 3 }}>
+                <Typography variant="body2">
+                  <strong>Note:</strong> Currently, only "interested" and
+                  "contacted" leads campaigns are fully implemented. Other lead
+                  statuses will be supported in future updates.
+                </Typography>
+              </Alert>
+            )}
 
           <TextField
             fullWidth
@@ -1223,7 +1340,7 @@ We're here to support you and are excited to have you on this journey! 🌟`;
               </Typography>
               <Typography variant="body2">
                 <strong>Campaign Type:</strong>{" "}
-                {selectedLeadStatus === "interested"
+                {["interested", "contacted"].includes(selectedLeadStatus)
                   ? "✅ Fully Supported"
                   : "⚠️ Limited Support"}
               </Typography>
@@ -1256,8 +1373,11 @@ We're here to support you and are excited to have you on this journey! 🌟`;
           >
             {loading
               ? "Starting..."
-              : selectedLeadStatus === "interested"
-              ? "Start Interested Leads Campaign"
+              : ["interested", "contacted"].includes(selectedLeadStatus)
+              ? `Start ${
+                  selectedLeadStatus.charAt(0).toUpperCase() +
+                  selectedLeadStatus.slice(1)
+                } Leads Campaign`
               : `Start ${
                   selectedLeadStatus.charAt(0).toUpperCase() +
                   selectedLeadStatus.slice(1)

@@ -26,8 +26,8 @@ import {
   Storage as DataCenterIcon,
   MenuBook as KnowledgeBaseIcon,
   CloudUpload as ImportIcon,
-  Campaign as CampaignIcon,
   Send as BulkActionsIcon,
+  Facebook as FacebookIcon,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -77,9 +77,9 @@ const Layout = ({ children }) => {
           path: "/admission-admin/import-data",
         },
         {
-          text: "Lead Forms",
-          icon: <CampaignIcon />,
-          path: "/super-admin/lead-forms",
+          text: "Facebook Lead Forms",
+          icon: <FacebookIcon />,
+          path: "/super-admin/facebook-lead-forms",
         },
         {
           text: "Bulk Actions",

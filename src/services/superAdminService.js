@@ -183,94 +183,6 @@ export const superAdminService = {
     }
   },
 
-  // ========== LEAD FORMS MANAGEMENT ==========
-
-  // Get all lead forms
-  async getLeadForms() {
-    try {
-      const response = await axiosInstance.get("/api/super-admin/lead-forms");
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching lead forms:", error);
-      throw new Error(
-        error.response?.data?.message || "Failed to fetch lead forms"
-      );
-    }
-  },
-
-  // Create new lead form
-  async createLeadForm(formData) {
-    try {
-      const response = await axiosInstance.post(
-        "/api/super-admin/lead-forms",
-        formData
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error creating lead form:", error);
-      throw error;
-    }
-  },
-
-  // Update lead form
-  async updateLeadForm(formId, formData) {
-    try {
-      const response = await axiosInstance.put(
-        `/api/super-admin/lead-forms/${formId}`,
-        formData
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error updating lead form:", error);
-      throw error;
-    }
-  },
-
-  // Delete lead form
-  async deleteLeadForm(formId) {
-    try {
-      const response = await axiosInstance.delete(
-        `/api/super-admin/lead-forms/${formId}`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error deleting lead form:", error);
-      throw new Error(
-        error.response?.data?.message || "Failed to delete lead form"
-      );
-    }
-  },
-
-  // Get lead form statistics
-  async getLeadFormStats(formId, timeRange = "30") {
-    try {
-      const response = await axiosInstance.get(
-        `/api/super-admin/lead-forms/${formId}/stats?timeRange=${timeRange}`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching lead form stats:", error);
-      throw new Error(
-        error.response?.data?.message || "Failed to fetch lead form statistics"
-      );
-    }
-  },
-
-  // Test Meta webhook connection for a specific form
-  async testLeadFormWebhook(formId) {
-    try {
-      const response = await axiosInstance.post(
-        `/api/super-admin/lead-forms/${formId}/test-webhook`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error testing webhook:", error);
-      throw new Error(
-        error.response?.data?.message || "Failed to test webhook"
-      );
-    }
-  },
-
   // ========== BULK ACTIONS ==========
 
   // Get all interested leads for bulk messaging
@@ -284,6 +196,21 @@ export const superAdminService = {
       console.error("Error fetching interested leads:", error);
       throw new Error(
         error.response?.data?.message || "Failed to fetch interested leads"
+      );
+    }
+  },
+
+  // Get all contacted leads for bulk messaging
+  async getContactedLeads() {
+    try {
+      const response = await axiosInstance.get(
+        "/api/super-admin/bulk-actions/contacted-leads"
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching contacted leads:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch contacted leads"
       );
     }
   },
@@ -347,6 +274,112 @@ export const superAdminService = {
       throw new Error(
         error.response?.data?.message || "Failed to delete campaign"
       );
+    }
+  },
+
+  // ========== FACEBOOK LEAD FORMS METHODS ==========
+
+  // Get all Facebook lead forms from Meta API
+  async getFacebookLeadForms(fetchAllLeads = false) {
+    try {
+      const response = await axiosInstance.get(
+        "/api/super-admin/facebook-lead-forms",
+        {
+          params: {
+            fetchAllLeads: fetchAllLeads,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching Facebook lead forms:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch Facebook lead forms"
+      );
+    }
+  },
+
+  // Get all leads from all Facebook forms
+  async getAllFacebookLeads(maxLeadsPerForm = 1000) {
+    try {
+      const response = await axiosInstance.get(
+        "/api/super-admin/facebook-lead-forms/all-leads",
+        {
+          params: {
+            maxLeadsPerForm: maxLeadsPerForm,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching all Facebook leads:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch all Facebook leads"
+      );
+    }
+  },
+
+  // Get detailed statistics for a specific Facebook lead form
+  async getFacebookLeadFormStats(formId, pageAccessToken) {
+    try {
+      const response = await axiosInstance.get(
+        `/api/super-admin/facebook-lead-forms/${formId}/stats`,
+        {
+          params: {
+            pageAccessToken,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching Facebook form statistics:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch form statistics"
+      );
+    }
+  },
+
+  // Get leads from a specific Facebook form
+  async getFacebookLeadFormLeads(formId, pageAccessToken, limit = 25) {
+    try {
+      const response = await axiosInstance.get(
+        `/api/super-admin/facebook-lead-forms/${formId}/leads`,
+        {
+          params: {
+            pageAccessToken,
+            limit,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching Facebook form leads:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch form leads"
+      );
+    }
+  },
+
+  // ========== LEADS MANAGEMENT ==========
+
+  // Get all leads with pagination and filtering
+  async getAllLeads(params = {}) {
+    try {
+      const response = await axiosInstance.get("/api/leads", {
+        params: {
+          limit: params.limit || 50,
+          page: params.page || 1,
+          status: params.status,
+          sortBy: params.sortBy || "createdAt",
+          sortOrder: params.sortOrder || "desc",
+          search: params.search,
+          ...params,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching all leads:", error);
+      throw new Error(error.response?.data?.message || "Failed to fetch leads");
     }
   },
 };

@@ -11,7 +11,7 @@ import ChatManagement from "./pages/super-admin/ChatManagement";
 import Settings from "./pages/super-admin/Settings";
 import UserManagement from "./pages/super-admin/UserManagement";
 import SuperAdminSettings from "./pages/super-admin/AdminSettings";
-import LeadFormsManagement from "./pages/super-admin/LeadFormsManagement";
+import FacebookLeadForms from "./pages/super-admin/FacebookLeadForms";
 import BulkActions from "./pages/super-admin/BulkActions";
 // Admin Pages (formerly organization)
 import TeamManagement from "./pages/admin/TeamManagement";
@@ -130,8 +130,8 @@ function App() {
                         />
                         <Route path="users" element={<UserManagement />} />
                         <Route
-                          path="lead-forms"
-                          element={<LeadFormsManagement />}
+                          path="facebook-lead-forms"
+                          element={<FacebookLeadForms />}
                         />
                         <Route path="bulk-actions" element={<BulkActions />} />
                         <Route path="chat" element={<ChatManagement />} />

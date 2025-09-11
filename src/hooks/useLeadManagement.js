@@ -300,6 +300,7 @@ export const useLeadManagement = ({
   // Analytics helpers
   const getStatusColor = useCallback((status) => {
     const colors = {
+      CONTACTED: "info", // New status for leads we've contacted
       INQUIRY: "primary",
       INTERESTED: "warning", // Current status system
       PRE_QUALIFIED: "warning", // Legacy status for backward compatibility

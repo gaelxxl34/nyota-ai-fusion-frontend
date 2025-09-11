@@ -138,6 +138,7 @@ const DataCenter = () => {
       {
         label: "All Leads",
         statuses: [
+          "CONTACTED",
           "INTERESTED",
           "APPLIED",
           "MISSING_DOCUMENT",
@@ -157,6 +158,12 @@ const DataCenter = () => {
         icon: PersonIcon,
         color: "secondary",
         isPersonal: true, // Special flag to indicate this shows personal submissions
+      },
+      {
+        label: "Contacted",
+        statuses: ["CONTACTED"],
+        icon: ContactMailIcon,
+        color: "default",
       },
       {
         label: "Interested",
@@ -729,6 +736,13 @@ const DataCenter = () => {
         color: "primary",
       },
       {
+        key: "contacted",
+        status: "CONTACTED",
+        label: "Contacted",
+        icon: ContactMailIcon,
+        color: "default",
+      },
+      {
         key: "interested",
         status: "INTERESTED",
         label: "Interested",
@@ -813,6 +827,7 @@ const DataCenter = () => {
       return allCards.filter((card) =>
         [
           "total",
+          "contacted",
           "interested",
           "applied",
           "in_review",
@@ -829,6 +844,13 @@ const DataCenter = () => {
   // Get funnel stages based on user role
   const getVisibleFunnelStages = () => {
     const allStages = [
+      {
+        key: "contacted",
+        status: "CONTACTED",
+        label: "Contacted",
+        color: "default",
+        subtitle: "Initial Contact",
+      },
       {
         key: "interested",
         status: "INTERESTED",
@@ -884,6 +906,7 @@ const DataCenter = () => {
       // Marketing agents see Interested to Admitted
       return allStages.filter((stage) =>
         [
+          "contacted",
           "interested",
           "applied",
           "in_review",
@@ -1016,6 +1039,8 @@ const DataCenter = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
+      case "CONTACTED":
+        return "default";
       case "INTERESTED":
         return "warning";
       case "APPLIED":
@@ -1565,6 +1590,7 @@ const DataCenter = () => {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {card.key === "total" && "All prospects in system"}
+                    {card.key === "contacted" && "Initial contact made"}
                     {card.key === "interested" && "Showing interest"}
                     {card.key === "qualified" && "Ready for admission"}
                     {card.key === "applied" && "Submitted applications"}

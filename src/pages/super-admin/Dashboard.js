@@ -55,7 +55,7 @@ const AdminDashboard = () => {
 
   const [roleMetrics, setRoleMetrics] = useState([]);
   const [leadFunnel, setLeadFunnel] = useState({
-    new_contact: 0,
+    contacted: 0,
     interested: 0,
     qualified: 0,
     applied: 0,
@@ -186,17 +186,9 @@ const AdminDashboard = () => {
 
         setRoleMetrics(processedRoleMetrics);
 
-        // Process leadFunnel data to exclude 'contacted' stage
+        // Process leadFunnel data to include 'contacted' stage
         const leadFunnelData = systemStatsData.leadFunnel || {};
         const processedLeadFunnel = { ...leadFunnelData };
-
-        // Remove 'contacted' if it exists and merge its count with 'interested'
-        if (processedLeadFunnel.contacted) {
-          processedLeadFunnel.interested =
-            (processedLeadFunnel.interested || 0) +
-            processedLeadFunnel.contacted;
-          delete processedLeadFunnel.contacted;
-        }
 
         setLeadFunnel(processedLeadFunnel);
 
@@ -263,7 +255,7 @@ const AdminDashboard = () => {
       });
       setRoleMetrics([]);
       setLeadFunnel({
-        new_contact: 0,
+        contacted: 0,
         interested: 0,
         qualified: 0,
         applied: 0,
@@ -843,7 +835,7 @@ const AdminDashboard = () => {
                 >
                   {Object.entries(leadFunnel).map(([stage, count], index) => {
                     const stages = Object.keys(leadFunnel);
-                    const maxCount = leadFunnel.new_contact || 1;
+                    const maxCount = leadFunnel.contacted || 1;
                     const percentage = ((count / maxCount) * 100).toFixed(1);
                     const previousStage =
                       index > 0 ? leadFunnel[stages[index - 1]] : count;
@@ -854,11 +846,11 @@ const AdminDashboard = () => {
                         : "0";
 
                     const stageConfig = {
-                      new_contact: {
+                      contacted: {
                         color: "#1e40af",
                         icon: <ForumIcon />,
-                        label: "New Contacts",
-                        sublabel: "Initial Inquiries",
+                        label: "Contacted",
+                        sublabel: "Initial Contact Made",
                       },
                       interested: {
                         color: "#7c3aed",
@@ -1085,10 +1077,9 @@ const AdminDashboard = () => {
                             Overall Conversion
                           </Typography>
                           <Typography variant="h3" fontWeight="bold">
-                            {leadFunnel.new_contact > 0
+                            {leadFunnel.contacted > 0
                               ? (
-                                  (leadFunnel.enrolled /
-                                    leadFunnel.new_contact) *
+                                  (leadFunnel.enrolled / leadFunnel.contacted) *
                                   100
                                 ).toFixed(1)
                               : "0.0"}
@@ -1129,10 +1120,9 @@ const AdminDashboard = () => {
                             Application Rate
                           </Typography>
                           <Typography variant="h3" fontWeight="bold">
-                            {leadFunnel.new_contact > 0
+                            {leadFunnel.contacted > 0
                               ? (
-                                  (leadFunnel.applied /
-                                    leadFunnel.new_contact) *
+                                  (leadFunnel.applied / leadFunnel.contacted) *
                                   100
                                 ).toFixed(1)
                               : "0.0"}
@@ -1176,7 +1166,7 @@ const AdminDashboard = () => {
                             color="#d97706"
                           >
                             {formatNumber(
-                              (leadFunnel.new_contact || 0) -
+                              (leadFunnel.contacted || 0) -
                                 (leadFunnel.applied || 0) -
                                 (leadFunnel.qualified || 0)
                             )}
@@ -1339,17 +1329,6 @@ const AdminDashboard = () => {
                     sx={{ py: 2 }}
                   >
                     Manage Users
-                  </Button>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    startIcon={<CampaignIcon />}
-                    onClick={() => navigate("/super-admin/lead-forms")}
-                    sx={{ py: 2 }}
-                  >
-                    Lead Forms
                   </Button>
                 </Grid>
                 <Grid item xs={12} sm={4}>

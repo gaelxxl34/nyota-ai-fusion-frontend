@@ -301,6 +301,8 @@ const ImportData = () => {
         endpoint = "/api/admin/import-tag-updates";
       } else if (importType === "emails") {
         endpoint = "/api/admin/import-send-emails";
+      } else if (importType === "facebookLeads") {
+        endpoint = "/api/admin/import-facebook-leads";
       }
 
       // Make API call to upload file
@@ -451,6 +453,13 @@ John,Doe,john.doe@example.com
 Jane,Smith,jane.smith@example.com
 Mark,Johnson,mark.johnson@example.com`;
       filename = "email_campaign_template.csv";
+    } else if (importType === "facebookLeads") {
+      // Template for Facebook leads
+      csvContent = `Form Name,Name,Email,Phone,Preferred Program,Highest Level of Education Completed,Are you transferring from another university?,When would you like to come and complete your application?,How will you pay your tuition fees?,Created Date
+Contact Form,John Doe,john.doe@example.com,+256700000000,Information Technology,Bachelor's Degree,No,August 2025,Self-sponsored,"Sep 11, 2025, 08:29 PM"
+Interest Form,Jane Smith,jane.smith@example.com,+256700000001,Business Administration,High School Certificate,Yes,January 2025,Scholarship,"Sep 10, 2025, 02:15 PM"
+Application Form,Mark Johnson,mark.johnson@example.com,+256700000002,Computer Science,Diploma,No,August 2025,Family Support,"Sep 9, 2025, 11:45 AM"`;
+      filename = "facebook_leads_template.csv";
     } else {
       // Template for new applications
       csvContent = `CreatedAt,Source,FirstName,LastName,Email,Phone No.,Nationality,Reg No.,Course,Faculty,Mode of study,Date of Birth,Company,Company(City/Province),ID TYPE,UACE Level,UACE Level Results,Other Documents,Sponsor Email,Sponsor Phone
@@ -644,7 +653,9 @@ Mark,Johnson,mark.johnson@example.com`;
             ? "Upload and import student application data in bulk. Creates both applications and leads with ADMITTED status automatically."
             : importType === "tags"
             ? "Update existing applications with tags based on registration numbers. Green tags will update ADMITTED status to ENROLLED."
-            : "Send campaign emails using the IUEA template to a list of recipients. Upload a CSV with email addresses and names."}
+            : importType === "emails"
+            ? "Send campaign emails using the IUEA template to a list of recipients. Upload a CSV with email addresses and names."
+            : "Import Facebook leads with CONTACTED status. Upload a CSV with Form Name, Name, Email, Phone, and other lead information."}
         </Typography>
       </Box>
 
@@ -706,6 +717,20 @@ Mark,Johnson,mark.johnson@example.com`;
                         </Typography>
                         <Typography variant="body2" color="textSecondary">
                           Send campaign emails using IUEA template to email list
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                  <FormControlLabel
+                    value="facebookLeads"
+                    control={<Radio />}
+                    label={
+                      <Box>
+                        <Typography variant="body1" fontWeight="bold">
+                          Facebook Leads Import
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary">
+                          Import Facebook leads with CONTACTED status from CSV
                         </Typography>
                       </Box>
                     }
@@ -1015,25 +1040,35 @@ Mark,Johnson,mark.johnson@example.com`;
                   {uploadResult.errors?.length > 0 && (
                     <Box mt={1}>
                       <Typography variant="body2" fontWeight="bold">
-                        Errors:
+                        Import Errors ({uploadResult.errors.length}):
                       </Typography>
-                      {uploadResult.errors.slice(0, 5).map((error, index) => (
-                        <Typography key={index} variant="body2">
-                          • {error}
-                        </Typography>
-                      ))}
-                      {uploadResult.errors.length > 5 && (
-                        <Typography variant="body2">
-                          ... and {uploadResult.errors.length - 5} more errors
-                        </Typography>
-                      )}
+                      <Box
+                        sx={{
+                          maxHeight: 200,
+                          overflow: "auto",
+                          bgcolor: "grey.50",
+                          p: 1,
+                          borderRadius: 1,
+                          mt: 1,
+                        }}
+                      >
+                        {uploadResult.errors.map((error, index) => (
+                          <Typography
+                            key={index}
+                            variant="body2"
+                            sx={{ mb: 0.5 }}
+                          >
+                            • {error}
+                          </Typography>
+                        ))}
+                      </Box>
                     </Box>
                   )}
                 </Alert>
               )}
             </CardContent>
 
-            {/* Debug Info - Remove this in production */}
+            {/* Debug Info - Hidden in production 
             {selectedFile && (
               <CardContent
                 sx={{
@@ -1052,6 +1087,7 @@ Mark,Johnson,mark.johnson@example.com`;
                 </Typography>
               </CardContent>
             )}
+            */}
 
             {/* File Processing Status */}
             {processingFile && (
@@ -1116,7 +1152,9 @@ Mark,Johnson,mark.johnson@example.com`;
                     ? "Import Applications"
                     : importType === "tags"
                     ? "Update Status Tags"
-                    : "Send Emails"}
+                    : importType === "emails"
+                    ? "Send Emails"
+                    : "Import Facebook Leads"}
                 </Button>
               </CardActions>
             )}
@@ -1151,6 +1189,10 @@ Mark,Johnson,mark.johnson@example.com`;
                               label={
                                 item.importType === "tags"
                                   ? "Tag Updates"
+                                  : item.importType === "facebookLeads"
+                                  ? "Facebook Leads"
+                                  : item.importType === "emails"
+                                  ? "Email Campaign"
                                   : "New Applications"
                               }
                               size="small"
@@ -1355,6 +1397,69 @@ Mark,Johnson,mark.johnson@example.com`;
                     </ListItemIcon>
                     <ListItemText
                       primary="Save as CSV or Excel file and upload"
+                      sx={{
+                        "& .MuiListItemText-primary": {
+                          color: "text.primary",
+                        },
+                      }}
+                    />
+                  </ListItem>
+                </List>
+              ) : importType === "facebookLeads" ? (
+                <List dense>
+                  <ListItem>
+                    <ListItemIcon>
+                      <Typography variant="body2" fontWeight="bold">
+                        1.
+                      </Typography>
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Download the Facebook leads template"
+                      sx={{
+                        "& .MuiListItemText-primary": {
+                          color: "text.primary",
+                        },
+                      }}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      <Typography variant="body2" fontWeight="bold">
+                        2.
+                      </Typography>
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Fill in the required fields: Lead ID, Form Name, Name, Email, Phone"
+                      sx={{
+                        "& .MuiListItemText-primary": {
+                          color: "text.primary",
+                        },
+                      }}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      <Typography variant="body2" fontWeight="bold">
+                        3.
+                      </Typography>
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Include Created Date in the format provided on the sheet"
+                      sx={{
+                        "& .MuiListItemText-primary": {
+                          color: "text.primary",
+                        },
+                      }}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      <Typography variant="body2" fontWeight="bold">
+                        4.
+                      </Typography>
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="All leads will be imported with CONTACTED status"
                       sx={{
                         "& .MuiListItemText-primary": {
                           color: "text.primary",

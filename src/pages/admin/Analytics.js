@@ -471,6 +471,7 @@ const Analytics = () => {
           totalLeads: data.overview?.totalLeads || 0,
           newLeads: data.overview?.recentLeads || 0,
           // Count leads by their current status, not separate applications
+          contacted: data.overview?.statusCounts?.CONTACTED || 0, // Leads with CONTACTED status
           applied: data.overview?.statusCounts?.APPLIED || 0, // Leads with APPLIED status
           inReview: data.overview?.statusCounts?.IN_REVIEW || 0, // Leads with IN_REVIEW status
           qualified: data.overview?.statusCounts?.QUALIFIED || 0, // Leads with QUALIFIED status
@@ -493,6 +494,11 @@ const Analytics = () => {
           })),
         // Complete lead lifecycle funnel based on status progression
         conversionFunnel: [
+          {
+            stage: "Contacted",
+            count: data.overview?.statusCounts?.CONTACTED || 0,
+            description: "Initial contact made through ads/campaigns",
+          },
           {
             stage: "Interested",
             count: data.overview?.statusCounts?.INTERESTED || 0,
@@ -748,13 +754,20 @@ const Analytics = () => {
 
       yPos += 10;
       pdf.text(
-        `In Review Status: ${formatNumber(reportData.summary.inReview)}`,
+        `Contacted Status: ${formatNumber(reportData.summary.contacted)}`,
         20,
         yPos
       );
       pdf.text(
-        `Qualified Status: ${formatNumber(reportData.summary.qualified)}`,
+        `In Review Status: ${formatNumber(reportData.summary.inReview)}`,
         120,
+        yPos
+      );
+
+      yPos += 10;
+      pdf.text(
+        `Qualified Status: ${formatNumber(reportData.summary.qualified)}`,
+        20,
         yPos
       );
 
@@ -1611,6 +1624,17 @@ const Analytics = () => {
                 icon={PendingIcon}
                 color="warning"
                 statusCode="IN_REVIEW"
+                clickable={true}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <KpiCard
+                title="Contacted Status"
+                value={reportData.summary.contacted}
+                subtitle="CONTACTED status"
+                icon={ReportIcon}
+                color="default"
+                statusCode="CONTACTED"
                 clickable={true}
               />
             </Grid>
