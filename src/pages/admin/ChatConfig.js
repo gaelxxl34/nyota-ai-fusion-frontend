@@ -89,6 +89,23 @@ const ChatConfig = () => {
         tabId: "new-contact-tab",
       },
       {
+        label: "Contacted",
+        statuses: [
+          "CONTACTED",
+          "CONTACTED_VIA_WHATSAPP",
+          "CONTACTED_VIA_PHONE",
+          "CONTACTED_VIA_EMAIL",
+          "REACHED_OUT",
+          "OUTBOUND_CONTACT",
+          "FIRST_CONTACT_MADE",
+          "CONTACTED_TODAY",
+          "CONTACTED_RECENTLY",
+        ],
+        color: "primary.main",
+        icon: "💬",
+        tabId: "contacted-tab",
+      },
+      {
         label: "Interested",
         statuses: [
           "INTERESTED",
