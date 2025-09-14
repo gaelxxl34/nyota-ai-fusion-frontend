@@ -587,6 +587,22 @@ Application Form,Mark Johnson,mark.johnson@example.com,+256700000002,Computer Sc
       });
     }
 
+    // Add skipped records
+    if (tagUpdateReport.skipped && tagUpdateReport.skipped.length > 0) {
+      tagUpdateReport.skipped.forEach((item) => {
+        allRecords.push({
+          regNo: item.regNo || "N/A",
+          name: item.name || "N/A",
+          tag: item.requestedTag || "N/A",
+          previousStatus: item.currentStatus || "N/A",
+          newStatus: item.currentStatus || "N/A", // Same as previous since it was skipped
+          updatedAt: new Date().toLocaleString(),
+          result: "SKIPPED",
+          reason: item.reason || "Already in target status",
+        });
+      });
+    }
+
     // If no records, return
     if (allRecords.length === 0) {
       console.error("No records to export");
@@ -947,7 +963,9 @@ Application Form,Mark Johnson,mark.johnson@example.com,+256700000002,Computer Sc
                             {uploadResult.stats.updated} |{" "}
                             <strong>Failed:</strong> {uploadResult.stats.failed}{" "}
                             | <strong>Not Found:</strong>{" "}
-                            {uploadResult.stats.notFound}
+                            {uploadResult.stats.notFound} |{" "}
+                            <strong>Skipped:</strong>{" "}
+                            {uploadResult.stats.skipped || 0}
                           </Typography>
                           <Box
                             sx={{
@@ -1024,6 +1042,28 @@ Application Form,Mark Johnson,mark.johnson@example.com,+256700000002,Computer Sc
                               <Typography variant="body2">
                                 <strong>Expired:</strong>{" "}
                                 {uploadResult.stats.expired || 0}
+                              </Typography>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Box
+                                component="span"
+                                sx={{
+                                  bgcolor: "#2196f3",
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: "50%",
+                                  display: "inline-block",
+                                }}
+                              ></Box>
+                              <Typography variant="body2">
+                                <strong>Skipped:</strong>{" "}
+                                {uploadResult.stats.skipped || 0}
                               </Typography>
                             </Box>
                           </Box>
@@ -1987,6 +2027,22 @@ Application Form,Mark Johnson,mark.johnson@example.com,+256700000002,Computer Sc
                       {uploadResult?.stats?.failed || 0}
                     </Typography>
                   </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box
+                      component="span"
+                      sx={{
+                        bgcolor: "#2196f3",
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        display: "inline-block",
+                      }}
+                    ></Box>
+                    <Typography variant="body2">
+                      <strong>Skipped:</strong>{" "}
+                      {uploadResult?.stats?.skipped || 0}
+                    </Typography>
+                  </Box>
                 </Box>
               </Box>
 
@@ -2233,13 +2289,132 @@ Application Form,Mark Johnson,mark.johnson@example.com,+256700000002,Computer Sc
                   </Box>
                 )}
 
+              {/* Skipped Updates */}
+              {tagUpdateReport.skipped &&
+                tagUpdateReport.skipped.length > 0 && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        mb: 1,
+                        fontWeight: "bold",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      <WarningIcon color="info" sx={{ mr: 1 }} />
+                      Skipped Updates ({tagUpdateReport.skipped.length})
+                    </Typography>
+                    <TableContainer
+                      sx={{
+                        maxHeight: 200,
+                        border: "1px solid #e0e0e0",
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Table stickyHeader size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Reg No.
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Name
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Current Status
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Requested Tag
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}
+                            >
+                              Reason
+                            </TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {tagUpdateReport.skipped.map((item, index) => (
+                            <TableRow key={index} hover>
+                              <TableCell>{item.regNo || "N/A"}</TableCell>
+                              <TableCell>{item.name || "N/A"}</TableCell>
+                              <TableCell
+                                sx={{
+                                  fontWeight: "medium",
+                                  color:
+                                    item.currentStatus === "ENROLLED"
+                                      ? "#2e7d32"
+                                      : item.currentStatus === "DEFERRED"
+                                      ? "#f57c00"
+                                      : item.currentStatus === "EXPIRED"
+                                      ? "#c62828"
+                                      : "inherit",
+                                }}
+                              >
+                                {item.currentStatus || "N/A"}
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={item.requestedTag || "N/A"}
+                                  size="small"
+                                  sx={{
+                                    bgcolor:
+                                      item.requestedTag === "green"
+                                        ? "#e8f5e9"
+                                        : item.requestedTag === "yellow"
+                                        ? "#fffde7"
+                                        : item.requestedTag === "red"
+                                        ? "#ffebee"
+                                        : "#f5f5f5",
+                                    color:
+                                      item.requestedTag === "green"
+                                        ? "#2e7d32"
+                                        : item.requestedTag === "yellow"
+                                        ? "#f57c00"
+                                        : item.requestedTag === "red"
+                                        ? "#c62828"
+                                        : "inherit",
+                                    borderColor:
+                                      item.requestedTag === "green"
+                                        ? "#a5d6a7"
+                                        : item.requestedTag === "yellow"
+                                        ? "#fff59d"
+                                        : item.requestedTag === "red"
+                                        ? "#ef9a9a"
+                                        : "#e0e0e0",
+                                    border: "1px solid",
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell sx={{ color: "#1976d2" }}>
+                                {item.reason || "N/A"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
               {/* No Data Scenario */}
               {(!tagUpdateReport.successful ||
                 tagUpdateReport.successful.length === 0) &&
                 (!tagUpdateReport.failed ||
                   tagUpdateReport.failed.length === 0) &&
                 (!tagUpdateReport.notFound ||
-                  tagUpdateReport.notFound.length === 0) && (
+                  tagUpdateReport.notFound.length === 0) &&
+                (!tagUpdateReport.skipped ||
+                  tagUpdateReport.skipped.length === 0) && (
                   <Box sx={{ textAlign: "center", py: 5 }}>
                     <Typography variant="subtitle1" color="text.secondary">
                       No detailed report data available
