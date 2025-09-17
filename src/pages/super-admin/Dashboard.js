@@ -1335,6 +1335,17 @@ const AdminDashboard = () => {
                   <Button
                     variant="outlined"
                     fullWidth
+                    startIcon={<AssignmentIcon />}
+                    onClick={() => navigate("/super-admin/conversion-plan")}
+                    sx={{ py: 2 }}
+                  >
+                    Conversion Plan
+                  </Button>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
                     startIcon={<AnalyticsIcon />}
                     onClick={() => navigate("/analytics")}
                     sx={{ py: 2 }}

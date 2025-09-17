@@ -221,6 +221,29 @@ export const leadService = {
     }
   },
 
+  // Get interactions for a lead
+  async getInteractions(leadId, options = {}) {
+    try {
+      const { type, outcome, agent, limit = 50, offset = 0 } = options;
+      const params = new URLSearchParams();
+
+      if (type) params.append("type", type);
+      if (outcome) params.append("outcome", outcome);
+      if (agent) params.append("agent", agent);
+      params.append("limit", limit.toString());
+      params.append("offset", offset.toString());
+
+      const response = await axiosInstance.get(
+        `/api/leads/${leadId}/interactions?${params.toString()}`
+      );
+      return response.data;
+    } catch (error) {
+      throw new Error(
+        error.response?.data?.message || "Failed to get interactions"
+      );
+    }
+  },
+
   // Get lead statistics
   async getLeadStats(timeFrame = "week") {
     try {
@@ -491,6 +514,107 @@ export const leadService = {
     } catch (error) {
       throw new Error(
         error.response?.data?.message || "Failed to fetch your submitted leads"
+      );
+    }
+  },
+
+  // Lead Assignment Methods
+
+  // Assign a lead to a user
+  async assignLead(leadId, assignTo, notes = "") {
+    try {
+      const response = await axiosInstance.post(
+        `/api/lead-assignment/${leadId}`,
+        {
+          assignTo,
+          notes,
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("❌ Error assigning lead:", error);
+      throw new Error(error.response?.data?.message || "Failed to assign lead");
+    }
+  },
+
+  // Bulk assign leads to a user
+  async bulkAssignLeads(leadIds, assignTo, notes = "") {
+    try {
+      const response = await axiosInstance.post(`/api/lead-assignment/bulk`, {
+        leadIds,
+        assignTo,
+        notes,
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error("❌ Error bulk assigning leads:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to bulk assign leads"
+      );
+    }
+  },
+
+  // Get assigned leads for current user
+  async getMyAssignedLeads(options = {}) {
+    try {
+      const {
+        status,
+        sortBy = "updatedAt",
+        sortOrder = "desc",
+        limit = 100,
+        offset = 0,
+      } = options;
+
+      const params = { sortBy, sortOrder, limit, offset };
+      if (status) params.status = status;
+
+      const response = await axiosInstance.get(
+        `/api/lead-assignment/my-assignments`,
+        {
+          params,
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("❌ Error fetching assigned leads:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch assigned leads"
+      );
+    }
+  },
+
+  // Get lead assignment history
+  async getLeadAssignmentHistory(leadId) {
+    try {
+      const response = await axiosInstance.get(
+        `/api/lead-assignment/${leadId}/history`
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("❌ Error fetching lead assignment history:", error);
+      throw new Error(
+        error.response?.data?.message ||
+          "Failed to fetch lead assignment history"
+      );
+    }
+  },
+
+  // Get available agents for assignment
+  async getAvailableAgents() {
+    try {
+      const response = await axiosInstance.get(
+        `/api/lead-assignment/available-agents`
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("❌ Error fetching available agents:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch available agents"
       );
     }
   },

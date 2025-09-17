@@ -3,12 +3,23 @@ import { axiosInstance } from "./axiosConfig";
 export const teamService = {
   async getTeamMembers() {
     try {
-      const response = await axiosInstance.get("/api/team/members");
-      return {
-        success: true,
-        members: response.data?.members || [], // Ensure we always return an array
-        message: response.data?.message,
-      };
+      // For admin role, fetch marketing agents from the correct endpoint
+      if (localStorage.getItem("userRole") === "admin") {
+        const response = await axiosInstance.get("/api/leads/marketing-agents");
+        return {
+          success: response.data?.success || true,
+          members: response.data?.data || [], // The marketing agents API returns data in response.data.data
+          message: response.data?.message,
+        };
+      } else {
+        // Keep original endpoint for other roles
+        const response = await axiosInstance.get("/api/team/members");
+        return {
+          success: true,
+          members: response.data?.members || [], // Ensure we always return an array
+          message: response.data?.message,
+        };
+      }
     } catch (error) {
       console.error("Error fetching team members:", error);
       return {

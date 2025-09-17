@@ -71,27 +71,30 @@ const TeamManagement = () => {
     try {
       setLoading(true);
       console.log("Fetching team members...");
+      console.log("Current user role:", role);
+      console.log("Current user:", user);
+      console.log("isAdmin:", isAdmin);
+      console.log("isAdmissionAdmin:", isAdmissionAdmin);
+      console.log("canManageTeam:", canManageTeam);
+
       const response = await teamService.getTeamMembers();
       console.log("Team members response:", response);
 
       // Initialize teamMembers as an empty array if response or members is undefined
       let members = response?.members || [];
+      console.log("All members before filtering:", members.length);
+      console.log(
+        "Member roles breakdown:",
+        members.map((m) => ({ name: m.name, role: m.role, id: m.id || m.uid }))
+      );
 
-      // Filter team members based on role restrictions
-      if (isAdmissionAdmin) {
-        // Admission admins can only see admission agents and themselves
-        members = members.filter(
-          (member) =>
-            member.role === "admissionAgent" || member.id === user?.uid
-        );
-      } else if (isAdmin) {
-        // Regular admins can only see marketing agents and themselves
-        members = members.filter(
-          (member) =>
-            member.role === "marketingAgent" || member.id === user?.uid
-        );
+      // If admin and no members found, it might be due to response format mismatch
+      if (isAdmin && members.length === 0 && response?.data?.data) {
+        console.log("Using alternative data format from response");
+        members = response.data.data;
       }
 
+      console.log("Final filtered members:", members.length, members);
       setTeamMembers(members);
 
       if (!response.success) {
@@ -110,10 +113,16 @@ const TeamManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [isAdmissionAdmin, isAdmin, user]);
+  }, [isAdmissionAdmin, isAdmin, user, canManageTeam, role]);
 
   useEffect(() => {
+    // Store user role in localStorage for teamService to use
+    if (role) {
+      localStorage.setItem("userRole", role);
+    }
+
     fetchTeamMembers();
+
     // Update page title based on role
     if (isAdmissionAdmin) {
       document.title = "Admission Team Management";
@@ -122,7 +131,7 @@ const TeamManagement = () => {
     } else {
       document.title = "Team Management";
     }
-  }, [fetchTeamMembers, isAdmissionAdmin, isAdmin]);
+  }, [fetchTeamMembers, isAdmissionAdmin, isAdmin, role]);
 
   const handleAddMember = () => {
     setSelectedMember(null);

@@ -28,6 +28,8 @@ import {
   CloudUpload as ImportIcon,
   Send as BulkActionsIcon,
   Facebook as FacebookIcon,
+  Assignment as AssignmentIcon,
+  PersonPin as AssignedLeadsIcon,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -65,6 +67,11 @@ const Layout = ({ children }) => {
           text: "Dashboard",
           icon: <DashboardIcon />,
           path: "/super-admin/dashboard",
+        },
+        {
+          text: "Conversion Plan",
+          icon: <AssignmentIcon />,
+          path: "/super-admin/conversion-plan",
         },
         {
           text: "User Management",
@@ -111,6 +118,11 @@ const Layout = ({ children }) => {
           text: "Dashboard",
           icon: <DashboardIcon />,
           path: "/admission-admin/dashboard",
+        },
+        {
+          text: "Conversion Plan",
+          icon: <AssignmentIcon />,
+          path: "/super-admin/conversion-plan",
         },
         {
           text: "Import Data",
@@ -178,6 +190,46 @@ const Layout = ({ children }) => {
       return admissionAdminItems;
     }
 
+    // Marketing Agent menu
+    if (role === "marketingAgent") {
+      const marketingAgentItems = [];
+
+      // Primary feature for marketing agents - their assigned leads
+      marketingAgentItems.push({
+        text: "Your Leads to Convert",
+        icon: <AssignedLeadsIcon />,
+        path: "/marketing/assigned-leads",
+      });
+
+      // Add other items that marketing agents need
+      if (checkPermission(role, PERMISSIONS.DATA_CENTER)) {
+        marketingAgentItems.push({
+          text: "Data Center",
+          icon: <DataCenterIcon />,
+          path: "/admin/data-center",
+        });
+      }
+
+      // Chat Configuration for marketing agents
+      if (checkPermission(role, PERMISSIONS.CHAT_CONFIG)) {
+        marketingAgentItems.push({
+          text: "Chat Configuration",
+          icon: <ChatIcon />,
+          path: "/admin/chat-config",
+        });
+      }
+
+      if (checkPermission(role, PERMISSIONS.SETTINGS)) {
+        marketingAgentItems.push({
+          text: "Settings",
+          icon: <SettingsIcon />,
+          path: "/admin/settings",
+        });
+      }
+
+      return marketingAgentItems;
+    }
+
     // Admission Agent menu
     if (role === "admissionAgent") {
       const admissionAgentItems = [];
@@ -227,6 +279,15 @@ const Layout = ({ children }) => {
 
     // Admin level menu based on permissions (for IUEA admins and staff)
     const adminMenuItems = [];
+
+    // Add Conversion Plan only for admin roles (not agents)
+    if (role === "admin" || role === "admissionAdmin") {
+      adminMenuItems.push({
+        text: "Conversion Plan",
+        icon: <AssignmentIcon />,
+        path: "/super-admin/conversion-plan",
+      });
+    }
 
     // Check permissions for each menu item
     if (checkPermission(role, PERMISSIONS.LEADS_OVERVIEW)) {

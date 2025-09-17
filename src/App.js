@@ -13,6 +13,7 @@ import UserManagement from "./pages/super-admin/UserManagement";
 import SuperAdminSettings from "./pages/super-admin/AdminSettings";
 import FacebookLeadForms from "./pages/super-admin/FacebookLeadForms";
 import BulkActions from "./pages/super-admin/BulkActions";
+import ConversionPlan from "./pages/super-admin/ConversionPlan";
 // Admin Pages (formerly organization)
 import TeamManagement from "./pages/admin/TeamManagement";
 import LeadsOverview from "./pages/admin/LeadsOverview";
@@ -22,6 +23,8 @@ import DataCenter from "./pages/admin/DataCenter";
 import KnowledgeBase from "./pages/admin/KnowledgeBase";
 // Admission Admin Pages
 import { AdmissionAdminDashboard, ImportData } from "./pages/admission-admin";
+// Marketing Pages
+import AssignedLeads from "./pages/Marketing/AssignedLeads";
 // Auth Pages
 import Login from "./pages/auth/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
@@ -73,7 +76,8 @@ const ProtectedRoute = ({
     else if (userRole === "admin") redirectPath = "/admin/leads";
     else if (userRole === "admissionAdmin")
       redirectPath = "/admission-admin/dashboard";
-    else if (userRole === "marketingAgent") redirectPath = "/admin/chat-config";
+    else if (userRole === "marketingAgent")
+      redirectPath = "/marketing/assigned-leads";
     else if (userRole === "admissionAgent") redirectPath = "/admin/chat-config";
 
     return <Navigate to={redirectPath} replace />;
@@ -146,6 +150,20 @@ function App() {
                           element={<SuperAdminSettings />}
                         />
                       </Routes>
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Shared Conversion Plan Route - Accessible by admin roles only */}
+              <Route
+                path="/super-admin/conversion-plan"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["superAdmin", "admin", "admissionAdmin"]}
+                  >
+                    <Layout>
+                      <ConversionPlan />
                     </Layout>
                   </ProtectedRoute>
                 }
@@ -327,6 +345,28 @@ function App() {
                     />
                     <Route path="*" element={<Navigate to="leads" replace />} />
                   </Routes>
+                }
+              />
+
+              {/* Marketing Routes */}
+              <Route
+                path="/marketing/*"
+                element={
+                  <ProtectedRoute allowedRoles={["marketingAgent"]}>
+                    <Layout>
+                      <Routes>
+                        <Route
+                          path="assigned-leads"
+                          element={<AssignedLeads />}
+                        />
+                        {/* Root path redirects to assigned leads */}
+                        <Route
+                          path=""
+                          element={<Navigate to="assigned-leads" replace />}
+                        />
+                      </Routes>
+                    </Layout>
+                  </ProtectedRoute>
                 }
               />
 
