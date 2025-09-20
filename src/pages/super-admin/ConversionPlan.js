@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Grid,
@@ -39,9 +39,7 @@ import {
   Tooltip,
   Stack,
   ButtonGroup,
-  Menu,
   Skeleton,
-  Fade,
 } from "@mui/material";
 import {
   Assignment as AssignmentIcon,
@@ -65,27 +63,50 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { useSnackbar } from "notistack";
-import { axiosInstance } from "../../services/axiosConfig";
 import { leadService } from "../../services/leadService";
-import { teamService } from "../../services/teamService";
-import { superAdminService } from "../../services/superAdminService";
+import { useConversionLeadsCache } from "../../hooks/useConversionLeadsCache";
+import logger from "../../utils/logger";
 
 const ConversionPlan = () => {
   const { user, getUserRole } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
+
   const currentUserName =
     user?.name || user?.email?.split("@")[0] || "Current User";
 
-  // State management - Must be declared before any conditional returns
-  const [leads, setLeads] = useState([]);
+  // Use the caching hook for leads and team data
+  const {
+    leads,
+    teamMembers,
+    loading,
+    refreshing,
+    error,
+    lastFetch,
+    refresh,
+    clearCache,
+    isCacheValid,
+    optimisticallyAssignLeads,
+    reconcileAfterBulk,
+  } = useConversionLeadsCache();
+
+  // Debug logging when data changes
+  useEffect(() => {
+    logger.debug("ConversionPlan dataset updated", {
+      leads: leads.length,
+      teamMembers: teamMembers.length,
+      loading,
+      error: Boolean(error),
+      lastFetch,
+      isCacheValid,
+    });
+  }, [leads, teamMembers, loading, error, lastFetch, isCacheValid]);
+
+  // State management for UI
   const [filteredLeads, setFilteredLeads] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(200); // Reasonable default to prevent freezing
+  const [rowsPerPage, setRowsPerPage] = useState(200);
   const [filters, setFilters] = useState({
-    status: "all", // all, contacted, interested
+    status: "all",
     country: "all",
     assignedTo: "all",
     searchTerm: "",
@@ -97,305 +118,15 @@ const ConversionPlan = () => {
     selectedLeads: [],
     selectedAgent: "",
   });
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [assignmentResult, setAssignmentResult] = useState(null); // {assigned, failed, errors}
 
-  // Team members state - no mock data initially, will be populated from API
-  const [teamMembers, setTeamMembers] = useState([]);
+  // Selected leads for bulk operations
+  const [selectedLeads, setSelectedLeads] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
 
-  // Function to calculate priority based on creation date
-  const calculatePriorityByDate = (contactedDate) => {
-    const currentDate = new Date();
-    const leadDate = new Date(contactedDate);
-    const daysDifference = Math.floor(
-      (currentDate - leadDate) / (1000 * 60 * 60 * 24)
-    );
-
-    // Priority based on age:
-    // 0-3 days: high priority
-    // 4-10 days: medium priority
-    // 11+ days: low priority
-    if (daysDifference <= 3) {
-      return "high";
-    } else if (daysDifference <= 10) {
-      return "medium";
-    } else {
-      return "low";
-    }
-  };
-
-  // Function to generate realistic lead data
-  const generateMockLeads = () => {
-    const firstNames = {
-      Uganda: [
-        "John",
-        "Grace",
-        "Moses",
-        "Sarah",
-        "David",
-        "Mary",
-        "Peter",
-        "Jane",
-        "Joseph",
-        "Rebecca",
-      ],
-      Kenya: [
-        "James",
-        "Mary",
-        "Peter",
-        "Grace",
-        "David",
-        "Jane",
-        "Joseph",
-        "Sarah",
-        "Michael",
-        "Faith",
-      ],
-      Tanzania: [
-        "Emmanuel",
-        "Fatima",
-        "Hassan",
-        "Amina",
-        "Said",
-        "Zubeda",
-        "Ali",
-        "Mwajuma",
-        "Omar",
-        "Halima",
-      ],
-      Rwanda: [
-        "Jean",
-        "Marie",
-        "Claude",
-        "Jeanne",
-        "Pierre",
-        "Diane",
-        "Eric",
-        "Rose",
-        "Alain",
-        "Chantal",
-      ],
-      Nigeria: [
-        "Chidi",
-        "Adaeze",
-        "Emeka",
-        "Chioma",
-        "Kemi",
-        "Tunde",
-        "Folake",
-        "Biodun",
-        "Segun",
-        "Funmi",
-      ],
-      Ghana: [
-        "Kwame",
-        "Akosua",
-        "Kofi",
-        "Ama",
-        "Yaw",
-        "Efua",
-        "Kweku",
-        "Abena",
-        "Kwadwo",
-        "Adjoa",
-      ],
-    };
-
-    const lastNames = {
-      Uganda: [
-        "Mukasa",
-        "Namugga",
-        "Ssekandi",
-        "Nakato",
-        "Kato",
-        "Namusoke",
-        "Ssentongo",
-        "Nalubega",
-        "Wasswa",
-        "Nakimuli",
-      ],
-      Kenya: [
-        "Wanjiku",
-        "Mwangi",
-        "Njeri",
-        "Kamau",
-        "Wambui",
-        "Kariuki",
-        "Nyong'o",
-        "Mburu",
-        "Gitau",
-        "Waithaka",
-      ],
-      Tanzania: [
-        "Mwinyi",
-        "Mkuu",
-        "Juma",
-        "Salim",
-        "Hamisi",
-        "Bakari",
-        "Mwalimu",
-        "Rajabu",
-        "Hassani",
-        "Khamis",
-      ],
-      Rwanda: [
-        "Ndayishimiye",
-        "Uwimana",
-        "Habimana",
-        "Mukamana",
-        "Niyonzima",
-        "Uwingabire",
-        "Bizimana",
-        "Umurungi",
-        "Nsengimana",
-        "Mukashema",
-      ],
-      Nigeria: [
-        "Okafor",
-        "Adebayo",
-        "Okonkwo",
-        "Olumide",
-        "Eze",
-        "Chukwu",
-        "Ogbonna",
-        "Okoro",
-        "Nwosu",
-        "Emeka",
-      ],
-      Ghana: [
-        "Asante",
-        "Osei",
-        "Boateng",
-        "Adjei",
-        "Mensah",
-        "Owusu",
-        "Amoah",
-        "Agyeman",
-        "Appiah",
-        "Darko",
-      ],
-    };
-
-    const sources = [
-      "Facebook",
-      "WhatsApp",
-      "Website",
-      "Referral",
-      "Instagram",
-      "LinkedIn",
-      "Google Ads",
-      "Direct",
-    ];
-    const priorities = ["high", "medium", "low"];
-    const countries = [
-      "Uganda",
-      "Kenya",
-      "Tanzania",
-      "Rwanda",
-      "Nigeria",
-      "Ghana",
-    ];
-    const countryCodes = {
-      Uganda: "256",
-      Kenya: "254",
-      Tanzania: "255",
-      Rwanda: "250",
-      Nigeria: "234",
-      Ghana: "233",
-    };
-
-    const leads = [];
-
-    // Generate 40 contacted leads
-    for (let i = 1; i <= 40; i++) {
-      const country = countries[Math.floor(Math.random() * countries.length)];
-      const firstName =
-        firstNames[country][
-          Math.floor(Math.random() * firstNames[country].length)
-        ];
-      const lastName =
-        lastNames[country][
-          Math.floor(Math.random() * lastNames[country].length)
-        ];
-
-      leads.push({
-        id: i,
-        name: `${firstName} ${lastName}`,
-        email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@gmail.com`,
-        phone: `+${countryCodes[country]}${Math.floor(
-          Math.random() * 900000000 + 100000000
-        )}`,
-        country: country,
-        countryCode: countryCodes[country],
-        status: "contacted",
-        source: sources[Math.floor(Math.random() * sources.length)],
-        contactedDate: new Date(
-          Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000
-        )
-          .toISOString()
-          .split("T")[0],
-        lastActivity: new Date(
-          Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000
-        )
-          .toISOString()
-          .split("T")[0],
-        assignedTo: null,
-        get priority() {
-          return calculatePriorityByDate(this.contactedDate);
-        },
-        notes: `Initial contact made via ${
-          sources[Math.floor(Math.random() * sources.length)]
-        }.`,
-      });
-    }
-
-    // Generate 160 interested leads
-    for (let i = 41; i <= 200; i++) {
-      const country = countries[Math.floor(Math.random() * countries.length)];
-      const firstName =
-        firstNames[country][
-          Math.floor(Math.random() * firstNames[country].length)
-        ];
-      const lastName =
-        lastNames[country][
-          Math.floor(Math.random() * lastNames[country].length)
-        ];
-
-      leads.push({
-        id: i,
-        name: `${firstName} ${lastName}`,
-        email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@gmail.com`,
-        phone: `+${countryCodes[country]}${Math.floor(
-          Math.random() * 900000000 + 100000000
-        )}`,
-        country: country,
-        countryCode: countryCodes[country],
-        status: "interested",
-        source: sources[Math.floor(Math.random() * sources.length)],
-        contactedDate: new Date(
-          Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000
-        )
-          .toISOString()
-          .split("T")[0],
-        lastActivity: new Date(
-          Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000
-        )
-          .toISOString()
-          .split("T")[0],
-        assignedTo: null,
-        get priority() {
-          return calculatePriorityByDate(this.contactedDate);
-        },
-        notes: `Lead expressed interest via ${
-          sources[Math.floor(Math.random() * sources.length)]
-        }. ${
-          Math.random() > 0.5
-            ? "Requesting more information."
-            : "Ready for follow-up call."
-        }`,
-      });
-    }
-
-    return leads;
-  };
+  // State for dynamic countries
+  const [availableCountries, setAvailableCountries] = useState({});
 
   // Comprehensive country mapping with flags and names
   const getCountryInfo = (countryCode) => {
@@ -461,6 +192,41 @@ const ConversionPlan = () => {
       216: { name: "Tunisia", flag: "🇹🇳", code: "TN" },
       218: { name: "Libya", flag: "🇱🇾", code: "LY" },
 
+      // Middle East & Gulf States
+      961: { name: "Lebanon", flag: "🇱🇧", code: "LB" },
+      962: { name: "Jordan", flag: "🇯🇴", code: "JO" },
+      963: { name: "Syria", flag: "🇸🇾", code: "SY" },
+      964: { name: "Iraq", flag: "🇮🇶", code: "IQ" },
+      965: { name: "Kuwait", flag: "🇰🇼", code: "KW" },
+      966: { name: "Saudi Arabia", flag: "🇸🇦", code: "SA" },
+      967: { name: "Yemen", flag: "🇾🇪", code: "YE" },
+      968: { name: "Oman", flag: "🇴🇲", code: "OM" },
+      970: { name: "Palestine", flag: "🇵🇸", code: "PS" },
+      971: { name: "United Arab Emirates", flag: "🇦🇪", code: "AE" },
+      972: { name: "Israel", flag: "🇮🇱", code: "IL" },
+      973: { name: "Bahrain", flag: "🇧🇭", code: "BH" },
+      974: { name: "Qatar", flag: "🇶🇦", code: "QA" },
+
+      // Other Asian Countries
+      92: { name: "Pakistan", flag: "🇵🇰", code: "PK" },
+      93: { name: "Afghanistan", flag: "🇦🇫", code: "AF" },
+      94: { name: "Sri Lanka", flag: "🇱🇰", code: "LK" },
+      95: { name: "Myanmar", flag: "🇲🇲", code: "MM" },
+      98: { name: "Iran", flag: "🇮🇷", code: "IR" },
+      60: { name: "Malaysia", flag: "🇲🇾", code: "MY" },
+      62: { name: "Indonesia", flag: "🇮🇩", code: "ID" },
+      63: { name: "Philippines", flag: "🇵🇭", code: "PH" },
+      65: { name: "Singapore", flag: "🇸🇬", code: "SG" },
+      66: { name: "Thailand", flag: "🇹🇭", code: "TH" },
+      84: { name: "Vietnam", flag: "🇻🇳", code: "VN" },
+      880: { name: "Bangladesh", flag: "🇧🇩", code: "BD" },
+
+      // European Countries
+      30: { name: "Greece", flag: "🇬🇷", code: "GR" },
+      36: { name: "Hungary", flag: "🇭🇺", code: "HU" },
+      40: { name: "Romania", flag: "🇷🇴", code: "RO" },
+      351: { name: "Portugal", flag: "🇵🇹", code: "PT" },
+
       // Other regions (common international codes)
       1: { name: "United States/Canada", flag: "🇺🇸", code: "US" },
       44: { name: "United Kingdom", flag: "🇬🇧", code: "GB" },
@@ -498,30 +264,265 @@ const ConversionPlan = () => {
   };
 
   // Extract unique country codes from leads data
-  const getAvailableCountries = (leadsData) => {
+  const availableCountriesFromLeads = useMemo(() => {
+    if (!leads.length) return {};
+
+    logger.debug("Extracting countries from leads", { count: leads.length });
     const countryCodes = new Set();
 
-    leadsData.forEach((lead) => {
-      if (lead.phone) {
-        // Extract country code from phone number
-        let code = lead.phone.replace(/\D/g, ""); // Remove non-digits
+    leads.forEach((lead, index) => {
+      // Use the countryCode field that was already extracted in the hook
+      const countryCode = lead.countryCode || lead.country_code;
 
-        if (code.startsWith("0")) {
-          code = code.substring(1); // Remove leading 0
+      if (countryCode) {
+        countryCodes.add(countryCode);
+
+        // Debug logging for first few leads
+        // trimmed verbose per-lead logging
+      } else if (lead.phone) {
+        // Fallback: extract from phone if countryCode is missing
+        let cleanPhone = lead.phone.replace(/\D/g, "");
+
+        // Remove leading zeros
+        while (cleanPhone.startsWith("0")) {
+          cleanPhone = cleanPhone.substring(1);
         }
 
-        // Try different country code lengths (1-4 digits)
-        for (let len = 1; len <= 4; len++) {
-          const potentialCode = code.substring(0, len);
-          const countryInfo = getCountryInfo(potentialCode);
+        // Complete country code mapping (same as hook)
+        const countryCodeMap = {
+          // 3-digit codes (most common for our region)
+          212: "Morocco",
+          213: "Algeria",
+          216: "Tunisia",
+          218: "Libya",
+          220: "Gambia",
+          221: "Senegal",
+          222: "Mauritania",
+          223: "Mali",
+          224: "Guinea",
+          225: "Ivory Coast",
+          226: "Burkina Faso",
+          227: "Niger",
+          228: "Togo",
+          229: "Benin",
+          230: "Mauritius",
+          231: "Liberia",
+          232: "Sierra Leone",
+          233: "Ghana",
+          234: "Nigeria",
+          235: "Chad",
+          236: "Central African Republic",
+          237: "Cameroon",
+          238: "Cape Verde",
+          239: "Sao Tome and Principe",
+          240: "Equatorial Guinea",
+          241: "Gabon",
+          242: "Republic of Congo",
+          243: "Democratic Republic of Congo",
+          244: "Angola",
+          245: "Guinea-Bissau",
+          246: "British Indian Ocean Territory",
+          248: "Seychelles",
+          249: "Sudan",
+          250: "Rwanda",
+          251: "Ethiopia",
+          252: "Somalia",
+          253: "Djibouti",
+          254: "Kenya",
+          255: "Tanzania",
+          256: "Uganda",
+          257: "Burundi",
+          258: "Mozambique",
+          260: "Zambia",
+          261: "Madagascar",
+          262: "Reunion",
+          263: "Zimbabwe",
+          264: "Namibia",
+          265: "Malawi",
+          266: "Lesotho",
+          267: "Botswana",
+          268: "Swaziland",
+          269: "Comoros",
+          290: "Saint Helena",
+          291: "Eritrea",
+          297: "Aruba",
+          298: "Faroe Islands",
+          299: "Greenland",
+          350: "Gibraltar",
+          351: "Portugal",
+          352: "Luxembourg",
+          353: "Ireland",
+          354: "Iceland",
+          355: "Albania",
+          356: "Malta",
+          357: "Cyprus",
+          358: "Finland",
+          359: "Bulgaria",
+          370: "Lithuania",
+          371: "Latvia",
+          372: "Estonia",
+          373: "Moldova",
+          374: "Armenia",
+          375: "Belarus",
+          376: "Andorra",
+          377: "Monaco",
+          378: "San Marino",
+          380: "Ukraine",
+          381: "Serbia",
+          382: "Montenegro",
+          383: "Kosovo",
+          385: "Croatia",
+          386: "Slovenia",
+          387: "Bosnia and Herzegovina",
+          389: "North Macedonia",
+          420: "Czech Republic",
+          421: "Slovakia",
+          423: "Liechtenstein",
+          500: "Falkland Islands",
+          501: "Belize",
+          502: "Guatemala",
+          503: "El Salvador",
+          504: "Honduras",
+          505: "Nicaragua",
+          506: "Costa Rica",
+          507: "Panama",
+          508: "Saint Pierre and Miquelon",
+          509: "Haiti",
+          590: "Guadeloupe",
+          591: "Bolivia",
+          592: "Guyana",
+          593: "Ecuador",
+          594: "French Guiana",
+          595: "Paraguay",
+          596: "Martinique",
+          597: "Suriname",
+          598: "Uruguay",
+          599: "Netherlands Antilles",
+          670: "East Timor",
+          672: "Antarctica",
+          673: "Brunei",
+          674: "Nauru",
+          675: "Papua New Guinea",
+          676: "Tonga",
+          677: "Solomon Islands",
+          678: "Vanuatu",
+          679: "Fiji",
+          680: "Palau",
+          681: "Wallis and Futuna",
+          682: "Cook Islands",
+          683: "Niue",
+          684: "American Samoa",
+          685: "Samoa",
+          686: "Kiribati",
+          687: "New Caledonia",
+          688: "Tuvalu",
+          689: "French Polynesia",
+          690: "Tokelau",
+          691: "Micronesia",
+          692: "Marshall Islands",
+          850: "North Korea",
+          852: "Hong Kong",
+          853: "Macau",
+          855: "Cambodia",
+          856: "Laos",
+          880: "Bangladesh",
+          886: "Taiwan",
+          960: "Maldives",
+          961: "Lebanon",
+          962: "Jordan",
+          963: "Syria",
+          964: "Iraq",
+          965: "Kuwait",
+          966: "Saudi Arabia",
+          967: "Yemen",
+          968: "Oman",
+          970: "Palestine",
+          971: "United Arab Emirates",
+          972: "Israel",
+          973: "Bahrain",
+          974: "Qatar",
+          975: "Bhutan",
+          976: "Mongolia",
+          977: "Nepal",
+          992: "Tajikistan",
+          993: "Turkmenistan",
+          994: "Azerbaijan",
+          995: "Georgia",
+          996: "Kyrgyzstan",
+          998: "Uzbekistan",
 
-          if (countryInfo.name !== `Unknown (+${potentialCode})`) {
-            countryCodes.add(potentialCode);
-            break;
+          // 2-digit codes
+          20: "Egypt",
+          27: "South Africa",
+          30: "Greece",
+          31: "Netherlands",
+          32: "Belgium",
+          33: "France",
+          34: "Spain",
+          36: "Hungary",
+          39: "Italy",
+          40: "Romania",
+          41: "Switzerland",
+          43: "Austria",
+          44: "United Kingdom",
+          45: "Denmark",
+          46: "Sweden",
+          47: "Norway",
+          48: "Poland",
+          49: "Germany",
+          51: "Peru",
+          52: "Mexico",
+          53: "Cuba",
+          54: "Argentina",
+          55: "Brazil",
+          56: "Chile",
+          57: "Colombia",
+          58: "Venezuela",
+          60: "Malaysia",
+          61: "Australia",
+          62: "Indonesia",
+          63: "Philippines",
+          64: "New Zealand",
+          65: "Singapore",
+          66: "Thailand",
+          81: "Japan",
+          82: "South Korea",
+          84: "Vietnam",
+          86: "China",
+          90: "Turkey",
+          91: "India",
+          92: "Pakistan",
+          93: "Afghanistan",
+          94: "Sri Lanka",
+          95: "Myanmar",
+          98: "Iran",
+
+          // 1-digit codes
+          1: "United States/Canada",
+          7: "Russia/Kazakhstan",
+        };
+
+        // Try to match country codes by length (longest first for accuracy)
+        const codeLengths = [4, 3, 2, 1];
+        let foundCode = null;
+
+        for (const length of codeLengths) {
+          if (cleanPhone.length >= length) {
+            const potentialCode = cleanPhone.substring(0, length);
+            if (countryCodeMap[potentialCode]) {
+              foundCode = potentialCode;
+              countryCodes.add(potentialCode);
+              break;
+            }
           }
         }
+
+        // Debug logging for first few leads
+        // trimmed verbose per-lead fallback logging
       }
     });
+
+    logger.debug("Found country codes", Array.from(countryCodes));
 
     // Convert to array and create mapping
     const availableCountries = {};
@@ -530,302 +531,142 @@ const ConversionPlan = () => {
     });
 
     return availableCountries;
-  };
+  }, [leads]);
 
-  // State for dynamic countries
-  const [availableCountries, setAvailableCountries] = useState({});
-
-  // Legacy country mapping for fallback
-  const countryMapping = {
-    256: { name: "Uganda", flag: "🇺🇬", code: "UG" },
-    254: { name: "Kenya", flag: "🇰🇪", code: "KE" },
-    250: { name: "Rwanda", flag: "🇷🇼", code: "RW" },
-    255: { name: "Tanzania", flag: "🇹🇿", code: "TZ" },
-    234: { name: "Nigeria", flag: "🇳🇬", code: "NG" },
-    233: { name: "Ghana", flag: "🇬🇭", code: "GH" },
-  };
-
-  // Fetch marketing agents from API using TeamService approach
-  const fetchMarketingAgents = async () => {
-    try {
-      console.log("📋 Fetching marketing agents from team service...");
-
-      const response = await teamService.getTeamMembers();
-
-      if (response.success && response.members) {
-        // Filter for marketing agents only
-        const marketingAgents = response.members.filter(
-          (member) => member.role === "marketingAgent"
-        );
-
-        console.log(`✅ Found ${marketingAgents.length} marketing agents`);
-
-        // Get assigned lead counts for each agent
-        const agentsWithLeadCounts = await Promise.all(
-          marketingAgents.map(async (agent) => {
-            try {
-              // Count assigned leads for this agent (CONTACTED + INTERESTED only)
-              const assignedLeadsPromises = ["CONTACTED", "INTERESTED"].map(
-                async (status) => {
-                  try {
-                    const response = await leadService.getLeadsByStatus(
-                      status,
-                      {
-                        limit: 10000,
-                        offset: 0,
-                      }
-                    );
-                    const leads = response?.data || [];
-                    return leads.filter(
-                      (lead) => lead.assignedTo === agent.email
-                    ).length;
-                  } catch (error) {
-                    console.error(
-                      `Error fetching ${status} leads for ${agent.email}:`,
-                      error
-                    );
-                    return 0;
-                  }
-                }
-              );
-
-              const leadCounts = await Promise.all(assignedLeadsPromises);
-              const totalAssignedCount = leadCounts.reduce(
-                (sum, count) => sum + count,
-                0
-              );
-
-              return {
-                id: agent.id,
-                name:
-                  agent.name || agent.email?.split("@")[0] || "Unknown Agent",
-                email: agent.email,
-                avatar: null, // You can add photoURL if available
-                assignedCount: totalAssignedCount,
-                status: agent.status === "active" ? "online" : "offline",
-                conversionRate: 0, // You can calculate this based on historical data
-                maxCapacity: 1000, // No practical limit to assignments
-                role: agent.role,
-                lastSignIn: agent.lastSignIn,
-                createdAt: agent.createdAt,
-              };
-            } catch (error) {
-              console.error(`Error processing agent ${agent.email}:`, error);
-              return {
-                id: agent.id,
-                name:
-                  agent.name || agent.email?.split("@")[0] || "Unknown Agent",
-                email: agent.email,
-                avatar: null,
-                assignedCount: 0,
-                status: "offline",
-                conversionRate: 0,
-                maxCapacity: 1000, // No practical limit
-                role: agent.role,
-              };
-            }
-          })
-        );
-
-        // Sort by availability (least assigned first)
-        agentsWithLeadCounts.sort((a, b) => {
-          const aAvailability =
-            (a.maxCapacity - a.assignedCount) / a.maxCapacity;
-          const bAvailability =
-            (b.maxCapacity - b.assignedCount) / b.maxCapacity;
-          return bAvailability - aAvailability;
-        });
-
-        setTeamMembers(agentsWithLeadCounts);
-        console.log(
-          `✅ Loaded ${agentsWithLeadCounts.length} marketing agents with lead counts`
-        );
-
-        return agentsWithLeadCounts; // Return the data for promise chaining
-      } else {
-        throw new Error("Failed to fetch team members");
-      }
-    } catch (error) {
-      console.error("❌ Error fetching marketing agents:", error);
-      enqueueSnackbar("Failed to load marketing agents", { variant: "error" });
-      throw error; // Re-throw the error to be handled by the caller
-    }
-  };
-
-  // Fetch conversion leads from API using efficient DataCenter approach
-  const fetchConversionLeads = async () => {
-    try {
-      setRefreshing(true);
-      setError(null);
-
-      console.log("📋 Fetching conversion leads (CONTACTED + INTERESTED)...");
-
-      // Use the same efficient approach as DataCenter
-      const statusPromises = ["CONTACTED", "INTERESTED"].map(async (status) => {
-        try {
-          console.log(`📊 Fetching leads for status: ${status}`);
-          const statusResponse = await leadService.getLeadsByStatus(status, {
-            limit: 10000, // Get all leads for each status
-            offset: 0,
-            sortBy: "createdAt",
-            sortOrder: "desc",
-          });
-          const leads = statusResponse?.data || [];
-          console.log(`📊 Fetched ${leads.length} leads for status: ${status}`);
-          return leads.map((lead) => ({
-            ...lead,
-            status: status.toLowerCase(), // Normalize status for frontend
-            contactedDate: lead.createdAt,
-            // Extract country code from phone number using improved logic
-            countryCode: (() => {
-              if (!lead.phone) return null;
-              let code = lead.phone.replace(/\D/g, ""); // Remove non-digits
-              if (code.startsWith("0")) code = code.substring(1); // Remove leading 0
-
-              // Try different country code lengths (1-4 digits)
-              for (let len = 1; len <= 4; len++) {
-                const potentialCode = code.substring(0, len);
-                const countryInfo = getCountryInfo(potentialCode);
-                if (countryInfo.name !== `Unknown (+${potentialCode})`) {
-                  return potentialCode;
-                }
-              }
-              return code.substring(0, 3); // Fallback to first 3 digits
-            })(),
-            // Calculate priority based on creation date
-            priority: calculatePriorityByDate(lead.createdAt),
-          }));
-        } catch (error) {
-          console.error(`❌ Error fetching leads for status ${status}:`, error);
-          return []; // Return empty array on error
-        }
-      });
-
-      // Wait for both status fetches to complete
-      const statusResults = await Promise.all(statusPromises);
-
-      // Combine all results and sort by createdAt desc
-      const allCombinedLeads = statusResults.flat();
-      console.log(
-        `📊 Combined ${allCombinedLeads.length} leads from all statuses`
-      );
-
-      // Sort by creation date (newest first)
-      allCombinedLeads.sort((a, b) => {
-        const dateA =
-          a.createdAt instanceof Date
-            ? a.createdAt
-            : new Date(a.createdAt || 0);
-        const dateB =
-          b.createdAt instanceof Date
-            ? b.createdAt
-            : new Date(b.createdAt || 0);
-        return dateB - dateA;
-      });
-
-      setLeads(allCombinedLeads);
-      setFilteredLeads(allCombinedLeads);
-
-      // Extract and set available countries from the leads data
-      const dynamicCountries = getAvailableCountries(allCombinedLeads);
-      setAvailableCountries(dynamicCountries);
-      console.log(
-        `📊 Extracted ${
-          Object.keys(dynamicCountries).length
-        } unique countries from leads`
-      );
-
-      console.log(
-        `✅ Successfully loaded ${allCombinedLeads.length} conversion leads`
-      );
-      enqueueSnackbar(`Loaded ${allCombinedLeads.length} leads successfully`, {
-        variant: "success",
-      });
-
-      return allCombinedLeads; // Return data for promise chaining
-    } catch (error) {
-      console.error("❌ Error fetching conversion leads:", error);
-      setError("Failed to load leads data");
-      enqueueSnackbar("Failed to load leads data", { variant: "error" });
-      throw error; // Re-throw to be handled by the caller
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // Initialize data - first fetch marketing agents, then fetch the leads
+  // Update available countries when leads change
   useEffect(() => {
-    const initializeData = async () => {
-      setLoading(true);
-      try {
-        // First, get the team members
-        await fetchMarketingAgents();
-        // Then, fetch the leads
-        await fetchConversionLeads();
-      } catch (error) {
-        console.error("Error initializing data:", error);
-        setError("Failed to initialize data");
-        enqueueSnackbar("Failed to load data", { variant: "error" });
-      } finally {
-        setLoading(false);
-      }
-    };
+    setAvailableCountries(availableCountriesFromLeads);
+  }, [availableCountriesFromLeads]);
 
-    initializeData();
-  }, []);
+  // Handle refresh with cache invalidation
+  const handleRefresh = async () => {
+    try {
+      logger.info("Refreshing data (manual trigger)");
+      clearCache(); // Clear the cache first
+      await refresh();
+      enqueueSnackbar("Data refreshed successfully", { variant: "success" });
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      enqueueSnackbar("Failed to refresh data", { variant: "error" });
+    }
+  };
 
   // Filter leads based on current filters
   useEffect(() => {
-    let filtered = [...leads];
-
-    // Role-based filtering: Since agents can't access this screen,
-    // we only need to handle admin roles that can see all leads
-    // No role-based filtering needed for admins
-
-    // Status filter
-    if (filters.status !== "all") {
-      filtered = filtered.filter((lead) => lead.status === filters.status);
-    }
-
-    // Country filter
-    if (filters.country !== "all") {
-      filtered = filtered.filter(
-        (lead) => lead.countryCode === filters.country
-      );
-    }
-
-    // Assignment filter (all admin roles can see all assignments)
-    if (filters.assignedTo !== "all") {
-      if (filters.assignedTo === "unassigned") {
-        filtered = filtered.filter((lead) => !lead.assignedTo);
-      } else {
-        // Now directly filter by email since we store the email in the dropdown value
-        filtered = filtered.filter(
-          (lead) => lead.assignedTo === filters.assignedTo
-        );
+    try {
+      // Debug: Log the first few leads to understand data structure
+      if (leads.length > 0) {
+        logger.debug("Filter debug sample", {
+          sampleLeadId: leads[0].id,
+          totalLeads: leads.length,
+          filters,
+        });
       }
-    }
 
-    // Search filter
-    if (filters.searchTerm) {
-      const searchLower = filters.searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (lead) =>
-          lead.name.toLowerCase().includes(searchLower) ||
-          lead.email.toLowerCase().includes(searchLower) ||
-          lead.phone.includes(searchLower)
-      );
-    }
+      let filtered = [...leads];
 
-    setFilteredLeads(filtered);
-    setPage(0); // Reset to first page when filtering
+      // Status filter
+      if (filters.status !== "all") {
+        filtered = filtered.filter((lead) => {
+          const leadStatus = lead.status?.toLowerCase();
+          return leadStatus === filters.status.toLowerCase();
+        });
+        logger.debug("After status filter", {
+          status: filters.status,
+          count: filtered.length,
+        });
+      }
+
+      // Country filter
+      if (filters.country !== "all") {
+        filtered = filtered.filter((lead) => {
+          // Check multiple possible country code fields
+          const countryCode = lead.countryCode || lead.country_code;
+          const isMatch = countryCode === filters.country;
+
+          // Debug logging for country filtering
+          if (filtered.length < 5) {
+            // omit noisy country filter debug
+          }
+
+          return isMatch;
+        });
+        logger.debug("After country filter", {
+          country: filters.country,
+          count: filtered.length,
+        });
+      }
+
+      // Assignment filter
+      if (filters.assignedTo !== "all") {
+        if (filters.assignedTo === "unassigned") {
+          filtered = filtered.filter((lead) => {
+            // Check multiple possible assignment fields
+            const assignedTo =
+              lead.assignedTo || lead.assigned_to || lead.assignedAgent;
+            return !assignedTo || assignedTo === "" || assignedTo === null;
+          });
+        } else {
+          filtered = filtered.filter((lead) => {
+            // Check multiple possible assignment fields and match with email
+            const assignedTo =
+              lead.assignedTo || lead.assigned_to || lead.assignedAgent;
+            return assignedTo === filters.assignedTo;
+          });
+        }
+        logger.debug("After assignment filter", {
+          assignedTo: filters.assignedTo,
+          count: filtered.length,
+        });
+      }
+
+      // Search filter
+      if (filters.searchTerm) {
+        const searchLower = filters.searchTerm.toLowerCase();
+        filtered = filtered.filter((lead) => {
+          // Add safety checks for undefined/null fields
+          const name = (lead.name || "").toLowerCase();
+          const email = (lead.email || "").toLowerCase();
+          const phone = (lead.phone || "").toLowerCase();
+
+          return (
+            name.includes(searchLower) ||
+            email.includes(searchLower) ||
+            phone.includes(searchLower)
+          );
+        });
+        logger.debug("After search filter", {
+          term: filters.searchTerm,
+          count: filtered.length,
+        });
+      }
+
+      logger.info("Filtered leads computed", { count: filtered.length });
+      setFilteredLeads(filtered);
+      setPage(0); // Reset to first page when filtering
+    } catch (error) {
+      console.error("❌ Error in filtering logic:", error);
+      // Fallback to showing all leads if filtering fails
+      setFilteredLeads(leads);
+    }
   }, [leads, filters]);
 
-  // Selected leads for bulk operations
-  const [selectedLeads, setSelectedLeads] = useState([]);
-  const [selectAll, setSelectAll] = useState(false);
+  // Statistics calculations
+  const stats = useMemo(
+    () => ({
+      totalLeads: filteredLeads.length,
+      unassigned: filteredLeads.filter((lead) => !lead.assignedTo).length,
+      contacted: filteredLeads.filter((lead) => lead.status === "contacted")
+        .length,
+      interested: filteredLeads.filter((lead) => lead.status === "interested")
+        .length,
+      highPriority: filteredLeads.filter((lead) => lead.priority === "high")
+        .length,
+    }),
+    [filteredLeads]
+  );
 
-  // Check if user is an agent and deny access
+  // Check if user is an agent and deny access - AFTER all hooks
   const userRole = getUserRole();
   const isAgent =
     userRole === "marketingAgent" || userRole === "admissionAgent";
@@ -842,6 +683,37 @@ const ConversionPlan = () => {
       </Box>
     );
   }
+
+  // Function to calculate priority based on creation date
+  const calculatePriorityByDate = (contactedDate) => {
+    const currentDate = new Date();
+    const leadDate = new Date(contactedDate);
+    const daysDifference = Math.floor(
+      (currentDate - leadDate) / (1000 * 60 * 60 * 24)
+    );
+
+    // Priority based on age:
+    // 0-3 days: high priority
+    // 4-10 days: medium priority
+    // 11+ days: low priority
+    if (daysDifference <= 3) {
+      return "high";
+    } else if (daysDifference <= 10) {
+      return "medium";
+    } else {
+      return "low";
+    }
+  };
+
+  // Legacy country mapping for fallback
+  const countryMapping = {
+    256: { name: "Uganda", flag: "🇺🇬", code: "UG" },
+    254: { name: "Kenya", flag: "🇰🇪", code: "KE" },
+    250: { name: "Rwanda", flag: "🇷🇼", code: "RW" },
+    255: { name: "Tanzania", flag: "🇹🇿", code: "TZ" },
+    234: { name: "Nigeria", flag: "🇳🇬", code: "NG" },
+    233: { name: "Ghana", flag: "🇬🇭", code: "GH" },
+  };
 
   // Handle select all checkbox
   const handleSelectAll = (event) => {
@@ -881,97 +753,76 @@ const ConversionPlan = () => {
   // Handle assignment with real API calls
   const handleAssignLeads = async (leadIds, agentName) => {
     try {
+      setIsAssigning(true);
+      setAssignmentResult(null);
       // Find the selected agent
       const selectedAgent = teamMembers.find((m) => m.name === agentName);
       if (!selectedAgent) {
         enqueueSnackbar("Agent not found", { variant: "error" });
+        setIsAssigning(false);
         return;
       }
 
-      // Optimistic update - update UI immediately
-      setLeads((prevLeads) =>
-        prevLeads.map((lead) =>
-          leadIds.includes(lead.id)
-            ? { ...lead, assignedTo: selectedAgent.email }
-            : lead
-        )
-      );
-
-      // Update team member assigned count optimistically
-      setTeamMembers((prevTeam) =>
-        prevTeam.map((member) => {
-          if (member.name === agentName) {
-            return {
-              ...member,
-              assignedCount: member.assignedCount + leadIds.length,
-            };
-          }
-          return member;
-        })
-      );
-
-      // Make API call
-      const response = await axiosInstance.post("/api/leads/bulk-assign", {
+      // Optimistic local update
+      optimisticallyAssignLeads(
         leadIds,
-        assignTo: selectedAgent,
-        assignedBy: {
-          uid: user.uid,
-          email: user.email,
-          name: user.displayName || user.email,
-        },
-      });
+        { email: selectedAgent.email, name: selectedAgent.name },
+        {
+          assignedByEmail: user?.email,
+          assignedByName: user?.displayName || user?.email,
+          notes: `Bulk assigned to ${selectedAgent.name} by ${
+            user.displayName || user.email
+          }`,
+        }
+      );
 
-      if (response.data.success) {
+      // Make API call using leadService for consistency
+      const response = await leadService.bulkAssignLeads(
+        leadIds,
+        selectedAgent,
+        `Bulk assigned to ${selectedAgent.name} by ${
+          user.displayName || user.email
+        }`
+      );
+
+      if (response.success) {
+        setAssignmentResult(response.results);
+        reconcileAfterBulk(response.results, leadIds);
         enqueueSnackbar(
-          `${response.data.results.assigned} leads assigned successfully`,
-          { variant: "success" }
+          `${response.results.assigned} assigned, ${response.results.failed} failed`,
+          { variant: response.results.failed ? "warning" : "success" }
         );
-
-        // Refresh data to ensure consistency
-        await fetchConversionLeads();
-        await fetchMarketingAgents();
-      } else {
-        throw new Error("Assignment failed");
-      }
+        // Background refresh (do not await to keep UI snappy)
+        refresh();
+      } else throw new Error("Assignment failed");
     } catch (error) {
       console.error("Error assigning leads:", error);
       enqueueSnackbar("Failed to assign leads", { variant: "error" });
-
-      // Revert optimistic updates on error
-      await fetchConversionLeads();
-      await fetchMarketingAgents();
+      setAssignmentResult({
+        assigned: 0,
+        failed: leadIds?.length || 0,
+        errors: [{ error: error.message }],
+      });
     } finally {
+      setIsAssigning(false);
       // Clear selections and close dialog
       setSelectedLeads([]);
       setSelectAll(false);
-      setAssignmentDialog({
-        open: false,
-        selectedLeads: [],
-        selectedAgent: "",
-      });
+      // Keep dialog open briefly to display results if any
+      setTimeout(() => {
+        setAssignmentDialog({
+          open: false,
+          selectedLeads: [],
+          selectedAgent: "",
+        });
+        setAssignmentResult(null);
+      }, 1200);
     }
   };
 
   // Handle single lead assignment directly from table
   const handleQuickAssign = (leadId, agentName) => {
     handleAssignLeads([leadId], agentName);
-  };
-
-  // Handle refresh
-  const handleRefresh = async () => {
-    setLoading(true);
-    try {
-      // First, get the team members
-      await fetchMarketingAgents();
-      // Then, fetch the leads
-      await fetchConversionLeads();
-    } catch (error) {
-      console.error("Error refreshing data:", error);
-      setError("Failed to refresh data");
-      enqueueSnackbar("Failed to refresh data", { variant: "error" });
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Get priority color
@@ -998,18 +849,6 @@ const ConversionPlan = () => {
       default:
         return "default";
     }
-  };
-
-  // Statistics calculations
-  const stats = {
-    totalLeads: filteredLeads.length,
-    unassigned: filteredLeads.filter((lead) => !lead.assignedTo).length,
-    contacted: filteredLeads.filter((lead) => lead.status === "contacted")
-      .length,
-    interested: filteredLeads.filter((lead) => lead.status === "interested")
-      .length,
-    highPriority: filteredLeads.filter((lead) => lead.priority === "high")
-      .length,
   };
 
   return (
@@ -1403,23 +1242,12 @@ const ConversionPlan = () => {
             <strong>Available Countries:</strong>{" "}
             {Object.keys(availableCountries).length} countries detected from
             leads data:{" "}
-            {Object.values(availableCountries)
-              .slice(0, 8)
-              .map((country, index) => (
-                <span key={index}>
-                  {country.flag} {country.name}
-                  {index <
-                  Math.min(7, Object.keys(availableCountries).length - 1)
-                    ? ", "
-                    : ""}
-                </span>
-              ))}
-            {Object.keys(availableCountries).length > 8 && (
-              <span>
-                {" "}
-                and {Object.keys(availableCountries).length - 8} more...
+            {Object.values(availableCountries).map((country, index) => (
+              <span key={index}>
+                {country.flag} {country.name}
+                {index < Object.keys(availableCountries).length - 1 ? ", " : ""}
               </span>
-            )}
+            ))}
           </Typography>
         </Alert>
       )}
@@ -1429,7 +1257,7 @@ const ConversionPlan = () => {
 
       {/* Error alert */}
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+        <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
@@ -1781,7 +1609,7 @@ const ConversionPlan = () => {
                               >
                                 {member.name.charAt(0)}
                               </Avatar>
-                              {member.name}
+                              {member.name} ({member.email})
                             </Box>
                           </MenuItem>
                         ))}
@@ -2099,12 +1927,17 @@ const ConversionPlan = () => {
                                           {
                                             (
                                               availableCountries[
-                                                lead.countryCode
+                                                lead.countryCode ||
+                                                  lead.country_code
                                               ] ||
                                               countryMapping[
-                                                lead.countryCode
+                                                lead.countryCode ||
+                                                  lead.country_code
                                               ] ||
-                                              getCountryInfo(lead.countryCode)
+                                              getCountryInfo(
+                                                lead.countryCode ||
+                                                  lead.country_code
+                                              )
                                             )?.flag
                                           }
                                         </Typography>
@@ -2115,12 +1948,17 @@ const ConversionPlan = () => {
                                           {
                                             (
                                               availableCountries[
-                                                lead.countryCode
+                                                lead.countryCode ||
+                                                  lead.country_code
                                               ] ||
                                               countryMapping[
-                                                lead.countryCode
+                                                lead.countryCode ||
+                                                  lead.country_code
                                               ] ||
-                                              getCountryInfo(lead.countryCode)
+                                              getCountryInfo(
+                                                lead.countryCode ||
+                                                  lead.country_code
+                                              )
                                             )?.name
                                           }
                                         </Typography>
@@ -2245,46 +2083,78 @@ const ConversionPlan = () => {
                             />
                           </TableCell>
                           <TableCell>
-                            {lead.assignedTo ? (
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                }}
-                              >
-                                <Avatar sx={{ width: 24, height: 24 }}>
-                                  {lead.assignedTo.charAt(0)}
-                                </Avatar>
-                                <Typography variant="body2">
-                                  {lead.assignedTo}
-                                </Typography>
-                              </Box>
-                            ) : (
-                              <Chip
-                                label="Unassigned"
-                                color="warning"
-                                variant="outlined"
-                                size="small"
-                              />
-                            )}
+                            {(() => {
+                              const assignedTo =
+                                lead.assignedTo ||
+                                lead.assigned_to ||
+                                lead.assignedAgent;
+                              if (assignedTo) {
+                                // Try to find the team member by email first, then by name
+                                const teamMember = teamMembers.find(
+                                  (m) =>
+                                    m.email === assignedTo ||
+                                    m.name === assignedTo
+                                );
+                                const displayName = teamMember
+                                  ? teamMember.name
+                                  : assignedTo;
+
+                                return (
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 1,
+                                    }}
+                                  >
+                                    <Avatar sx={{ width: 24, height: 24 }}>
+                                      {displayName.charAt(0)}
+                                    </Avatar>
+                                    <Typography variant="body2">
+                                      {displayName}
+                                    </Typography>
+                                  </Box>
+                                );
+                              } else {
+                                return (
+                                  <Chip
+                                    label="Unassigned"
+                                    color="warning"
+                                    variant="outlined"
+                                    size="small"
+                                  />
+                                );
+                              }
+                            })()}
                           </TableCell>
                           {/* Assignment dropdown - Always show for admins */}
                           <TableCell>
                             <Box sx={{ display: "flex", gap: 1 }}>
                               <FormControl size="small" sx={{ minWidth: 120 }}>
                                 <Select
-                                  value={lead.assignedTo || ""}
+                                  value={
+                                    lead.assignedTo ||
+                                    lead.assigned_to ||
+                                    lead.assignedAgent ||
+                                    ""
+                                  }
                                   displayEmpty
                                   onChange={(e) => {
                                     if (
                                       e.target.value &&
-                                      e.target.value !== lead.assignedTo
+                                      e.target.value !==
+                                        (lead.assignedTo ||
+                                          lead.assigned_to ||
+                                          lead.assignedAgent)
                                     ) {
-                                      handleQuickAssign(
-                                        lead.id,
-                                        e.target.value
+                                      // Find the team member by email to get their name
+                                      const selectedMember = teamMembers.find(
+                                        (m) => m.email === e.target.value
                                       );
+                                      const agentName = selectedMember
+                                        ? selectedMember.name
+                                        : e.target.value;
+                                      handleQuickAssign(lead.id, agentName);
                                     }
                                   }}
                                   sx={{ fontSize: "0.875rem" }}
@@ -2295,7 +2165,7 @@ const ConversionPlan = () => {
                                   {teamMembers.map((member) => (
                                     <MenuItem
                                       key={member.id}
-                                      value={member.name}
+                                      value={member.email}
                                     >
                                       {member.name.split(" ")[0]}
                                       <Chip
@@ -2568,21 +2438,50 @@ const ConversionPlan = () => {
           >
             Cancel
           </Button>
-          <Button
-            variant="contained"
-            onClick={() =>
-              handleAssignLeads(
-                selectedLeads.length > 0
-                  ? selectedLeads
-                  : assignmentDialog.selectedLeads,
-                assignmentDialog.selectedAgent
-              )
-            }
-            disabled={!assignmentDialog.selectedAgent}
-          >
-            Assign Leads
-          </Button>
+          <Box sx={{ position: "relative", display: "inline-block" }}>
+            <Button
+              variant="contained"
+              onClick={() =>
+                handleAssignLeads(
+                  selectedLeads.length > 0
+                    ? selectedLeads
+                    : assignmentDialog.selectedLeads,
+                  assignmentDialog.selectedAgent
+                )
+              }
+              disabled={!assignmentDialog.selectedAgent || isAssigning}
+            >
+              {isAssigning ? "Assigning..." : "Assign Leads"}
+            </Button>
+            {isAssigning && (
+              <LinearProgress
+                sx={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: -4,
+                  height: 3,
+                  borderRadius: 2,
+                }}
+              />
+            )}
+          </Box>
         </DialogActions>
+        {isAssigning && (
+          <Box sx={{ px: 3, pb: 2 }}>
+            <Typography variant="caption" color="text.secondary">
+              Processing assignment... This may take a moment.
+            </Typography>
+          </Box>
+        )}
+        {assignmentResult && !isAssigning && (
+          <Box sx={{ px: 3, pb: 2 }}>
+            <Alert severity={assignmentResult.failed ? "warning" : "success"}>
+              Assigned: {assignmentResult.assigned} | Failed:{" "}
+              {assignmentResult.failed}
+            </Alert>
+          </Box>
+        )}
       </Dialog>
     </Box>
   );

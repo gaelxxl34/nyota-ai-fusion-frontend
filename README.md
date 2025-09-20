@@ -23,7 +23,7 @@ git clone https://github.com/your-username/nyota-ai-fusion.git
 cd nyota-ai-fusion/nyota-ai-fusion-frontend
 ```
 
-2. Install dependencies:
+1. Install dependencies:
 
 ```bash
 npm install
@@ -31,14 +31,14 @@ npm install
 yarn install
 ```
 
-3. Set up environment variables:
+1. Set up environment variables:
 
 ```bash
 cp .env.example .env
 # Edit .env with your actual values
 ```
 
-4. Start the development server:
+1. Start the development server:
 
 ```bash
 npm start
@@ -146,3 +146,32 @@ nyota-ai-fusion-frontend/
 - **SEO Ready**: All external pages optimized for search engines and social sharing
 - **Performance**: Optimized images and CSS for fast loading
 - **Accessibility**: WCAG compliant design patterns
+
+## Logging & Debugging
+
+Verbose scattered `console.log` calls have been consolidated using a lightweight logger at `src/utils/logger.js`.
+
+Usage:
+
+```js
+import logger from "../utils/logger";
+logger.info("Something important", { context: "value" });
+logger.debug("Detailed stuff");
+logger.warn("Unexpected but handled");
+logger.error("Real problem", err);
+```
+
+Control output via environment variables (set in `.env` before build/start):
+
+```bash
+REACT_APP_LOG_LEVEL=debug|info|warn|error   # default: debug (dev) / info (prod)
+REACT_APP_LOG_STRATEGY=minimal              # if set to 'minimal', hides debug+info
+```
+
+Recommended:
+
+- Local development deep dive: `REACT_APP_LOG_LEVEL=debug`
+- Normal development: omit (defaults are fine)
+- Production noise reduction: `REACT_APP_LOG_STRATEGY=minimal`
+
+Only warnings and errors are always shown when using the minimal strategy.
