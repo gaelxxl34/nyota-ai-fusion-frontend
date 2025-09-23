@@ -337,7 +337,7 @@ const BulkActions = () => {
   };
 
   // Fetch all lead statuses - simplified
-  const fetchAllLeads = async () => {
+  const fetchAllLeads = useCallback(async () => {
     try {
       // Fetch leads in parallel to reduce loading time
       await Promise.all([
@@ -347,10 +347,10 @@ const BulkActions = () => {
     } catch (error) {
       console.error("Error in fetchAllLeads:", error);
     }
-  };
+  }, []);
 
   // Fetch campaigns - simplified
-  const fetchCampaigns = async () => {
+  const fetchCampaigns = useCallback(async () => {
     try {
       setCampaignLoading(true);
       const response = await superAdminService.getAllCampaigns();
@@ -361,7 +361,7 @@ const BulkActions = () => {
     } finally {
       setCampaignLoading(false);
     }
-  };
+  }, []);
 
   // Start auto-refresh for running campaigns - simplified
   const startAutoRefresh = () => {

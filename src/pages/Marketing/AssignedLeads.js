@@ -175,6 +175,9 @@ const AssignedLeads = () => {
   const [statusUpdateLead, setStatusUpdateLead] = useState(null);
   const [newStatus, setNewStatus] = useState("");
 
+  // Additional state variables
+  const [refreshing, setRefreshing] = useState(false);
+
   // Advanced filter states
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -358,26 +361,26 @@ const AssignedLeads = () => {
           };
         });
 
-        // Calculate stats for dashboard
-        const statsData = {
-          total: processedLeads.length,
-          applied: processedLeads.filter((lead) => lead.status === "APPLIED")
-            .length,
-          followUp: processedLeads.filter((lead) => lead.status === "FOLLOW_UP")
-            .length,
-          // Only count real interactions, not fake data
-          positiveInteractions: processedLeads.filter(
-            (lead) => lead.lastInteractionOutcome === "positive"
-          ).length,
-          negativeInteractions: processedLeads.filter(
-            (lead) => lead.lastInteractionOutcome === "negative"
-          ).length,
-          highPriority: processedLeads.filter(
-            (lead) => lead.priority === "high"
-          ).length,
-        };
+        // Calculate stats for dashboard (currently unused in UI)
+        // const statsData = {
+        //   total: processedLeads.length,
+        //   applied: processedLeads.filter((lead) => lead.status === "APPLIED")
+        //     .length,
+        //   followUp: processedLeads.filter((lead) => lead.status === "FOLLOW_UP")
+        //     .length,
+        //   // Only count real interactions, not fake data
+        //   positiveInteractions: processedLeads.filter(
+        //     (lead) => lead.lastInteractionOutcome === "positive"
+        //   ).length,
+        //   negativeInteractions: processedLeads.filter(
+        //     (lead) => lead.lastInteractionOutcome === "negative"
+        //   ).length,
+        //   highPriority: processedLeads.filter(
+        //     (lead) => lead.priority === "high"
+        //   ).length,
+        // };
 
-        setStats(statsData);
+        // setStats(statsData); // Stats not currently used in UI
         setAssignedLeads(processedLeads);
         console.log(`✅ Loaded ${processedLeads.length} assigned leads`);
       } else {
@@ -642,6 +645,10 @@ const AssignedLeads = () => {
     setStatusUpdateDialogOpen(false);
     setStatusUpdateLead(null);
     setNewStatus("");
+  };
+
+  const handleActionClose = () => {
+    setActionAnchorEl(null);
   };
 
   const handleStatusUpdate = async () => {

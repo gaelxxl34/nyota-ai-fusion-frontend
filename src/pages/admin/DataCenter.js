@@ -106,11 +106,12 @@ const logDebug = (message, ...args) => {
   }
 };
 
-const logVerbose = (message, ...args) => {
-  if (CURRENT_LOG_LEVEL >= LOG_LEVEL.VERBOSE) {
-    console.log(`🔎 ${message}`, ...args);
-  }
-};
+// REMOVED: Unused logVerbose function
+// const logVerbose = (message, ...args) => {
+//   if (CURRENT_LOG_LEVEL >= LOG_LEVEL.VERBOSE) {
+//     console.log(`🔎 ${message}`, ...args);
+//   }
+// };
 
 // Move TabPanel outside the main component to prevent recreation on every render
 const TabPanel = React.memo(({ children, value, index, ...other }) => {

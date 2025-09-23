@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -189,14 +189,7 @@ const InteractionTimeline = ({ leadId, leadName }) => {
     interactionTag: "",
   });
 
-  // Load interactions when component mounts or leadId changes
-  useEffect(() => {
-    if (leadId) {
-      loadInteractions();
-    }
-  }, [leadId, filter, loadInteractions]);
-
-  const loadInteractions = async () => {
+  const loadInteractions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -219,7 +212,14 @@ const InteractionTimeline = ({ leadId, leadName }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [leadId, filter]);
+
+  // Load interactions when component mounts or leadId changes
+  useEffect(() => {
+    if (leadId) {
+      loadInteractions();
+    }
+  }, [leadId, loadInteractions]);
 
   // Pre-defined templates for quick logging - Organized by conversion priority
   const quickTemplates = [
