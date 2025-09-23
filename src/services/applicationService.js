@@ -434,10 +434,25 @@ class ApplicationService {
       const response = await axiosInstance.get(
         `${this.apiUrl}/email/${encodeURIComponent(email)}`
       );
-      console.log("Raw backend response:", response.data);
+      console.log(
+        "Raw backend response for applications by email:",
+        response.data
+      );
+      console.log(
+        "Academic documents in response:",
+        response.data?.data?.[0]?.academicDocuments
+          ? {
+              exists: true,
+              isArray: Array.isArray(response.data.data[0].academicDocuments),
+              length: Array.isArray(response.data.data[0].academicDocuments)
+                ? response.data.data[0].academicDocuments.length
+                : "not an array",
+            }
+          : "missing"
+      );
 
-      // Backend already returns { success: true, data: [...] }
-      // So we return the backend response directly
+      // Make sure we're returning the correct structure
+      // Backend returns { success: true, data: [...applications] }
       return response.data;
     } catch (error) {
       console.error("Get applications by email error:", error);

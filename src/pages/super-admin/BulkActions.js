@@ -363,30 +363,6 @@ const BulkActions = () => {
     }
   };
 
-  // Fetch specific campaign details
-  const fetchCampaignDetails = useCallback(
-    async (campaignId) => {
-      try {
-        const response = await superAdminService.getCampaign(campaignId);
-        const updatedCampaign = response.campaign;
-
-        setCampaigns((prev) =>
-          prev.map((campaign) =>
-            campaign.id === campaignId ? updatedCampaign : campaign
-          )
-        );
-
-        return updatedCampaign;
-      } catch (error) {
-        console.error("Error fetching campaign details:", error);
-        enqueueSnackbar("Failed to fetch campaign details", {
-          variant: "error",
-        });
-      }
-    },
-    [enqueueSnackbar]
-  );
-
   // Start auto-refresh for running campaigns - simplified
   const startAutoRefresh = () => {
     if (refreshInterval) {
@@ -423,7 +399,7 @@ const BulkActions = () => {
         clearInterval(refreshInterval);
       }
     };
-  }, []); // Empty dependency array to run only on mount
+  }, [fetchAllLeads, fetchCampaigns, refreshInterval]); // Added missing dependencies
 
   // Auto-refresh effect for running campaigns
   useEffect(() => {
@@ -433,7 +409,7 @@ const BulkActions = () => {
     } else {
       stopAutoRefresh();
     }
-  }, [campaigns]);
+  }, [campaigns, startAutoRefresh, stopAutoRefresh]);
 
   // Handle form input changes
   const handleFormChange = (field, value) => {

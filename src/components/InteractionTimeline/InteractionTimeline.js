@@ -2,8 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
-  Card,
-  CardContent,
   Button,
   IconButton,
   Avatar,
@@ -23,12 +21,9 @@ import {
   ListItemAvatar,
   ListItemText,
   ListItemSecondaryAction,
-  Tooltip,
   Badge,
   Stack,
   Menu,
-  ToggleButton,
-  ToggleButtonGroup,
   CircularProgress,
   Alert,
 } from "@mui/material";
@@ -38,9 +33,6 @@ import {
   WhatsApp as WhatsAppIcon,
   Videocam as VideocamIcon,
   Person as PersonIcon,
-  Sms as SmsIcon,
-  Facebook as FacebookIcon,
-  Instagram as InstagramIcon,
   Add as AddIcon,
   Schedule as ScheduleIcon,
   FilterList as FilterIcon,
@@ -48,8 +40,6 @@ import {
   TrendingDown as TrendingDownIcon,
   TrendingFlat as TrendingFlatIcon,
   AccessTime as TimeIcon,
-  Check as CheckIcon,
-  Close as CloseIcon,
   MoreVert as MoreVertIcon,
 } from "@mui/icons-material";
 import { format, formatDistanceToNow } from "date-fns";
@@ -184,7 +174,6 @@ const InteractionTimeline = ({ leadId, leadName }) => {
   const [interactions, setInteractions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [interactionSummary, setInteractionSummary] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [filter, setFilter] = useState("all");
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
@@ -205,7 +194,7 @@ const InteractionTimeline = ({ leadId, leadName }) => {
     if (leadId) {
       loadInteractions();
     }
-  }, [leadId, filter]);
+  }, [leadId, filter, loadInteractions]);
 
   const loadInteractions = async () => {
     try {
@@ -221,7 +210,6 @@ const InteractionTimeline = ({ leadId, leadName }) => {
 
       if (response.success) {
         setInteractions(response.data || []);
-        setInteractionSummary(response.summary || null);
       } else {
         setError(response.error || "Failed to load interactions");
       }

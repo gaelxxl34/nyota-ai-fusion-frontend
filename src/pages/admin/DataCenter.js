@@ -65,6 +65,53 @@ import LeadEditDialog from "../../components/leads/LeadEditDialog";
 import LeadDeleteDialog from "../../components/leads/LeadDeleteDialog";
 import StartConversationDialog from "../../components/leads/StartConversationDialog";
 
+// Simple logging utility to control debug output and make it easy to disable logs in production
+const LOG_LEVEL = {
+  NONE: 0,
+  ERROR: 1,
+  WARN: 2,
+  INFO: 3,
+  DEBUG: 4,
+  VERBOSE: 5,
+};
+
+// Set the current log level - can be adjusted based on environment
+const CURRENT_LOG_LEVEL =
+  process.env.NODE_ENV === "production"
+    ? LOG_LEVEL.ERROR // Only show errors in production
+    : LOG_LEVEL.INFO; // Show info and above in development
+
+// Logging utility functions
+const logError = (message, ...args) => {
+  if (CURRENT_LOG_LEVEL >= LOG_LEVEL.ERROR) {
+    console.error(`❌ ${message}`, ...args);
+  }
+};
+
+const logWarn = (message, ...args) => {
+  if (CURRENT_LOG_LEVEL >= LOG_LEVEL.WARN) {
+    console.warn(`⚠️ ${message}`, ...args);
+  }
+};
+
+const logInfo = (message, ...args) => {
+  if (CURRENT_LOG_LEVEL >= LOG_LEVEL.INFO) {
+    console.log(`ℹ️ ${message}`, ...args);
+  }
+};
+
+const logDebug = (message, ...args) => {
+  if (CURRENT_LOG_LEVEL >= LOG_LEVEL.DEBUG) {
+    console.log(`🔍 ${message}`, ...args);
+  }
+};
+
+const logVerbose = (message, ...args) => {
+  if (CURRENT_LOG_LEVEL >= LOG_LEVEL.VERBOSE) {
+    console.log(`🔎 ${message}`, ...args);
+  }
+};
+
 // Move TabPanel outside the main component to prevent recreation on every render
 const TabPanel = React.memo(({ children, value, index, ...other }) => {
   return (
@@ -225,10 +272,10 @@ const DataCenter = () => {
 
   // Filter tabs based on user role - only show tabs for stages they have access to
   const filteredTabs = useMemo(() => {
-    console.log("🔑 Permission check for user:", userRole);
+    logInfo("Permission check for user:", userRole);
 
     if (!userRole) {
-      console.log("❌ No user role found, returning empty tabs");
+      logWarn("No user role found, returning empty tabs");
       return [];
     }
 
@@ -315,8 +362,8 @@ const DataCenter = () => {
         return tab;
       });
 
-    console.log(
-      "🎯 Filtered tabs:",
+    logInfo(
+      "Filtered tabs:",
       filtered.map((t) => t.label)
     );
     return filtered;
@@ -324,7 +371,7 @@ const DataCenter = () => {
 
   // Manual refresh function - only refreshes leads, not stats
   const refreshCurrentTab = useCallback(() => {
-    console.log("📊 Manual refresh: updating leads only");
+    logInfo("Manual refresh: updating leads only");
     setPagination((prev) => ({ ...prev, page: 0 }));
     setRefreshTrigger((prev) => prev + 1);
     // Don't refresh stats on manual refresh - only leads
@@ -371,7 +418,7 @@ const DataCenter = () => {
   // Handle tab change
   const handleTabChange = useCallback(
     (event, newTabIndex) => {
-      console.log(`🔄 Tab change from ${currentTab} to ${newTabIndex}`);
+      logInfo(`Tab change from ${currentTab} to ${newTabIndex}`);
 
       // Clear any existing errors
       setError("");
@@ -403,16 +450,16 @@ const DataCenter = () => {
   useEffect(() => {
     // With client-side filtering, we don't need complex debouncing or API calls
     // The filtering happens in real-time in the filteredLeads useMemo
-    console.log("🔍 Search term changed:", searchTerm);
+    logDebug("Search term changed:", searchTerm);
   }, [searchTerm]);
 
   // Fetch initial data only once on component mount
   useEffect(() => {
-    console.log("🏁 Component mounted - fetching initial data once");
+    logInfo("Component mounted - fetching initial data once");
 
     const fetchData = async () => {
       try {
-        console.log(`📊 Fetching initial data`);
+        logInfo(`Fetching initial data`);
 
         const [applicationsResponse, statsResponse] = await Promise.all([
           leadService.getApplications({ limit: 50 }),
@@ -424,7 +471,7 @@ const DataCenter = () => {
           statsResponse?.data || { total: 0, byStatus: {}, bySource: {} }
         );
       } catch (err) {
-        console.error("Error fetching initial data:", err);
+        logError("Error fetching initial data:", err);
         setError(err.message);
       }
     };
@@ -435,7 +482,7 @@ const DataCenter = () => {
   // Fetch leads when component mounts or current tab changes or refresh is triggered
   useEffect(() => {
     const loadData = async () => {
-      console.log("🔄 useEffect triggered:", {
+      logDebug("useEffect triggered:", {
         currentTab,
         filteredTabsLength: filteredTabs.length,
         userRole,
@@ -443,14 +490,14 @@ const DataCenter = () => {
 
       // Early exit if no user role (not authenticated)
       if (!userRole) {
-        console.log("❌ No user role found, user might not be authenticated");
+        logWarn("No user role found, user might not be authenticated");
         setLoading(false);
         return;
       }
 
       // Early exit if no tabs available
       if (filteredTabs.length === 0) {
-        console.log("❌ No filtered tabs available, setting loading to false");
+        logWarn("No filtered tabs available, setting loading to false");
         setLoading(false);
         return;
       }
@@ -458,15 +505,13 @@ const DataCenter = () => {
       // Get current state values
       const currentTabConfig = filteredTabs[currentTab];
       if (!currentTabConfig) {
-        console.log("❌ No current tab config found, setting loading to false");
+        logWarn("No current tab config found, setting loading to false");
         setLoading(false);
         return;
       }
 
       if (currentTab >= filteredTabs.length) {
-        console.log(
-          "❌ Current tab index out of bounds, setting loading to false"
-        );
+        logWarn("Current tab index out of bounds, setting loading to false");
         setLoading(false);
         return;
       }
@@ -475,8 +520,8 @@ const DataCenter = () => {
         setLoading(true);
         setError("");
 
-        console.log(
-          `📊 Fetching ALL ${currentTabConfig.label} data for client-side filtering`
+        logInfo(
+          `Fetching ALL ${currentTabConfig.label} data for client-side filtering`
         );
 
         let leadsResponse;
@@ -503,8 +548,8 @@ const DataCenter = () => {
             total: allPersonal.length,
           }));
         } else if (currentTabConfig.label === "All Leads") {
-          console.log(
-            `📊 Fetching ALL leads for ${currentTabConfig.statuses.length} statuses:`,
+          logInfo(
+            `Fetching ALL leads for ${currentTabConfig.statuses.length} statuses:`,
             currentTabConfig.statuses
           );
 
@@ -522,15 +567,10 @@ const DataCenter = () => {
                   }
                 );
                 const leads = statusResponse?.data || [];
-                console.log(
-                  `📊 Fetched ${leads.length} leads for status: ${status}`
-                );
+                logInfo(`Fetched ${leads.length} leads for status: ${status}`);
                 return leads;
               } catch (error) {
-                console.error(
-                  `❌ Error fetching leads for status ${status}:`,
-                  error
-                );
+                logError(`Error fetching leads for status ${status}:`, error);
                 return []; // Return empty array on error
               }
             }
@@ -540,8 +580,8 @@ const DataCenter = () => {
 
           // Combine all results and sort by createdAt desc
           const allCombinedLeads = statusResults.flat();
-          console.log(
-            `📊 Combined ${allCombinedLeads.length} leads from all statuses`
+          logInfo(
+            `Combined ${allCombinedLeads.length} leads from all statuses`
           );
 
           allCombinedLeads.sort((a, b) => {
@@ -605,10 +645,7 @@ const DataCenter = () => {
                   );
                   return statusResponse?.data || [];
                 } catch (error) {
-                  console.error(
-                    `❌ Error fetching leads for status ${status}:`,
-                    error
-                  );
+                  logError(`Error fetching leads for status ${status}:`, error);
                   return []; // Return empty array on error
                 }
               }
@@ -641,8 +678,8 @@ const DataCenter = () => {
           }
         }
 
-        console.log(
-          `📊 Loaded ${
+        logInfo(
+          `Loaded ${
             currentTabConfig.label === "For You"
               ? allPersonalLeadsData.length ||
                 (leadsResponse?.data || []).length
@@ -650,7 +687,7 @@ const DataCenter = () => {
           } leads for ${currentTabConfig.label} tab`
         );
       } catch (err) {
-        console.error(`Error fetching leads:`, err);
+        logError(`Error fetching leads:`, err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -670,7 +707,7 @@ const DataCenter = () => {
       if (event.origin !== "https://applicant.iuea.ac.ug") return;
 
       if (event.data?.type === "signup_success") {
-        console.log("🎉 Signup success received from iframe:", event.data);
+        logInfo("Signup success received from iframe:", event.data);
         // Close dialog and refresh data
         setCreateAccountDialogOpen(false);
         // Refresh leads to show the new signup
@@ -1124,7 +1161,7 @@ const DataCenter = () => {
         return new Date(dateValue).toLocaleString("en-US", dateTimeOptions);
       }
     } catch (error) {
-      console.error("Error formatting date:", error, dateValue);
+      logError("Error formatting date:", error, dateValue);
     }
 
     return typeof dateValue === "string" ? dateValue : "N/A";
@@ -1367,7 +1404,7 @@ const DataCenter = () => {
 
   const handleConvertLead = (lead) => {
     // Convert lead to application
-    console.log("Convert lead:", lead.id);
+    logInfo("Convert lead:", lead.id);
     // TODO: Implement conversion to application
   };
 
@@ -1377,7 +1414,7 @@ const DataCenter = () => {
   };
 
   const handleLeadUpdated = (updatedLead) => {
-    console.log("Lead updated:", updatedLead.id);
+    logInfo("Lead updated:", updatedLead.id);
 
     // Update the lead in all relevant data arrays
     setAllLeadsData((prev) =>
@@ -1401,7 +1438,7 @@ const DataCenter = () => {
   };
 
   const handleLeadDeleted = (leadId) => {
-    console.log("Lead deleted:", leadId);
+    logInfo("Lead deleted:", leadId);
 
     // Remove the deleted lead from all relevant data arrays
     setAllLeadsData((prev) => prev.filter((lead) => lead.id !== leadId));
@@ -1522,7 +1559,7 @@ const DataCenter = () => {
   };
 
   // Debug logging
-  console.log("🔍 DataCenter Debug:", {
+  logDebug("DataCenter Debug:", {
     userRole,
     allTabsCount: leadStatusTabs.length,
     filteredTabsCount: filteredTabs.length,
@@ -2059,7 +2096,7 @@ const DataCenter = () => {
                       {/* Refresh Button */}
                       <IconButton
                         onClick={() => {
-                          console.log("Manual refresh triggered");
+                          logDebug("Manual refresh triggered");
                           refreshCurrentTab();
                         }}
                         disabled={loading}
@@ -2755,10 +2792,7 @@ const DataCenter = () => {
                     user?.email?.split("@")[0] ||
                     `${userRole}-staff` ||
                     "staff";
-                  console.log(
-                    "📨 Sending submittedBy to iframe:",
-                    submittedByValue
-                  );
+                  logDebug("Sending submittedBy to iframe:", submittedByValue);
                   setTimeout(() => {
                     iframe.contentWindow?.postMessage(
                       {

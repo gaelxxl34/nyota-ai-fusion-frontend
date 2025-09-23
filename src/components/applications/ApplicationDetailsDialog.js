@@ -97,6 +97,9 @@ const ApplicationDetailsDialog = ({
     title: "",
     type: "",
   });
+  // Track new academic documents to add and existing ones to remove
+  const [newAcademicDocuments, setNewAcademicDocuments] = useState([]); // File[]
+  const [removeAcademicDocuments, setRemoveAcademicDocuments] = useState([]); // string[] URLs
 
   // Store any object URLs created for file previews so we can revoke them later
   const filePreviewUrls = useRef([]);
@@ -134,6 +137,35 @@ const ApplicationDetailsDialog = ({
 
   // Handler for opening documents in a new window or in a dialog
   const handleViewDocument = async (documentUrl, displayName) => {
+    // If a direct URL is provided (from arrays of documents), preview it immediately
+    if (documentUrl && typeof documentUrl === "string") {
+      try {
+        const url = documentUrl;
+        const isBase64 = url.startsWith("data:");
+        const lower = url.toLowerCase();
+        const isPdf =
+          lower.includes("application/pdf") || lower.endsWith(".pdf");
+        const isImage =
+          lower.includes("image/") ||
+          /\.(jpe?g|png|gif|bmp|webp)$/i.test(lower);
+
+        setDocumentPreview({
+          open: true,
+          url,
+          title: displayName,
+          type: isPdf
+            ? "pdf"
+            : isImage
+            ? "image"
+            : isBase64
+            ? "iframe"
+            : "iframe",
+        });
+        return;
+      } catch (e) {
+        console.warn("Direct preview failed, falling back to API fetch", e);
+      }
+    }
     // Use email to fetch application if applicationId is not available
     if (!applicationId && !email) {
       console.error(
@@ -315,6 +347,40 @@ const ApplicationDetailsDialog = ({
       setLoading(false);
     }
   };
+  const handleAddAcademicDocuments = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const valid = [];
+    for (const f of files) {
+      if (f.size > maxSize) {
+        setErrorDialog({
+          open: true,
+          title: "File Too Large",
+          message: `One or more files exceed 10MB: ${f.name}`,
+        });
+        return;
+      }
+      valid.push(f);
+    }
+    setNewAcademicDocuments((prev) => [...prev, ...valid]);
+    // Clear input value so selecting the same files again will re-trigger change
+    e.target.value = "";
+  };
+
+  const handleRemoveExistingAcademicDocument = (docUrl) => {
+    setRemoveAcademicDocuments((prev) =>
+      prev.includes(docUrl) ? prev : [...prev, docUrl]
+    );
+  };
+
+  const handleUndoRemoveExistingAcademicDocument = (docUrl) => {
+    setRemoveAcademicDocuments((prev) => prev.filter((u) => u !== docUrl));
+  };
+
+  const handleRemoveQueuedAcademicDocument = (index) => {
+    setNewAcademicDocuments((prev) => prev.filter((_, i) => i !== index));
+  };
 
   // Handler to show file error dialog
   const showFileErrorDialog = (message) => {
@@ -442,6 +508,17 @@ const ApplicationDetailsDialog = ({
         const emailResponse = await applicationService.getApplicationsByEmail(
           email
         );
+        console.log("Email response structure:", {
+          success: emailResponse.success,
+          dataLength: emailResponse.data?.length,
+          firstItem: emailResponse.data?.[0] ? "exists" : "missing",
+          academicDocs: emailResponse.data?.[0]?.academicDocuments
+            ? Array.isArray(emailResponse.data[0].academicDocuments)
+              ? emailResponse.data[0].academicDocuments.length
+              : "not an array"
+            : "missing",
+        });
+
         if (
           emailResponse &&
           emailResponse.success &&
@@ -450,10 +527,21 @@ const ApplicationDetailsDialog = ({
         ) {
           // Use the most recent application
           const latestApplication = emailResponse.data[0];
+          // Do not create a nested structure, pass the application directly
           response = {
             success: true,
-            data: latestApplication,
+            data: latestApplication, // This is already the full application object
           };
+          console.log("Selected application structure:", {
+            id: latestApplication.id,
+            email: latestApplication.email,
+            hasAcademicDocs: !!latestApplication.academicDocuments,
+            academicDocsLength: Array.isArray(
+              latestApplication.academicDocuments
+            )
+              ? latestApplication.academicDocuments.length
+              : "not an array",
+          });
         } else {
           response = {
             success: false,
@@ -470,8 +558,19 @@ const ApplicationDetailsDialog = ({
       console.log("Application API response:", response);
 
       if (response && response.success) {
-        const applicationData = response.data.data || response.data;
+        // Extract application data without creating unnecessary nesting
+        const applicationData = response.data;
         console.log("Application data loaded:", applicationData);
+
+        // Debug academic documents specifically
+        console.log("Academic documents:", {
+          exists: !!applicationData.academicDocuments,
+          isArray: Array.isArray(applicationData.academicDocuments),
+          length: Array.isArray(applicationData.academicDocuments)
+            ? applicationData.academicDocuments.length
+            : "N/A",
+          items: applicationData.academicDocuments,
+        });
 
         // Process the data to handle timestamp objects
         const processedData = sanitizeFirestoreTimestamps(applicationData);
@@ -661,6 +760,8 @@ const ApplicationDetailsDialog = ({
     // Reset form data to original application data
     setFormData(application || {});
     setFormErrors({});
+    setNewAcademicDocuments([]);
+    setRemoveAcademicDocuments([]);
   };
 
   const handleInputChange = (e) => {
@@ -1093,21 +1194,17 @@ const ApplicationDetailsDialog = ({
         }
       }
 
-      // Create data to send for full update - filter out undefined values
-      const dataToSend = {};
+      // Build payload – prefer multipart/form-data when files are present, otherwise JSON
+      const hasFiles =
+        formData.passportPhoto instanceof File ||
+        formData.academicDocuments instanceof File ||
+        formData.identificationDocument instanceof File;
 
-      // Only include defined values to avoid backend Firestore errors
-      Object.keys(formData).forEach((key) => {
-        if (formData[key] !== undefined) {
-          dataToSend[key] = formData[key];
-        }
-      });
+      let payload = null;
+      let config = {};
 
-      // Use ISO format for consistency with the backend and lead documents
-      dataToSend.updatedAt = new Date().toISOString();
-
-      // Add updatedBy information for audit trail
-      dataToSend.updatedBy = {
+      // Common audit info
+      const updatedByInfo = {
         email: user?.email || "unknown@system.com",
         name: user?.displayName || user?.name || user?.email || "Unknown User",
         role: userRole || "unknown",
@@ -1115,53 +1212,115 @@ const ApplicationDetailsDialog = ({
         uid: user?.uid || null,
       };
 
-      // Remove preview URL
-      delete dataToSend.passportPhotoPreview;
+      if (hasFiles) {
+        console.log("Preparing multipart/form-data payload for file upload...");
+        const fd = new FormData();
 
-      console.log("Converting files to base64...");
+        // Append non-file fields (strings only)
+        Object.keys(formData).forEach((key) => {
+          if (
+            [
+              "passportPhoto",
+              "academicDocuments",
+              "identificationDocument",
+              "passportPhotoPreview",
+            ].includes(key)
+          )
+            return;
+          const val = formData[key];
+          if (val !== undefined && val !== null && typeof val !== "object") {
+            fd.append(key, String(val));
+          }
+        });
 
-      try {
-        // Convert passport photo to base64
-        if (dataToSend.passportPhoto instanceof File) {
-          console.log("Converting passport photo to base64...");
-          dataToSend.passportPhoto = await fileToBase64(
-            dataToSend.passportPhoto,
-            "passportPhoto"
+        // Append audit fields
+        fd.append("updatedAt", new Date().toISOString());
+        fd.append("updatedBy", JSON.stringify(updatedByInfo));
+
+        // Append files
+        if (formData.passportPhoto instanceof File) {
+          fd.append("passportPhoto", formData.passportPhoto);
+        }
+        // Append new academic documents (multiple allowed)
+        if (newAcademicDocuments && newAcademicDocuments.length > 0) {
+          newAcademicDocuments.forEach((file) => {
+            if (file instanceof File) {
+              fd.append("newAcademicDocuments", file);
+            }
+          });
+        }
+        if (formData.identificationDocument instanceof File) {
+          // Backend accepts either identificationDocument or idDocument
+          fd.append("identificationDocument", formData.identificationDocument);
+        }
+
+        // Append removals list for academic documents
+        if (removeAcademicDocuments && removeAcademicDocuments.length > 0) {
+          fd.append(
+            "removeAcademicDocuments",
+            JSON.stringify(removeAcademicDocuments)
           );
         }
 
-        // Convert academic documents to base64
-        if (dataToSend.academicDocuments instanceof File) {
-          console.log("Converting academic documents to base64...");
-          dataToSend.academicDocuments = await fileToBase64(
-            dataToSend.academicDocuments,
-            "academicDocuments"
-          );
+        payload = fd;
+        config = {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        };
+      } else {
+        console.log("Preparing JSON payload (no files to upload)...");
+        const dataToSend = {};
+        Object.keys(formData).forEach((key) => {
+          if (formData[key] !== undefined && key !== "passportPhotoPreview") {
+            dataToSend[key] = formData[key];
+          }
+        });
+        dataToSend.updatedAt = new Date().toISOString();
+        dataToSend.updatedBy = updatedByInfo;
+        if (removeAcademicDocuments && removeAcademicDocuments.length > 0) {
+          dataToSend.removeAcademicDocuments = removeAcademicDocuments;
         }
 
-        // Convert identification documents to base64
-        if (dataToSend.identificationDocument instanceof File) {
-          console.log("Converting identification documents to base64...");
-          dataToSend.identificationDocument = await fileToBase64(
-            dataToSend.identificationDocument,
-            "identificationDocument"
+        // Handle academic documents for JSON payload (base64 encoding needed)
+        if (newAcademicDocuments && newAcademicDocuments.length > 0) {
+          console.log(
+            `Need to encode ${newAcademicDocuments.length} academic documents for JSON payload...`
           );
+
+          try {
+            // We need to ensure all documents are encoded before sending
+            const encodePromises = newAcademicDocuments.map(
+              (file) =>
+                new Promise((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve(reader.result);
+                  reader.onerror = reject;
+                  reader.readAsDataURL(file);
+                })
+            );
+
+            // Wait for all files to be encoded
+            const encodedFiles = await Promise.all(encodePromises);
+            dataToSend.newAcademicDocuments = encodedFiles;
+            console.log(
+              `Successfully encoded ${encodedFiles.length} academic documents`
+            );
+          } catch (encodeError) {
+            console.error("Error encoding academic documents:", encodeError);
+            throw new Error(
+              "Failed to encode academic documents: " + encodeError.message
+            );
+          }
         }
-      } catch (error) {
-        console.error("Error processing file:", error);
-        setError(error.message);
-        setSaving(false);
-        return;
+
+        payload = dataToSend;
+        config = {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        };
       }
-
-      console.log("Saving application data with files converted to base64...");
-
-      // Create config to handle JSON data
-      const config = {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      };
 
       let response;
 
@@ -1169,14 +1328,13 @@ const ApplicationDetailsDialog = ({
       if (applicationId) {
         response = await applicationService.updateApplication(
           applicationId,
-          dataToSend,
+          payload,
           config
         );
       } else if (email) {
-        // Use the new email-based update method
         response = await applicationService.updateApplicationByEmail(
           email,
-          dataToSend,
+          payload,
           config
         );
       } else {
@@ -1185,9 +1343,25 @@ const ApplicationDetailsDialog = ({
 
       if (response && response.success) {
         console.log("Application updated successfully:", response.data);
+
+        // Clear any uploaded document queues
+        if (
+          newAcademicDocuments.length > 0 ||
+          removeAcademicDocuments.length > 0
+        ) {
+          console.log(
+            "Clearing academic document queues after successful update"
+          );
+          setNewAcademicDocuments([]);
+          setRemoveAcademicDocuments([]);
+        }
+
         setEditMode(false);
 
-        // Re-fetch application data to ensure we have the most up-to-date information
+        // Force a re-fetch of application data to ensure we have the most up-to-date information
+        console.log(
+          "Refreshing application data to show updated academic documents..."
+        );
         await fetchApplicationData();
       } else {
         console.error("Failed to update application:", response);
@@ -2567,68 +2741,180 @@ const ApplicationDetailsDialog = ({
                         >
                           Academic Documents
                         </Typography>
-                        <Button
-                          variant="outlined"
-                          component="label"
-                          startIcon={<PdfIcon />}
-                          fullWidth
-                          sx={{ mb: 1 }}
-                        >
-                          {application.academicDocuments
-                            ? "Replace Documents"
-                            : "Upload Documents"}
-                          <input
-                            type="file"
-                            hidden
-                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                            onChange={(e) => {
-                              const file = e.target.files[0];
-                              if (file) {
-                                // Check file size against specific academic document size limit - STRICT ENFORCEMENT
-                                if (file.size > MAX_ACADEMIC_DOCS_SIZE) {
-                                  showFileErrorDialog(
-                                    `Academic document size (${(
-                                      file.size / 1024
-                                    ).toFixed(0)}KB) exceeds the ${(
-                                      MAX_ACADEMIC_DOCS_SIZE / 1024
-                                    ).toFixed(
-                                      0
-                                    )}KB limit. Please select a smaller file.`
-                                  );
-                                  e.target.value = ""; // Reset the file input
-                                  return; // Prevent further processing
-                                }
 
-                                // If file size is acceptable, update form data
-                                setFormData({
-                                  ...formData,
-                                  academicDocuments: file,
-                                });
-                              }
-                            }}
-                          />
-                        </Button>
-                        {formData.academicDocuments && (
+                        {/* Existing documents list with remove/undo */}
+                        {(() => {
+                          const academicDocs = application.academicDocuments;
+                          console.log("Academic documents in render:", {
+                            raw: academicDocs,
+                            type: typeof academicDocs,
+                            isArray: Array.isArray(academicDocs),
+                            length: Array.isArray(academicDocs)
+                              ? academicDocs.length
+                              : "not array",
+                          });
+
+                          const docsArr = Array.isArray(academicDocs)
+                            ? academicDocs
+                            : academicDocs
+                            ? [academicDocs]
+                            : [];
+
+                          console.log("Processed docs array:", {
+                            length: docsArr.length,
+                            items: docsArr,
+                          });
+
+                          if (!docsArr.length && !newAcademicDocuments.length) {
+                            return (
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ mb: 1 }}
+                              >
+                                No academic documents uploaded yet.
+                              </Typography>
+                            );
+                          }
+
+                          return (
+                            <>
+                              {/* Existing documents */}
+                              {docsArr.map((doc, idx) => {
+                                const resolvedUrl =
+                                  typeof doc === "string"
+                                    ? doc
+                                    : doc?.url || doc?.href || "";
+                                const markedForRemoval =
+                                  removeAcademicDocuments.includes(resolvedUrl);
+                                return (
+                                  <Box
+                                    key={`acad-doc-${idx}`}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 1,
+                                      mb: 1,
+                                      flexWrap: "wrap",
+                                    }}
+                                  >
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onClick={() =>
+                                        handleViewDocument(
+                                          resolvedUrl,
+                                          `Academic Document ${idx + 1}`
+                                        )
+                                      }
+                                    >
+                                      View Doc {idx + 1}
+                                    </Button>
+                                    {markedForRemoval ? (
+                                      <Button
+                                        size="small"
+                                        color="warning"
+                                        onClick={() =>
+                                          handleUndoRemoveExistingAcademicDocument(
+                                            resolvedUrl
+                                          )
+                                        }
+                                      >
+                                        Undo Remove
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        size="small"
+                                        color="error"
+                                        onClick={() =>
+                                          handleRemoveExistingAcademicDocument(
+                                            resolvedUrl
+                                          )
+                                        }
+                                      >
+                                        Remove
+                                      </Button>
+                                    )}
+                                  </Box>
+                                );
+                              })}
+
+                              {/* Newly queued academic documents */}
+                              {newAcademicDocuments.length > 0 && (
+                                <Box sx={{ mt: 1 }}>
+                                  <Typography
+                                    variant="subtitle2"
+                                    sx={{ mb: 1 }}
+                                  >
+                                    New documents to add:
+                                  </Typography>
+                                  {newAcademicDocuments.map((file, idx) => (
+                                    <Box
+                                      key={`new-acad-doc-${idx}`}
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        mb: 0.5,
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="body2"
+                                        sx={{
+                                          flex: 1,
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {file.name} (
+                                        {Math.round(file.size / 1024)} KB)
+                                      </Typography>
+                                      <Button
+                                        size="small"
+                                        color="error"
+                                        onClick={() =>
+                                          handleRemoveQueuedAcademicDocument(
+                                            idx
+                                          )
+                                        }
+                                      >
+                                        Remove
+                                      </Button>
+                                    </Box>
+                                  ))}
+                                </Box>
+                              )}
+                            </>
+                          );
+                        })()}
+
+                        <Box sx={{ mt: 1 }}>
+                          <Button
+                            variant="outlined"
+                            component="label"
+                            startIcon={<PdfIcon />}
+                            fullWidth
+                          >
+                            Add Academic Documents
+                            <input
+                              type="file"
+                              hidden
+                              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                              multiple
+                              onChange={handleAddAcademicDocuments}
+                            />
+                          </Button>
                           <Typography
                             variant="caption"
-                            sx={{
-                              display: "block",
-                              textAlign: "center",
-                              color: "success.main",
-                            }}
+                            color="text.secondary"
+                            sx={{ display: "block", mt: 0.5 }}
                           >
-                            {formData.academicDocuments.name} selected
+                            You can add multiple academic documents and remove
+                            specific ones. ID/Passport still use replace
+                            behavior.
                           </Typography>
-                        )}
-                        {application.academicDocuments &&
-                          !formData.academicDocuments && (
-                            <Typography
-                              variant="caption"
-                              sx={{ display: "block", textAlign: "center" }}
-                            >
-                              Document exists (keep current version)
-                            </Typography>
-                          )}
+                        </Box>
                       </Grid>
                       <Grid item xs={12} sm={4}>
                         <Typography
@@ -2752,51 +3038,225 @@ const ApplicationDetailsDialog = ({
                           <Typography
                             variant="subtitle2"
                             color="text.secondary"
+                            gutterBottom
                           >
                             Academic Documents
+                            {Array.isArray(application.academicDocuments) &&
+                              application.academicDocuments.length > 1 &&
+                              ` (${application.academicDocuments.length})`}
                           </Typography>
-                          <Button
-                            startIcon={<PdfIcon />}
-                            endIcon={<LaunchIcon fontSize="small" />}
-                            variant="outlined"
-                            size="small"
-                            sx={{ mt: 1 }}
-                            onClick={() =>
-                              handleViewDocument(null, "Academic Documents")
-                            }
-                            title={`View document: ${
-                              application.academicDocuments ||
-                              "URL not available"
-                            }`}
-                          >
-                            View Document
-                          </Button>
+                          {/* Support both single URL and array of URLs */}
+                          {Array.isArray(application.academicDocuments) ? (
+                            application.academicDocuments.length > 0 ? (
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 1,
+                                  mt: 1,
+                                }}
+                              >
+                                {application.academicDocuments.map(
+                                  (docItem, idx) => {
+                                    const {
+                                      url: itemUrl,
+                                      name: itemName,
+                                      fileName: itemFileName,
+                                      href: itemHref,
+                                    } = typeof docItem === "object" &&
+                                    docItem !== null
+                                      ? docItem
+                                      : {};
+                                    const resolvedUrl =
+                                      typeof docItem === "string"
+                                        ? docItem
+                                        : itemUrl || itemHref || "";
+                                    const inferredName = (() => {
+                                      try {
+                                        if (itemName || itemFileName)
+                                          return itemName || itemFileName;
+                                        if (
+                                          !resolvedUrl ||
+                                          resolvedUrl.startsWith("data:")
+                                        )
+                                          return `Academic Document ${idx + 1}`;
+                                        const u = new URL(resolvedUrl);
+                                        const base =
+                                          u.pathname.substring(
+                                            u.pathname.lastIndexOf("/") + 1
+                                          ) || `Academic Document ${idx + 1}`;
+                                        return decodeURIComponent(base);
+                                      } catch {
+                                        return `Academic Document ${idx + 1}`;
+                                      }
+                                    })();
+                                    const label = `Academic Document ${
+                                      idx + 1
+                                    }`;
+                                    const title = `Open: ${inferredName}`;
+                                    return (
+                                      <Button
+                                        key={idx}
+                                        startIcon={<PdfIcon />}
+                                        endIcon={
+                                          <LaunchIcon fontSize="small" />
+                                        }
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() =>
+                                          handleViewDocument(
+                                            resolvedUrl,
+                                            "Academic Documents"
+                                          )
+                                        }
+                                        title={title}
+                                        sx={{ justifyContent: "space-between" }}
+                                      >
+                                        {label}
+                                      </Button>
+                                    );
+                                  }
+                                )}
+                              </Box>
+                            ) : (
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                No academic documents available
+                              </Typography>
+                            )
+                          ) : (
+                            <Button
+                              startIcon={<PdfIcon />}
+                              endIcon={<LaunchIcon fontSize="small" />}
+                              variant="outlined"
+                              size="small"
+                              sx={{ mt: 1 }}
+                              onClick={() =>
+                                handleViewDocument(null, "Academic Documents")
+                              }
+                              title={`View document: ${
+                                application.academicDocuments ||
+                                "URL not available"
+                              }`}
+                            >
+                              View Document
+                            </Button>
+                          )}
                         </Grid>
                       )}
-                      {application.identificationDocument && (
+                      {/* Support identificationDocuments array as well as single identificationDocument */}
+                      {(application.identificationDocument ||
+                        application.identificationDocuments) && (
                         <Grid item xs={12} sm={4}>
                           <Typography
                             variant="subtitle2"
                             color="text.secondary"
+                            gutterBottom
                           >
                             ID Document
                           </Typography>
-                          <Button
-                            startIcon={<PdfIcon />}
-                            endIcon={<LaunchIcon fontSize="small" />}
-                            variant="outlined"
-                            size="small"
-                            sx={{ mt: 1 }}
-                            onClick={() =>
-                              handleViewDocument(null, "ID Document")
-                            }
-                            title={`View document: ${
-                              application.identificationDocument ||
-                              "URL not available"
-                            }`}
-                          >
-                            View Document
-                          </Button>
+                          {Array.isArray(
+                            application.identificationDocuments
+                          ) ? (
+                            application.identificationDocuments.length > 0 ? (
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 1,
+                                  mt: 1,
+                                }}
+                              >
+                                {application.identificationDocuments.map(
+                                  (docItem, idx) => {
+                                    const {
+                                      url: itemUrl,
+                                      name: itemName,
+                                      fileName: itemFileName,
+                                      href: itemHref,
+                                    } = typeof docItem === "object" &&
+                                    docItem !== null
+                                      ? docItem
+                                      : {};
+                                    const resolvedUrl =
+                                      typeof docItem === "string"
+                                        ? docItem
+                                        : itemUrl || itemHref || "";
+                                    const nameFromUrl = (() => {
+                                      try {
+                                        if (itemName || itemFileName)
+                                          return itemName || itemFileName;
+                                        if (!resolvedUrl)
+                                          return `ID Document ${idx + 1}`;
+                                        if (resolvedUrl.startsWith("data:"))
+                                          return `ID Document ${idx + 1}`;
+                                        const u = new URL(resolvedUrl);
+                                        const pathname = u.pathname;
+                                        const base =
+                                          pathname.substring(
+                                            pathname.lastIndexOf("/") + 1
+                                          ) || `ID Document ${idx + 1}`;
+                                        return decodeURIComponent(base);
+                                      } catch {
+                                        return `ID Document ${idx + 1}`;
+                                      }
+                                    })();
+                                    return (
+                                      <Button
+                                        key={idx}
+                                        startIcon={<PdfIcon />}
+                                        endIcon={
+                                          <LaunchIcon fontSize="small" />
+                                        }
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() =>
+                                          handleViewDocument(
+                                            resolvedUrl,
+                                            "ID Document"
+                                          )
+                                        }
+                                        title={`View document: ${
+                                          resolvedUrl || "URL not available"
+                                        }`}
+                                        sx={{ justifyContent: "space-between" }}
+                                      >
+                                        {nameFromUrl}
+                                      </Button>
+                                    );
+                                  }
+                                )}
+                              </Box>
+                            ) : (
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                No ID documents available
+                              </Typography>
+                            )
+                          ) : (
+                            application.identificationDocument && (
+                              <Button
+                                startIcon={<PdfIcon />}
+                                endIcon={<LaunchIcon fontSize="small" />}
+                                variant="outlined"
+                                size="small"
+                                sx={{ mt: 1 }}
+                                onClick={() =>
+                                  handleViewDocument(null, "ID Document")
+                                }
+                                title={`View document: ${
+                                  application.identificationDocument ||
+                                  "URL not available"
+                                }`}
+                              >
+                                View Document
+                              </Button>
+                            )
+                          )}
                         </Grid>
                       )}
                       {!application.passportPhoto &&
@@ -3032,22 +3492,11 @@ const ApplicationDetailsDialog = ({
                                     )}
 
                                   {entry.notes && (
-                                    <Typography variant="body2" sx={{ mb: 1 }}>
-                                      {entry.notes}
-                                    </Typography>
-                                  )}
-
-                                  {entry.updatedBy && (
                                     <Typography
-                                      variant="caption"
-                                      color="text.secondary"
+                                      variant="body2"
+                                      sx={{ whiteSpace: "pre-wrap" }}
                                     >
-                                      By:{" "}
-                                      {entry.updatedBy.name ||
-                                        entry.updatedBy.email ||
-                                        "Unknown"}
-                                      {entry.updatedBy.role &&
-                                        ` (${entry.updatedBy.role})`}
+                                      {entry.notes}
                                     </Typography>
                                   )}
                                 </Box>

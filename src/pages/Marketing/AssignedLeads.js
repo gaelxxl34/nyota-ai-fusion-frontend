@@ -25,12 +25,7 @@ import {
   Select,
   Stack,
   Paper,
-  AutocompleteChangeDetails,
-  Autocomplete,
-  TextField as MuiTextField,
   Drawer,
-  Switch,
-  FormControlLabel,
   ListSubheader,
   CircularProgress,
   Alert,
@@ -40,8 +35,6 @@ import {
   FilterList as FilterIcon,
   Phone as PhoneIcon,
   Email as EmailIcon,
-  WhatsApp as WhatsAppIcon,
-  MoreVert as MoreVertIcon,
   TrendingUp as TrendingUpIcon,
   Schedule as ScheduleIcon,
   CalendarToday as CalendarIcon,
@@ -49,42 +42,17 @@ import {
   School as SchoolIcon,
   Timeline as TimelineIcon,
   Update as UpdateIcon,
-  Tag as TagIcon,
-  Add as AddIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   FiberManualRecord as NeutralIcon,
   Clear as ClearIcon,
   Tune as TuneIcon,
-  DateRange as DateRangeIcon,
   Close as CloseIcon,
   Refresh as RefreshIcon,
 } from "@mui/icons-material";
 import InteractionTimeline from "../../components/InteractionTimeline/InteractionTimeline";
 import { leadService } from "../../services/leadService";
 import { useSnackbar } from "notistack";
-
-// Predefined interaction tags - Organized by conversion priority
-const predefinedInteractionTags = [
-  // 🟢 HIGH PRIORITY - Strong Conversion Signals
-  "Application Started",
-  "Application Submitted",
-  "Application Assistance",
-  "Will Visit",
-  "Parent Meeting",
-
-  // 🟡 MEDIUM PRIORITY - Neutral Activities
-  "Document Shared",
-  "Follow-up Scheduled",
-  "Reminder Sent",
-  "Deferred",
-
-  // 🔴 LOW PRIORITY - Negative Conversion Signals
-  "Scholarship Information",
-  "Financial Assistance Request",
-  "Payment Plan Inquiry",
-  "Lead Closed",
-];
 
 // Function to generate stats from actual lead data
 const generateLeadStats = (leads) => {
@@ -195,32 +163,17 @@ const AssignedLeads = () => {
   const [assignedLeads, setAssignedLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   // Filter and search states
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [actionAnchorEl, setActionAnchorEl] = useState(null);
-  const [selectedLead, setSelectedLead] = useState(null);
   const [timelineDialogOpen, setTimelineDialogOpen] = useState(false);
   const [timelineLeadId, setTimelineLeadId] = useState(null);
   const [statusUpdateDialogOpen, setStatusUpdateDialogOpen] = useState(false);
   const [statusUpdateLead, setStatusUpdateLead] = useState(null);
   const [newStatus, setNewStatus] = useState("");
-
-  // Stats for the dashboard
-  const [stats, setStats] = useState({
-    total: 0,
-    applied: 0,
-    followUp: 0,
-    positiveInteractions: 0,
-    negativeInteractions: 0,
-    highPriority: 0,
-  });
-
-  // Get real-time filter stats from the actual lead data
-  const filterStats = generateLeadStats(assignedLeads);
 
   // Advanced filter states
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
@@ -618,7 +571,7 @@ const AssignedLeads = () => {
   // Load data on component mount
   useEffect(() => {
     fetchAssignedLeads();
-  }, []);
+  }, [fetchAssignedLeads]);
 
   // Handle refresh button click
   const handleRefresh = () => {
@@ -669,16 +622,6 @@ const AssignedLeads = () => {
     return activeFilters + (hasSearch ? 1 : 0) + (hasStatusFilter ? 1 : 0);
   };
 
-  const handleActionClick = (event, lead) => {
-    setActionAnchorEl(event.currentTarget);
-    setSelectedLead(lead);
-  };
-
-  const handleActionClose = () => {
-    setActionAnchorEl(null);
-    setSelectedLead(null);
-  };
-
   const handleTimelineOpen = (leadId) => {
     setTimelineLeadId(leadId);
     setTimelineDialogOpen(true);
@@ -693,7 +636,6 @@ const AssignedLeads = () => {
     setStatusUpdateLead(lead);
     setNewStatus("");
     setStatusUpdateDialogOpen(true);
-    handleActionClose();
   };
 
   const handleStatusUpdateClose = () => {

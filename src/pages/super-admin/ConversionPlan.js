@@ -71,9 +71,6 @@ const ConversionPlan = () => {
   const { user, getUserRole } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
 
-  const currentUserName =
-    user?.name || user?.email?.split("@")[0] || "Current User";
-
   // Use the caching hook for leads and team data
   const {
     leads,
@@ -510,7 +507,6 @@ const ConversionPlan = () => {
           if (cleanPhone.length >= length) {
             const potentialCode = cleanPhone.substring(0, length);
             if (countryCodeMap[potentialCode]) {
-              foundCode = potentialCode;
               countryCodes.add(potentialCode);
               break;
             }
@@ -683,27 +679,6 @@ const ConversionPlan = () => {
       </Box>
     );
   }
-
-  // Function to calculate priority based on creation date
-  const calculatePriorityByDate = (contactedDate) => {
-    const currentDate = new Date();
-    const leadDate = new Date(contactedDate);
-    const daysDifference = Math.floor(
-      (currentDate - leadDate) / (1000 * 60 * 60 * 24)
-    );
-
-    // Priority based on age:
-    // 0-3 days: high priority
-    // 4-10 days: medium priority
-    // 11+ days: low priority
-    if (daysDifference <= 3) {
-      return "high";
-    } else if (daysDifference <= 10) {
-      return "medium";
-    } else {
-      return "low";
-    }
-  };
 
   // Legacy country mapping for fallback
   const countryMapping = {

@@ -39,7 +39,7 @@ export const useConversionLeadsCache = () => {
     const cacheTime = parseInt(timestamp);
     const now = Date.now();
     return now - cacheTime < CACHE_DURATION;
-  }, []);
+  }, [CACHE_DURATION, CACHE_KEYS.TIMESTAMP]);
 
   /**
    * Get data from cache
@@ -60,21 +60,24 @@ export const useConversionLeadsCache = () => {
       logger.error("Cache read failure", error);
     }
     return null;
-  }, [isCacheValid]);
+  }, [isCacheValid, CACHE_KEYS.LEADS, CACHE_KEYS.TEAM_MEMBERS]);
 
   /**
    * Save data to cache
    */
-  const saveToCache = useCallback((leadsData, teamData) => {
-    try {
-      localStorage.setItem(CACHE_KEYS.LEADS, JSON.stringify(leadsData));
-      localStorage.setItem(CACHE_KEYS.TEAM_MEMBERS, JSON.stringify(teamData));
-      localStorage.setItem(CACHE_KEYS.TIMESTAMP, Date.now().toString());
-      logger.debug("Saved conversion data to cache");
-    } catch (error) {
-      logger.error("Cache save failure", error);
-    }
-  }, []);
+  const saveToCache = useCallback(
+    (leadsData, teamData) => {
+      try {
+        localStorage.setItem(CACHE_KEYS.LEADS, JSON.stringify(leadsData));
+        localStorage.setItem(CACHE_KEYS.TEAM_MEMBERS, JSON.stringify(teamData));
+        localStorage.setItem(CACHE_KEYS.TIMESTAMP, Date.now().toString());
+        logger.debug("Saved conversion data to cache");
+      } catch (error) {
+        logger.error("Cache save failure", error);
+      }
+    },
+    [CACHE_KEYS.LEADS, CACHE_KEYS.TEAM_MEMBERS, CACHE_KEYS.TIMESTAMP]
+  );
 
   /**
    * Clear cache
@@ -84,7 +87,7 @@ export const useConversionLeadsCache = () => {
     localStorage.removeItem(CACHE_KEYS.TEAM_MEMBERS);
     localStorage.removeItem(CACHE_KEYS.TIMESTAMP);
     logger.info("Cache cleared");
-  }, []);
+  }, [CACHE_KEYS.LEADS, CACHE_KEYS.TEAM_MEMBERS, CACHE_KEYS.TIMESTAMP]);
 
   /**
    * Fetch marketing agents from API
@@ -507,7 +510,7 @@ export const useConversionLeadsCache = () => {
       // Fallback to the old method if the new endpoint fails
       return await fetchConversionLeadsFallback();
     }
-  }, []);
+  }, [fetchConversionLeadsFallback]);
 
   /**
    * Fallback method using individual status calls
@@ -975,7 +978,7 @@ export const useConversionLeadsCache = () => {
         fetchData(false); // silent refresh
       }
     }, AUTO_REFRESH_INTERVAL);
-  }, [fetchData, lastFetch]);
+  }, [fetchData, lastFetch, AUTO_REFRESH_INTERVAL]);
 
   /** Stop auto refresh */
   const stopAutoRefresh = useCallback(() => {
@@ -992,7 +995,7 @@ export const useConversionLeadsCache = () => {
     fetchData(true);
     startAutoRefresh();
     return () => stopAutoRefresh();
-  }, [fetchData]);
+  }, [fetchData, startAutoRefresh, stopAutoRefresh]);
 
   return {
     leads,
