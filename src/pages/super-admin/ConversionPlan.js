@@ -71,61 +71,7 @@ const ConversionPlan = () => {
   const { user, getUserRole } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
 
-  // Use the caching hook for leads and team data
-  const {
-    leads,
-    teamMembers,
-    loading,
-    refreshing,
-    error,
-    lastFetch,
-    refresh,
-    clearCache,
-    isCacheValid,
-    optimisticallyAssignLeads,
-    reconcileAfterBulk,
-  } = useConversionLeadsCache();
-
-  // Debug logging when data changes
-  useEffect(() => {
-    logger.debug("ConversionPlan dataset updated", {
-      leads: leads.length,
-      teamMembers: teamMembers.length,
-      loading,
-      error: Boolean(error),
-      lastFetch,
-      isCacheValid,
-    });
-  }, [leads, teamMembers, loading, error, lastFetch, isCacheValid]);
-
-  // State management for UI
-  const [filteredLeads, setFilteredLeads] = useState([]);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(200);
-  const [filters, setFilters] = useState({
-    status: "all",
-    country: "all",
-    assignedTo: "all",
-    searchTerm: "",
-  });
-
-  // Assignment dialog state
-  const [assignmentDialog, setAssignmentDialog] = useState({
-    open: false,
-    selectedLeads: [],
-    selectedAgent: "",
-  });
-  const [isAssigning, setIsAssigning] = useState(false);
-  const [assignmentResult, setAssignmentResult] = useState(null); // {assigned, failed, errors}
-
-  // Selected leads for bulk operations
-  const [selectedLeads, setSelectedLeads] = useState([]);
-  const [selectAll, setSelectAll] = useState(false);
-
-  // State for dynamic countries
-  const [availableCountries, setAvailableCountries] = useState({});
-
-  // Comprehensive country mapping with flags and names
+  // Comprehensive country mapping with flags and names - MOVED TO TOP TO AVOID HOISTING ISSUES
   const getCountryInfo = (countryCode) => {
     // Remove + and normalize country code
     const cleanCode = countryCode?.toString().replace("+", "");
@@ -259,6 +205,60 @@ const ConversionPlan = () => {
       }
     );
   };
+
+  // Use the caching hook for leads and team data
+  const {
+    leads,
+    teamMembers,
+    loading,
+    refreshing,
+    error,
+    lastFetch,
+    refresh,
+    clearCache,
+    isCacheValid,
+    optimisticallyAssignLeads,
+    reconcileAfterBulk,
+  } = useConversionLeadsCache();
+
+  // Debug logging when data changes
+  useEffect(() => {
+    logger.debug("ConversionPlan dataset updated", {
+      leads: leads.length,
+      teamMembers: teamMembers.length,
+      loading,
+      error: Boolean(error),
+      lastFetch,
+      isCacheValid,
+    });
+  }, [leads, teamMembers, loading, error, lastFetch, isCacheValid]);
+
+  // State management for UI
+  const [filteredLeads, setFilteredLeads] = useState([]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(200);
+  const [filters, setFilters] = useState({
+    status: "all",
+    country: "all",
+    assignedTo: "all",
+    searchTerm: "",
+  });
+
+  // Assignment dialog state
+  const [assignmentDialog, setAssignmentDialog] = useState({
+    open: false,
+    selectedLeads: [],
+    selectedAgent: "",
+  });
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [assignmentResult, setAssignmentResult] = useState(null); // {assigned, failed, errors}
+
+  // Selected leads for bulk operations
+  const [selectedLeads, setSelectedLeads] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
+
+  // State for dynamic countries
+  const [availableCountries, setAvailableCountries] = useState({});
 
   // Extract unique country codes from leads data
   const availableCountriesFromLeads = useMemo(() => {
@@ -501,7 +501,6 @@ const ConversionPlan = () => {
 
         // Try to match country codes by length (longest first for accuracy)
         const codeLengths = [4, 3, 2, 1];
-        let foundCode = null;
 
         for (const length of codeLengths) {
           if (cleanPhone.length >= length) {

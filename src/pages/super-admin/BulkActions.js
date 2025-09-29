@@ -279,62 +279,65 @@ const BulkActions = () => {
 
   const { enqueueSnackbar } = useSnackbar();
 
-  // Fetch leads by status - simplified without useCallback to prevent dependency issues
-  const fetchLeadsByStatus = async (status) => {
-    // Prevent multiple simultaneous calls
-    if (isLoadingRef.current) return;
+  // Fetch leads by status
+  const fetchLeadsByStatus = useCallback(
+    async (status) => {
+      // Prevent multiple simultaneous calls
+      if (isLoadingRef.current) return;
 
-    try {
-      isLoadingRef.current = true;
-      setLoading(true);
+      try {
+        isLoadingRef.current = true;
+        setLoading(true);
 
-      // Call appropriate API endpoint based on status
-      let response;
-      if (status === "interested") {
-        response = await superAdminService.getInterestedLeads();
-      } else if (status === "contacted") {
-        response = await superAdminService.getContactedLeads();
-      } else {
-        // Placeholder for other statuses - will be implemented later
+        // Call appropriate API endpoint based on status
+        let response;
+        if (status === "interested") {
+          response = await superAdminService.getInterestedLeads();
+        } else if (status === "contacted") {
+          response = await superAdminService.getContactedLeads();
+        } else {
+          // Placeholder for other statuses - will be implemented later
+          setLeadsData((prev) => ({
+            ...prev,
+            [status]: [], // Empty array for now
+          }));
+          enqueueSnackbar(`${status} leads functionality coming soon!`, {
+            variant: "info",
+          });
+          return;
+        }
+
+        let leads = response.leads || [];
+
+        // Sort leads by creation date (latest first) - same as Data Center
+        leads.sort((a, b) => {
+          const dateA =
+            a.createdAt instanceof Date
+              ? a.createdAt
+              : new Date(a.createdAt || 0);
+          const dateB =
+            b.createdAt instanceof Date
+              ? b.createdAt
+              : new Date(b.createdAt || 0);
+          return dateB - dateA; // desc order (newest first)
+        });
+
         setLeadsData((prev) => ({
           ...prev,
-          [status]: [], // Empty array for now
+          [status]: leads,
         }));
-        enqueueSnackbar(`${status} leads functionality coming soon!`, {
-          variant: "info",
+      } catch (error) {
+        console.error(`Error fetching ${status} leads:`, error);
+        enqueueSnackbar(`Failed to fetch ${status} leads`, {
+          variant: "error",
         });
-        return;
+      } finally {
+        isLoadingRef.current = false;
+        setLoading(false);
       }
-
-      let leads = response.leads || [];
-
-      // Sort leads by creation date (latest first) - same as Data Center
-      leads.sort((a, b) => {
-        const dateA =
-          a.createdAt instanceof Date
-            ? a.createdAt
-            : new Date(a.createdAt || 0);
-        const dateB =
-          b.createdAt instanceof Date
-            ? b.createdAt
-            : new Date(b.createdAt || 0);
-        return dateB - dateA; // desc order (newest first)
-      });
-
-      setLeadsData((prev) => ({
-        ...prev,
-        [status]: leads,
-      }));
-    } catch (error) {
-      console.error(`Error fetching ${status} leads:`, error);
-      enqueueSnackbar(`Failed to fetch ${status} leads`, {
-        variant: "error",
-      });
-    } finally {
-      isLoadingRef.current = false;
-      setLoading(false);
-    }
-  };
+    },
+    [enqueueSnackbar]
+  );
 
   // Fetch all lead statuses - simplified
   const fetchAllLeads = useCallback(async () => {
@@ -347,7 +350,7 @@ const BulkActions = () => {
     } catch (error) {
       console.error("Error in fetchAllLeads:", error);
     }
-  }, []);
+  }, [fetchLeadsByStatus]);
 
   // Fetch campaigns - simplified
   const fetchCampaigns = useCallback(async () => {
@@ -361,10 +364,10 @@ const BulkActions = () => {
     } finally {
       setCampaignLoading(false);
     }
-  }, []);
+  }, [enqueueSnackbar]);
 
   // Start auto-refresh for running campaigns - simplified
-  const startAutoRefresh = () => {
+  const startAutoRefresh = useCallback(() => {
     if (refreshInterval) {
       clearInterval(refreshInterval);
     }
@@ -374,15 +377,15 @@ const BulkActions = () => {
     }, 5000); // Refresh every 5 seconds
 
     setRefreshInterval(interval);
-  };
+  }, [refreshInterval, fetchCampaigns]);
 
   // Stop auto-refresh
-  const stopAutoRefresh = () => {
+  const stopAutoRefresh = useCallback(() => {
     if (refreshInterval) {
       clearInterval(refreshInterval);
       setRefreshInterval(null);
     }
-  };
+  }, [refreshInterval]);
 
   // Initial load effect
   useEffect(() => {

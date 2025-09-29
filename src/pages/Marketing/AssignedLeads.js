@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -53,66 +53,6 @@ import {
 import InteractionTimeline from "../../components/InteractionTimeline/InteractionTimeline";
 import { leadService } from "../../services/leadService";
 import { useSnackbar } from "notistack";
-
-// Function to generate stats from actual lead data
-const generateLeadStats = (leads) => {
-  if (!leads || leads.length === 0) {
-    return {
-      priorities: [],
-      status: [],
-      sources: [],
-      outcomes: [],
-    };
-  }
-
-  // Count priorities
-  const priorityCounts = {};
-  leads.forEach((lead) => {
-    const priority = lead.priority || "Unknown";
-    priorityCounts[priority] = (priorityCounts[priority] || 0) + 1;
-  });
-
-  // Count statuses
-  const statusCounts = {};
-  leads.forEach((lead) => {
-    const status = lead.status || "NEW";
-    statusCounts[status] = (statusCounts[status] || 0) + 1;
-  });
-
-  // Count sources
-  const sourceCounts = {};
-  leads.forEach((lead) => {
-    const source = lead.source || "Unknown";
-    sourceCounts[source] = (sourceCounts[source] || 0) + 1;
-  });
-
-  // Count outcomes
-  const outcomeCounts = {};
-  leads.forEach((lead) => {
-    const outcome = lead.lastInteractionOutcome || "Unknown";
-    outcomeCounts[outcome] = (outcomeCounts[outcome] || 0) + 1;
-  });
-
-  // Convert to array format
-  return {
-    priorities: Object.keys(priorityCounts).map((name) => ({
-      name,
-      count: priorityCounts[name],
-    })),
-    status: Object.keys(statusCounts).map((name) => ({
-      name,
-      count: statusCounts[name],
-    })),
-    sources: Object.keys(sourceCounts).map((name) => ({
-      name,
-      count: sourceCounts[name],
-    })),
-    outcomes: Object.keys(outcomeCounts).map((name) => ({
-      name,
-      count: outcomeCounts[name],
-    })),
-  };
-};
 
 const getOutcomeColor = (outcome) => {
   const colors = {
@@ -174,9 +114,6 @@ const AssignedLeads = () => {
   const [statusUpdateDialogOpen, setStatusUpdateDialogOpen] = useState(false);
   const [statusUpdateLead, setStatusUpdateLead] = useState(null);
   const [newStatus, setNewStatus] = useState("");
-
-  // Additional state variables
-  const [refreshing, setRefreshing] = useState(false);
 
   // Advanced filter states
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
@@ -279,10 +216,9 @@ const AssignedLeads = () => {
   };
 
   // Fetch assigned leads from the API
-  const fetchAssignedLeads = async () => {
+  const fetchAssignedLeads = useCallback(async () => {
     try {
       setLoading(true);
-      setRefreshing(true);
       const response = await leadService.getMyAssignedLeads({
         limit: 100,
         offset: 0,
@@ -394,9 +330,8 @@ const AssignedLeads = () => {
       });
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  };
+  }, [enqueueSnackbar]);
 
   // Helper function to determine lead priority
   const determinePriority = (lead) => {
