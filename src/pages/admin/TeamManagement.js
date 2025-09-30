@@ -17,6 +17,9 @@ import {
   Skeleton,
   TextField,
   InputAdornment,
+  Avatar,
+  Tooltip,
+  Badge,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -25,6 +28,8 @@ import {
   Shield as ShieldIcon,
   Person as PersonIcon,
   Search as SearchIcon,
+  Circle as CircleIcon,
+  AccessTime as AccessTimeIcon,
 } from "@mui/icons-material";
 import TeamMemberDialog from "../../components/team/TeamMemberDialog";
 import DeleteConfirmationDialog from "../../components/common/DeleteConfirmationDialog";
@@ -67,6 +72,63 @@ const TeamManagement = () => {
     setNotification((prev) => ({ ...prev, open: false }));
   };
 
+  // Helper function to format last sign-in time
+  const formatLastSignIn = (timestamp) => {
+    if (!timestamp) return "Never";
+
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+
+    if (diffInMinutes < 1) return "Just now";
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+
+    if (diffInDays < 30) {
+      const weeks = Math.floor(diffInDays / 7);
+      return `${weeks}w ago`;
+    }
+
+    return date.toLocaleDateString();
+  };
+
+  // Helper function to determine online status
+  const getOnlineStatus = (lastSignIn, lastActivity) => {
+    if (!lastSignIn && !lastActivity) return "never-online";
+
+    const lastTime = new Date(lastActivity || lastSignIn);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now - lastTime) / (1000 * 60));
+
+    if (diffInMinutes < 5) return "online";
+    if (diffInMinutes < 30) return "away";
+    if (diffInMinutes < 1440) return "offline"; // 24 hours
+    return "long-offline";
+  };
+
+  // Helper function to get status color and label
+  const getStatusDisplay = (member) => {
+    const status = getOnlineStatus(member.lastSignIn, member.lastActivity);
+
+    switch (status) {
+      case "online":
+        return { color: "#4caf50", label: "Online", icon: "●" };
+      case "away":
+        return { color: "#ff9800", label: "Away", icon: "●" };
+      case "offline":
+        return { color: "#757575", label: "Offline", icon: "●" };
+      case "long-offline":
+        return { color: "#f44336", label: "Long offline", icon: "●" };
+      default:
+        return { color: "#9e9e9e", label: "Never online", icon: "○" };
+    }
+  };
+
   const fetchTeamMembers = useCallback(async () => {
     try {
       setLoading(true);
@@ -94,8 +156,20 @@ const TeamManagement = () => {
         members = response.data.data;
       }
 
-      console.log("Final filtered members:", members.length, members);
-      setTeamMembers(members);
+      // Enhance members with Firebase authentication data
+      try {
+        const enhancedMembers = await teamService.getTeamMembersWithAuthData(
+          members
+        );
+        setTeamMembers(enhancedMembers);
+        console.log("Enhanced members with auth data:", enhancedMembers.length);
+      } catch (authError) {
+        console.warn(
+          "Failed to enhance with auth data, using basic data:",
+          authError
+        );
+        setTeamMembers(members);
+      }
 
       if (!response.success) {
         showNotification(
@@ -251,12 +325,28 @@ const TeamManagement = () => {
       {[...Array(5)].map((_, index) => (
         <TableRow key={index}>
           <TableCell>
-            <Skeleton
-              variant="text"
-              width={`${60 + index * 5}%`}
-              height={24}
-              animation="wave"
-            />
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Skeleton
+                variant="circular"
+                width={32}
+                height={32}
+                animation="wave"
+              />
+              <Box>
+                <Skeleton
+                  variant="text"
+                  width={120 + index * 10}
+                  height={20}
+                  animation="wave"
+                />
+                <Skeleton
+                  variant="text"
+                  width={80}
+                  height={16}
+                  animation="wave"
+                />
+              </Box>
+            </Box>
           </TableCell>
           <TableCell>
             <Skeleton
@@ -279,37 +369,44 @@ const TeamManagement = () => {
             <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
               <Skeleton
                 variant="rectangular"
-                width={60}
+                width={100}
                 height={20}
                 sx={{ borderRadius: 1 }}
                 animation="wave"
               />
-              <Skeleton
-                variant="rectangular"
-                width={80}
-                height={20}
-                sx={{ borderRadius: 1 }}
-                animation="wave"
-              />
-              {index % 2 === 0 && (
-                <Skeleton
-                  variant="rectangular"
-                  width={70}
-                  height={20}
-                  sx={{ borderRadius: 1 }}
-                  animation="wave"
-                />
-              )}
             </Box>
           </TableCell>
           <TableCell>
-            <Skeleton
-              variant="rectangular"
-              width={60}
-              height={24}
-              sx={{ borderRadius: 1 }}
-              animation="wave"
-            />
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Skeleton
+                variant="circular"
+                width={12}
+                height={12}
+                animation="wave"
+              />
+              <Skeleton
+                variant="text"
+                width={60}
+                height={20}
+                animation="wave"
+              />
+            </Box>
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Skeleton
+                variant="circular"
+                width={16}
+                height={16}
+                animation="wave"
+              />
+              <Skeleton
+                variant="text"
+                width={80}
+                height={20}
+                animation="wave"
+              />
+            </Box>
           </TableCell>
           <TableCell align="right">
             <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
@@ -397,11 +494,12 @@ const TeamManagement = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
+              <TableCell>Team Member</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Role</TableCell>
               <TableCell>Access Level</TableCell>
-              <TableCell>Status</TableCell>
+              <TableCell>Online Status</TableCell>
+              <TableCell>Last Sign In</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -410,7 +508,7 @@ const TeamManagement = () => {
               <SkeletonTableRows />
             ) : displayMembers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                   <Box sx={{ textAlign: "center" }}>
                     <Typography
                       variant="body1"
@@ -439,70 +537,155 @@ const TeamManagement = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              displayMembers.map((member) => (
-                <TableRow key={member.id}>
-                  <TableCell>{member.name}</TableCell>
-                  <TableCell>{member.email}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      {getRoleIcon(member.role || member.jobRole)}
-                      <Typography variant="subtitle2">
-                        {getRoleLabel(member.role || member.jobRole)}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    {(member.role || member.jobRole) === "organizationAdmin" ? (
-                      <Chip label="Full Access" color="primary" size="small" />
-                    ) : (member.role || member.jobRole) === "marketingAgent" ? (
-                      <Chip
-                        label="Marketing Access"
-                        color="info"
-                        size="small"
-                      />
-                    ) : (member.role || member.jobRole) === "admissionAgent" ? (
-                      <Chip
-                        label="Admissions Access"
-                        color="secondary"
-                        size="small"
-                      />
-                    ) : (
-                      <Chip label="Custom Access" size="small" />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={member.status}
-                      color={member.status === "active" ? "success" : "default"}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    {canManageTeam ? (
-                      <>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditMember(member)}
+              displayMembers.map((member) => {
+                const statusDisplay = getStatusDisplay(member);
+                return (
+                  <TableRow key={member.id}>
+                    <TableCell>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
+                      >
+                        <Badge
+                          color={
+                            statusDisplay.color === "#4caf50"
+                              ? "success"
+                              : "default"
+                          }
+                          variant="dot"
+                          invisible={statusDisplay.color !== "#4caf50"}
+                          sx={{
+                            "& .MuiBadge-badge": {
+                              backgroundColor: statusDisplay.color,
+                            },
+                          }}
                         >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
+                          <Avatar sx={{ width: 32, height: 32, fontSize: 14 }}>
+                            {member.name
+                              ?.split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase() || "?"}
+                          </Avatar>
+                        </Badge>
+                        <Box>
+                          <Typography variant="body2" fontWeight="medium">
+                            {member.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {member.uid || member.id}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell>{member.email}</TableCell>
+                    <TableCell>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        {getRoleIcon(member.role || member.jobRole)}
+                        <Typography variant="subtitle2">
+                          {getRoleLabel(member.role || member.jobRole)}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      {(member.role || member.jobRole) ===
+                      "organizationAdmin" ? (
+                        <Chip
+                          label="Full Access"
+                          color="primary"
                           size="small"
-                          color="error"
-                          onClick={() => handleDeleteMember(member)}
-                          disabled={member.id === user?.uid} // Prevent self-deletion
+                        />
+                      ) : (member.role || member.jobRole) ===
+                        "marketingAgent" ? (
+                        <Chip
+                          label="Marketing Access"
+                          color="info"
+                          size="small"
+                        />
+                      ) : (member.role || member.jobRole) ===
+                        "admissionAgent" ? (
+                        <Chip
+                          label="Admissions Access"
+                          color="secondary"
+                          size="small"
+                        />
+                      ) : (
+                        <Chip label="Custom Access" size="small" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip
+                        title={`${statusDisplay.label}${
+                          member.lastActivity
+                            ? ` - Last activity: ${formatLastSignIn(
+                                member.lastActivity
+                              )}`
+                            : ""
+                        }`}
+                      >
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
-                          <DeleteIcon />
-                        </IconButton>
-                      </>
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">
-                        No actions
-                      </Typography>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
+                          <CircleIcon
+                            sx={{
+                              fontSize: 12,
+                              color: statusDisplay.color,
+                            }}
+                          />
+                          <Typography variant="body2" color="text.secondary">
+                            {statusDisplay.label}
+                          </Typography>
+                        </Box>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip
+                        title={
+                          member.lastSignIn
+                            ? new Date(member.lastSignIn).toLocaleString()
+                            : "Never signed in"
+                        }
+                      >
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <AccessTimeIcon
+                            sx={{ fontSize: 16, color: "text.secondary" }}
+                          />
+                          <Typography variant="body2" color="text.secondary">
+                            {formatLastSignIn(member.lastSignIn)}
+                          </Typography>
+                        </Box>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell align="right">
+                      {canManageTeam ? (
+                        <>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleEditMember(member)}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteMember(member)}
+                            disabled={member.id === user?.uid} // Prevent self-deletion
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          No actions
+                        </Typography>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

@@ -120,12 +120,11 @@ const AssignedLeads = () => {
   const [filters, setFilters] = useState({
     status: "all",
     priority: "all",
-    source: "all",
     interactionOutcome: "all",
     interactionTag: "all",
     assignDateRange: "all",
     lastContactRange: "all",
-    course: "all",
+    dailyInteractionRange: "all",
   });
 
   // Helper function to format dates consistently (like DataCenter.js)
@@ -540,12 +539,11 @@ const AssignedLeads = () => {
     setFilters({
       status: "all",
       priority: "all",
-      source: "all",
       interactionOutcome: "all",
       interactionTag: "all",
       assignDateRange: "all",
       lastContactRange: "all",
-      course: "all",
+      dailyInteractionRange: "all",
     });
     setSelectedStatus("all");
     setSearchTerm("");
@@ -634,9 +632,6 @@ const AssignedLeads = () => {
     const matchesPriority =
       filters.priority === "all" || lead.priority === filters.priority;
 
-    const matchesSource =
-      filters.source === "all" || lead.source === filters.source;
-
     const matchesInteractionOutcome =
       filters.interactionOutcome === "all" ||
       lead.lastInteractionOutcome === filters.interactionOutcome;
@@ -646,14 +641,68 @@ const AssignedLeads = () => {
       (lead.interactionTags &&
         lead.interactionTags.includes(filters.interactionTag));
 
-    const matchesCourse =
-      filters.course === "all" ||
-      (lead.course && lead.course.includes(filters.course));
+    // Helper function to parse dates consistently
+    const parseDate = (dateValue) => {
+      if (!dateValue) return null;
+
+      try {
+        // Handle Date objects
+        if (dateValue instanceof Date) {
+          return dateValue;
+        }
+
+        // Handle Firestore Timestamps or similar objects with seconds
+        if (
+          typeof dateValue === "object" &&
+          (dateValue.seconds || dateValue._seconds)
+        ) {
+          const seconds = dateValue.seconds || dateValue._seconds;
+          return new Date(seconds * 1000);
+        }
+
+        // Handle string dates
+        if (typeof dateValue === "string") {
+          // Handle Firestore string format: "11 September 2025 at 20:29:00 UTC+3"
+          if (dateValue.includes(" at ")) {
+            const [datePart, timePart] = dateValue.split(" at ");
+            if (datePart && timePart) {
+              // Remove timezone part and combine date and time
+              const timeWithoutTimezone = timePart.split(" ")[0]; // Remove "UTC+3" part
+              const combinedDateTime = `${datePart} ${timeWithoutTimezone}`;
+              const parsedDate = new Date(combinedDateTime);
+              if (!isNaN(parsedDate.getTime())) {
+                return parsedDate;
+              }
+            }
+          }
+
+          // Try standard date parsing for other string formats
+          const date = new Date(dateValue);
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+
+        // Handle timestamp numbers
+        if (typeof dateValue === "number") {
+          return dateValue > 1000000000000
+            ? new Date(dateValue) // milliseconds
+            : new Date(dateValue * 1000); // seconds
+        }
+      } catch (error) {
+        console.error("Error parsing date:", error, dateValue);
+      }
+
+      return null;
+    };
 
     // Date range filters
     const matchesAssignDate = () => {
       if (filters.assignDateRange === "all") return true;
-      const assignDate = new Date(lead.assignedDate);
+
+      const assignDate = parseDate(lead.assignedDate);
+      if (!assignDate) return false; // If we can't parse the date, exclude it
+
       const today = new Date();
 
       switch (filters.assignDateRange) {
@@ -687,7 +736,10 @@ const AssignedLeads = () => {
 
     const matchesLastContact = () => {
       if (filters.lastContactRange === "all") return true;
-      const lastContact = new Date(lead.lastContact);
+
+      const lastContact = parseDate(lead.lastContact);
+      if (!lastContact) return false; // If we can't parse the date, exclude it
+
       const today = new Date();
 
       switch (filters.lastContactRange) {
@@ -714,16 +766,56 @@ const AssignedLeads = () => {
       }
     };
 
+    const matchesDailyInteraction = () => {
+      if (filters.dailyInteractionRange === "all") return true;
+
+      if (!lead.timeline || !Array.isArray(lead.timeline)) return false;
+
+      const today = new Date();
+
+      // Find interactions based on the filter range
+      const hasInteractionInRange = lead.timeline.some((entry) => {
+        if (entry.action !== "INTERACTION") return false;
+
+        let entryDate = parseDate(entry.date);
+        if (!entryDate) return false;
+
+        switch (filters.dailyInteractionRange) {
+          case "today":
+            return entryDate.toDateString() === today.toDateString();
+          case "yesterday":
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            return entryDate.toDateString() === yesterday.toDateString();
+          case "thisWeek":
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay());
+            return entryDate >= weekStart;
+          case "last7days":
+            const sevenDaysAgo = new Date(today);
+            sevenDaysAgo.setDate(today.getDate() - 7);
+            return entryDate >= sevenDaysAgo;
+          case "last30days":
+            const thirtyDaysAgo = new Date(today);
+            thirtyDaysAgo.setDate(today.getDate() - 30);
+            return entryDate >= thirtyDaysAgo;
+          default:
+            return false;
+        }
+      });
+
+      return hasInteractionInRange;
+    };
+
     return (
       matchesSearch &&
       matchesStatus &&
       matchesPriority &&
-      matchesSource &&
       matchesInteractionOutcome &&
       matchesInteractionTag &&
-      matchesCourse &&
       matchesAssignDate() &&
-      matchesLastContact()
+      matchesLastContact() &&
+      matchesDailyInteraction()
     );
   });
 
@@ -755,6 +847,56 @@ const AssignedLeads = () => {
         l.interactionTags.length > 0 &&
         l.interactionTags.some((tag) => tag.includes("Application"))
     ).length,
+    // Count interactions performed today
+    dailyInteractions: assignedLeads.filter((lead) => {
+      if (!lead.timeline || !Array.isArray(lead.timeline)) return false;
+
+      const today = new Date();
+      const todayDateString = today.toDateString();
+
+      return lead.timeline.some((entry) => {
+        if (entry.action !== "INTERACTION") return false;
+
+        // Parse the interaction date using the same logic as our date parser
+        let entryDate = null;
+
+        if (entry.date) {
+          try {
+            // Handle Firestore Timestamps
+            if (
+              typeof entry.date === "object" &&
+              (entry.date.seconds || entry.date._seconds)
+            ) {
+              const seconds = entry.date.seconds || entry.date._seconds;
+              entryDate = new Date(seconds * 1000);
+            }
+            // Handle string dates
+            else if (typeof entry.date === "string") {
+              if (entry.date.includes(" at ")) {
+                const [datePart, timePart] = entry.date.split(" at ");
+                if (datePart && timePart) {
+                  const timeWithoutTimezone = timePart.split(" ")[0];
+                  const combinedDateTime = `${datePart} ${timeWithoutTimezone}`;
+                  entryDate = new Date(combinedDateTime);
+                }
+              } else {
+                entryDate = new Date(entry.date);
+              }
+            }
+            // Handle Date objects
+            else if (entry.date instanceof Date) {
+              entryDate = entry.date;
+            }
+          } catch (error) {
+            console.error("Error parsing interaction date:", error, entry.date);
+            return false;
+          }
+        }
+
+        // Check if the interaction was made today
+        return entryDate && entryDate.toDateString() === todayDateString;
+      });
+    }).length,
   };
 
   return (
@@ -771,7 +913,7 @@ const AssignedLeads = () => {
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               bgcolor: "primary.main",
@@ -809,7 +951,7 @@ const AssignedLeads = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               bgcolor: "success.main",
@@ -845,7 +987,7 @@ const AssignedLeads = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               bgcolor: "warning.main",
@@ -881,7 +1023,7 @@ const AssignedLeads = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               bgcolor: "info.main",
@@ -914,6 +1056,40 @@ const AssignedLeads = () => {
                   {analyticsData.negativeOutcomes} negative outcomes
                 </Typography>
               )}
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card
+            sx={{
+              bgcolor: "secondary.main",
+              color: "white",
+              height: 140,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <CardContent
+              sx={{
+                textAlign: "center",
+                width: "100%",
+                py: 2,
+                "&:last-child": { pb: 2 },
+              }}
+            >
+              <Typography variant="h3" sx={{ fontWeight: 600, mb: 1 }}>
+                {loading ? (
+                  <CircularProgress size={30} color="inherit" />
+                ) : (
+                  analyticsData.dailyInteractions
+                )}
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 0.5 }}>
+                Interactions Today
+              </Typography>
+              <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                Leads worked on today
+              </Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -1149,6 +1325,18 @@ const AssignedLeads = () => {
           }}
         >
           High Priority Leads ({analyticsData.highPriority})
+        </MenuItem>
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            handleFilterChange("dailyInteractionRange", "today");
+            handleFilterClose();
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <TrendingUpIcon color="secondary" fontSize="small" />
+            Worked on Today ({analyticsData.dailyInteractions})
+          </Box>
         </MenuItem>
       </Menu>
 
@@ -1774,73 +1962,6 @@ const AssignedLeads = () => {
             </Select>
           </FormControl>
 
-          {/* Source Filter */}
-          <FormControl fullWidth>
-            <InputLabel
-              sx={{ color: "#666666", "&.Mui-focused": { color: "#1976d2" } }}
-            >
-              Lead Source
-            </InputLabel>
-            <Select
-              value={filters.source}
-              label="Lead Source"
-              onChange={(e) => handleFilterChange("source", e.target.value)}
-              sx={{
-                backgroundColor: "#ffffff",
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "#d0d0d0",
-                },
-                "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "#1976d2",
-                },
-                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "#1976d2",
-                },
-              }}
-            >
-              <MenuItem value="all">All Sources</MenuItem>
-              <MenuItem value="Facebook">Facebook</MenuItem>
-              <MenuItem value="Website">Website</MenuItem>
-              <MenuItem value="Instagram">Instagram</MenuItem>
-              <MenuItem value="Referral">Referral</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* Course/Program Filter */}
-          <FormControl fullWidth>
-            <InputLabel
-              sx={{ color: "#666666", "&.Mui-focused": { color: "#1976d2" } }}
-            >
-              Course/Program
-            </InputLabel>
-            <Select
-              value={filters.course}
-              label="Course/Program"
-              onChange={(e) => handleFilterChange("course", e.target.value)}
-              sx={{
-                backgroundColor: "#ffffff",
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "#d0d0d0",
-                },
-                "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "#1976d2",
-                },
-                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "#1976d2",
-                },
-              }}
-            >
-              <MenuItem value="all">All Courses</MenuItem>
-              <MenuItem value="Computer Science">Computer Science</MenuItem>
-              <MenuItem value="Business Administration">
-                Business Administration
-              </MenuItem>
-              <MenuItem value="Education">Education</MenuItem>
-              <MenuItem value="Engineering">Engineering</MenuItem>
-              <MenuItem value="Medicine">Medicine</MenuItem>
-            </Select>
-          </FormControl>
-
           <Divider sx={{ borderColor: "#d0d0d0" }} />
 
           {/* Interaction Outcome Filter */}
@@ -2009,6 +2130,41 @@ const AssignedLeads = () => {
               label="Last Contact Range"
               onChange={(e) =>
                 handleFilterChange("lastContactRange", e.target.value)
+              }
+              sx={{
+                backgroundColor: "#ffffff",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#d0d0d0",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#1976d2",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#1976d2",
+                },
+              }}
+            >
+              <MenuItem value="all">Any Time</MenuItem>
+              <MenuItem value="today">Today</MenuItem>
+              <MenuItem value="yesterday">Yesterday</MenuItem>
+              <MenuItem value="thisWeek">This Week</MenuItem>
+              <MenuItem value="last7days">Last 7 Days</MenuItem>
+              <MenuItem value="last30days">Last 30 Days</MenuItem>
+            </Select>
+          </FormControl>
+
+          {/* Daily Interaction Range Filter */}
+          <FormControl fullWidth>
+            <InputLabel
+              sx={{ color: "#666666", "&.Mui-focused": { color: "#1976d2" } }}
+            >
+              Interaction Date Range
+            </InputLabel>
+            <Select
+              value={filters.dailyInteractionRange}
+              label="Interaction Date Range"
+              onChange={(e) =>
+                handleFilterChange("dailyInteractionRange", e.target.value)
               }
               sx={{
                 backgroundColor: "#ffffff",

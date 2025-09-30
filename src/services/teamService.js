@@ -31,6 +31,45 @@ export const teamService = {
     }
   },
 
+  async getTeamMembersWithAuthData(members) {
+    try {
+      console.log("Enhancing team members with Firebase auth data...");
+      const response = await axiosInstance.post("/api/team/members/auth-data", {
+        memberEmails: members.map((m) => m.email).filter(Boolean),
+      });
+
+      if (response.data.success && response.data.authData) {
+        // Merge auth data with team members
+        const enhancedMembers = members.map((member) => {
+          const authData = response.data.authData.find(
+            (auth) => auth.email === member.email
+          );
+          return {
+            ...member,
+            lastSignIn: authData?.lastSignInTime || null,
+            lastActivity:
+              authData?.lastRefreshTime || authData?.lastSignInTime || null,
+            firebaseUid: authData?.uid || null,
+            emailVerified: authData?.emailVerified || false,
+            disabled: authData?.disabled || false,
+            authProvider: authData?.provider || "password",
+            creationTime: authData?.creationTime || member.createdAt,
+          };
+        });
+
+        console.log("Successfully enhanced members with auth data");
+        return enhancedMembers;
+      } else {
+        console.warn("Auth data response was not successful:", response.data);
+        return members;
+      }
+    } catch (error) {
+      console.error("Error fetching Firebase auth data:", error);
+      // Return original members if auth data fetch fails
+      return members;
+    }
+  },
+
   async addTeamMember(memberData) {
     try {
       const response = await axiosInstance.post(

@@ -557,9 +557,37 @@ const ApplicationDetailsDialog = ({
 
       console.log("Application API response:", response);
 
-      if (response && response.success) {
-        // Extract application data without creating unnecessary nesting
-        const applicationData = response.data;
+      // Some endpoints (or intermediary logs) might already yield the plain object
+      // Accept either { success, data } or raw object (with id & applicationNumber)
+      // Also handle cases where data is nested another level inside { data: { data: {...} } }
+      const isWrapped = response && response.success && response.data;
+      const isDoubleWrapped =
+        isWrapped &&
+        response.data &&
+        response.data.data &&
+        typeof response.data.data === "object";
+
+      if (
+        isDoubleWrapped ||
+        isWrapped ||
+        (response && response.id && response.applicationNumber) ||
+        (response && response.data && response.data.id)
+      ) {
+        // Handle different nesting levels
+        let applicationData;
+        if (isDoubleWrapped) {
+          applicationData = response.data.data;
+          console.log(
+            "Double wrapped data detected, unwrapping",
+            applicationData
+          );
+        } else if (isWrapped) {
+          applicationData = response.data;
+        } else if (response && response.data && response.data.id) {
+          applicationData = response.data;
+        } else {
+          applicationData = response;
+        }
         console.log("Application data loaded:", applicationData);
 
         // Debug academic documents specifically
@@ -3125,9 +3153,31 @@ const ApplicationDetailsDialog = ({
                           </Typography>
                           <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
                             {application.timeline
-                              .sort(
-                                (a, b) => new Date(b.date) - new Date(a.date)
-                              )
+                              .slice()
+                              .sort((a, b) => {
+                                const toMillis = (d) => {
+                                  if (!d) return 0;
+                                  if (d instanceof Date) return d.getTime();
+                                  if (typeof d === "string") {
+                                    const dt = new Date(d);
+                                    return isNaN(dt) ? 0 : dt.getTime();
+                                  }
+                                  if (typeof d === "object") {
+                                    if (d._seconds)
+                                      return (
+                                        d._seconds * 1000 +
+                                        (d._nanoseconds || 0) / 1e6
+                                      );
+                                    if (d.seconds)
+                                      return (
+                                        d.seconds * 1000 +
+                                        (d.nanoseconds || 0) / 1e6
+                                      );
+                                  }
+                                  return 0;
+                                };
+                                return toMillis(b.date) - toMillis(a.date);
+                              })
                               .map((entry, index) => (
                                 <Box
                                   key={index}
