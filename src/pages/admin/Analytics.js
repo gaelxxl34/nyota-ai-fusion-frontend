@@ -99,7 +99,7 @@ const Analytics = () => {
     agentPerformance: [],
     assignmentStats: {
       totalAssignments: 0,
-      activeAssignments: 0,
+      appliedAssignments: 0, // Changed from activeAssignments to appliedAssignments
       completedAssignments: 0,
       averageResponseTime: 0,
       totalAgents: 0,
@@ -109,9 +109,20 @@ const Analytics = () => {
     interactionMetrics: {
       totalInteractions: 0,
       averageInteractionsPerLead: 0,
+      dailyInteractions: 0,
+      weeklyInteractions: 0,
+      monthlyInteractions: 0,
       responseTimeMetrics: {},
+      interactionBreakdown: {
+        positive: 0,
+        neutral: 0,
+        negative: 0,
+      },
     },
   });
+
+  // State for interaction analytics filters
+  const [interactionTimeFilter, setInteractionTimeFilter] = useState("daily");
 
   // Fetch assignment performance data showing all team members with real lead assignment analytics (like ConversionPlan)
   const fetchAssignmentPerformance = async () => {
@@ -132,7 +143,136 @@ const Analytics = () => {
         `Analyzing assignment performance for ${allTeamMembers.length} team members`
       );
 
-      // For each team member, get their actual assigned lead counts (same as ConversionPlan logic)
+      // Helper function to extract interaction tags like AssignedLeads.js
+      const extractInteractionTags = (lead) => {
+        if (
+          !lead.timeline ||
+          !Array.isArray(lead.timeline) ||
+          lead.timeline.length === 0
+        ) {
+          return [];
+        }
+
+        const tags = [];
+        lead.timeline.forEach((entry) => {
+          if (entry.action === "INTERACTION" && entry.interaction) {
+            const interaction = entry.interaction;
+            if (interaction.interactionTag) {
+              const formattedTag = interaction.interactionTag
+                .replace(/_/g, " ")
+                .split(" ")
+                .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(" ");
+              tags.push(formattedTag);
+            } else if (interaction.type) {
+              tags.push(interaction.type.replace(/_/g, " "));
+            }
+          }
+        });
+
+        return [...new Set(tags)];
+      };
+
+      // Helper function to extract interaction outcomes and dates
+      const extractInteractionData = (lead) => {
+        if (!lead.timeline || !Array.isArray(lead.timeline)) {
+          return {
+            totalInteractions: 0,
+            positiveInteractions: 0,
+            neutralInteractions: 0,
+            negativeInteractions: 0,
+            dailyInteractions: 0,
+            weeklyInteractions: 0,
+            monthlyInteractions: 0,
+            lastInteractionOutcome: null,
+            lastInteractionAt: null,
+          };
+        }
+
+        const interactions = lead.timeline.filter(
+          (entry) => entry.action === "INTERACTION"
+        );
+        const now = new Date();
+        const today = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        );
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - today.getDay());
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        let positiveInteractions = 0;
+        let neutralInteractions = 0;
+        let negativeInteractions = 0;
+        let dailyInteractions = 0;
+        let weeklyInteractions = 0;
+        let monthlyInteractions = 0;
+        let lastInteractionOutcome = null;
+        let lastInteractionAt = null;
+
+        interactions.forEach((entry) => {
+          const interaction = entry.interaction;
+          if (interaction) {
+            // Count by outcome
+            if (interaction.outcome === "positive") positiveInteractions++;
+            else if (interaction.outcome === "negative") negativeInteractions++;
+            else neutralInteractions++;
+
+            // Parse interaction date
+            let interactionDate = null;
+            if (entry.date) {
+              if (
+                typeof entry.date === "object" &&
+                (entry.date.seconds || entry.date._seconds)
+              ) {
+                const seconds = entry.date.seconds || entry.date._seconds;
+                interactionDate = new Date(seconds * 1000);
+              } else if (typeof entry.date === "string") {
+                if (entry.date.includes(" at ")) {
+                  const [datePart, timePart] = entry.date.split(" at ");
+                  if (datePart && timePart) {
+                    const timeWithoutTimezone = timePart.split(" ")[0];
+                    const combinedDateTime = `${datePart} ${timeWithoutTimezone}`;
+                    interactionDate = new Date(combinedDateTime);
+                  }
+                } else {
+                  interactionDate = new Date(entry.date);
+                }
+              } else if (entry.date instanceof Date) {
+                interactionDate = entry.date;
+              }
+            }
+
+            // Count by time period
+            if (interactionDate && !isNaN(interactionDate.getTime())) {
+              if (interactionDate >= today) dailyInteractions++;
+              if (interactionDate >= weekStart) weeklyInteractions++;
+              if (interactionDate >= monthStart) monthlyInteractions++;
+
+              // Track latest interaction
+              if (!lastInteractionAt || interactionDate > lastInteractionAt) {
+                lastInteractionAt = interactionDate;
+                lastInteractionOutcome = interaction.outcome || "neutral";
+              }
+            }
+          }
+        });
+
+        return {
+          totalInteractions: interactions.length,
+          positiveInteractions,
+          neutralInteractions,
+          negativeInteractions,
+          dailyInteractions,
+          weeklyInteractions,
+          monthlyInteractions,
+          lastInteractionOutcome,
+          lastInteractionAt,
+        };
+      };
+
+      // For each team member, get their actual assigned lead counts and interaction data
       const teamMembersWithLeadCounts = await Promise.all(
         allTeamMembers.map(async (member) => {
           try {
@@ -147,61 +287,96 @@ const Analytics = () => {
                   const leads = response?.data || [];
                   return leads.filter(
                     (lead) => lead.assignedTo === member.email
-                  ).length;
+                  );
                 } catch (error) {
                   console.warn(
                     `Failed to fetch ${status} leads for ${member.email}:`,
                     error
                   );
-                  return 0;
+                  return [];
                 }
               }
             );
 
-            const leadCounts = await Promise.all(assignedLeadsPromises);
-            const totalAssignedCount = leadCounts.reduce(
-              (sum, count) => sum + count,
-              0
+            const assignedLeadsArrays = await Promise.all(
+              assignedLeadsPromises
             );
+            const allAssignedLeads = assignedLeadsArrays.flat();
+            const totalAssignedCount = allAssignedLeads.length;
+
+            // Get APPLIED leads specifically for this member
+            let appliedLeads = [];
+            try {
+              const appliedResponse = await leadService.getLeadsByStatus(
+                "APPLIED",
+                {
+                  limit: 10000,
+                  offset: 0,
+                }
+              );
+              appliedLeads = (appliedResponse?.data || []).filter(
+                (lead) => lead.assignedTo === member.email
+              );
+            } catch (error) {
+              console.warn(
+                `Failed to fetch APPLIED leads for ${member.email}:`,
+                error
+              );
+            }
+
+            // Calculate interaction data for all assigned leads
+            let totalInteractions = 0;
+            let positiveInteractions = 0;
+            let neutralInteractions = 0;
+            let negativeInteractions = 0;
+            let dailyInteractions = 0;
+            let weeklyInteractions = 0;
+            let monthlyInteractions = 0;
+            let lastInteractionAt = null;
+            let lastInteractionOutcome = null;
+
+            allAssignedLeads.forEach((lead) => {
+              const interactionData = extractInteractionData(lead);
+              totalInteractions += interactionData.totalInteractions;
+              positiveInteractions += interactionData.positiveInteractions;
+              neutralInteractions += interactionData.neutralInteractions;
+              negativeInteractions += interactionData.negativeInteractions;
+              dailyInteractions += interactionData.dailyInteractions;
+              weeklyInteractions += interactionData.weeklyInteractions;
+              monthlyInteractions += interactionData.monthlyInteractions;
+
+              if (
+                interactionData.lastInteractionAt &&
+                (!lastInteractionAt ||
+                  interactionData.lastInteractionAt > lastInteractionAt)
+              ) {
+                lastInteractionAt = interactionData.lastInteractionAt;
+                lastInteractionOutcome = interactionData.lastInteractionOutcome;
+              }
+            });
 
             // Calculate realistic metrics based on actual assignment count
             const hasAssignments = totalAssignedCount > 0;
-            let completedLeads = 0;
-            let activeAssignments = totalAssignedCount;
-            let totalInteractions = 0;
-            let positiveInteractions = 0;
-            let negativeInteractions = 0;
-            let dailyInteractions = 0;
-            let conversionRate = "0.0";
-            let averageResponseTime = 0;
+            const appliedCount = appliedLeads.length;
+            const completedLeads = appliedCount; // Applied leads are considered "completed"
+            const conversionRate =
+              totalAssignedCount > 0
+                ? ((appliedCount / totalAssignedCount) * 100).toFixed(1)
+                : "0.0";
 
-            if (hasAssignments) {
-              // Calculate realistic completion and interaction metrics
-              completedLeads = Math.floor(
-                totalAssignedCount * (0.15 + Math.random() * 0.25)
-              ); // 15-40% completion
-              activeAssignments = totalAssignedCount - completedLeads;
-              totalInteractions = Math.floor(
-                totalAssignedCount * (2 + Math.random() * 3)
-              ); // 2-5 interactions per lead
-              positiveInteractions = Math.floor(
-                totalInteractions * (0.5 + Math.random() * 0.3)
-              ); // 50-80% positive
-              negativeInteractions = Math.floor(
-                totalInteractions * (0.1 + Math.random() * 0.1)
-              ); // 10-20% negative
-              dailyInteractions = Math.floor(Math.random() * 8) + 1; // 1-9 daily interactions
-              conversionRate =
-                totalAssignedCount > 0
-                  ? ((completedLeads / totalAssignedCount) * 100).toFixed(1)
-                  : "0.0";
-              averageResponseTime = Math.floor(Math.random() * 180) + 30; // 30-210 minutes
-            }
+            // Calculate average response time based on interaction data
+            const averageResponseTime = hasAssignments
+              ? Math.floor(Math.random() * 180) + 30 // 30-210 minutes (placeholder until we have real response time data)
+              : 0;
 
-            // Calculate last activity (assigned members are more active)
-            const lastActive = hasAssignments
-              ? new Date(Date.now() - Math.random() * 2 * 24 * 60 * 60 * 1000) // last 2 days
-              : new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000); // last week
+            // Calculate last activity
+            const lastActive =
+              lastInteractionAt ||
+              (hasAssignments
+                ? new Date(Date.now() - Math.random() * 2 * 24 * 60 * 60 * 1000) // last 2 days
+                : new Date(
+                    Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000
+                  )); // last week
 
             return {
               id: member.id,
@@ -212,20 +387,24 @@ const Analytics = () => {
               // Real assignment data from backend
               hasAssignments,
               assignedLeads: totalAssignedCount, // This is the real count from backend
+              appliedLeads: appliedCount, // NEW: Track applied leads instead of active
               completedLeads,
-              activeAssignments,
-              // Interaction analytics (based on real assignment count)
+              // Real interaction analytics
               totalInteractions,
               positiveInteractions,
+              neutralInteractions,
               negativeInteractions,
+              dailyInteractions,
+              weeklyInteractions,
+              monthlyInteractions,
               averageResponseTime,
               conversionRate,
               lastActive,
-              // Daily activity metrics
-              dailyInteractions,
+              lastInteractionOutcome,
+              lastInteractionAt,
               // Status indicators
               status: member.status === "active" ? "active" : "available",
-              // Assignment capacity (like ConversionPlan)
+              // Assignment capacity
               maxCapacity: hasAssignments
                 ? Math.floor(totalAssignedCount * 1.2) + 5
                 : 1000,
@@ -236,17 +415,15 @@ const Analytics = () => {
               // Member details
               lastSignIn: member.lastSignIn,
               createdAt: member.createdAt,
-              // Interaction tags for assigned members
+              // Extract interaction tags from assigned leads
               topInteractionTags: hasAssignments
                 ? [
-                    "Application Started",
-                    "Follow-up Scheduled",
-                    "Document Shared",
-                    "Parent Meeting",
-                    "Will Visit",
-                  ]
-                    .sort(() => 0.5 - Math.random())
-                    .slice(0, Math.floor(Math.random() * 3) + 2)
+                    ...new Set(
+                      allAssignedLeads.flatMap((lead) =>
+                        extractInteractionTags(lead)
+                      )
+                    ),
+                  ].slice(0, 5)
                 : [],
             };
           } catch (error) {
@@ -276,8 +453,8 @@ const Analytics = () => {
         (sum, member) => sum + member.assignedLeads,
         0
       );
-      const totalActive = assignedMembers.reduce(
-        (sum, member) => sum + member.activeAssignments,
+      const totalApplied = assignedMembers.reduce(
+        (sum, member) => sum + member.appliedLeads,
         0
       );
       const totalCompleted = assignedMembers.reduce(
@@ -292,12 +469,24 @@ const Analytics = () => {
         (sum, member) => sum + member.positiveInteractions,
         0
       );
+      const totalNeutral = assignedMembers.reduce(
+        (sum, member) => sum + member.neutralInteractions,
+        0
+      );
       const totalNegative = assignedMembers.reduce(
         (sum, member) => sum + member.negativeInteractions,
         0
       );
       const totalDaily = assignedMembers.reduce(
         (sum, member) => sum + member.dailyInteractions,
+        0
+      );
+      const totalWeekly = assignedMembers.reduce(
+        (sum, member) => sum + member.weeklyInteractions,
+        0
+      );
+      const totalMonthly = assignedMembers.reduce(
+        (sum, member) => sum + member.monthlyInteractions,
         0
       );
 
@@ -315,7 +504,7 @@ const Analytics = () => {
         agentPerformance: teamPerformance, // All team members (assigned and unassigned)
         assignmentStats: {
           totalAssignments,
-          activeAssignments: totalActive,
+          appliedAssignments: totalApplied, // Changed from activeAssignments
           completedAssignments: totalCompleted,
           averageResponseTime,
           totalAgents: allTeamMembers.length,
@@ -328,9 +517,14 @@ const Analytics = () => {
             totalAssignments > 0
               ? (totalInteractions / totalAssignments).toFixed(1)
               : 0,
-          positiveOutcomes: totalPositive,
-          negativeOutcomes: totalNegative,
           dailyInteractions: totalDaily,
+          weeklyInteractions: totalWeekly,
+          monthlyInteractions: totalMonthly,
+          interactionBreakdown: {
+            positive: totalPositive,
+            neutral: totalNeutral,
+            negative: totalNegative,
+          },
           responseTimeMetrics: {
             // Response time distribution based on assigned members only
             under30min:
@@ -386,7 +580,7 @@ const Analytics = () => {
         agentPerformance: [],
         assignmentStats: {
           totalAssignments: 0,
-          activeAssignments: 0,
+          appliedAssignments: 0,
           completedAssignments: 0,
           averageResponseTime: 0,
           totalAgents: 0,
@@ -396,9 +590,14 @@ const Analytics = () => {
         interactionMetrics: {
           totalInteractions: 0,
           averageInteractionsPerLead: 0,
-          positiveOutcomes: 0,
-          negativeOutcomes: 0,
           dailyInteractions: 0,
+          weeklyInteractions: 0,
+          monthlyInteractions: 0,
+          interactionBreakdown: {
+            positive: 0,
+            neutral: 0,
+            negative: 0,
+          },
           responseTimeMetrics: {
             under30min: 0,
             under2hours: 0,
@@ -1690,9 +1889,17 @@ const Analytics = () => {
                     <TableCell>Team Member</TableCell>
                     <TableCell align="center">Assignment Status</TableCell>
                     <TableCell align="center">Assigned Leads</TableCell>
-                    <TableCell align="center">Active</TableCell>
+                    <TableCell align="center">Applied</TableCell>
                     <TableCell align="center">Completed</TableCell>
-                    <TableCell align="center">Interactions</TableCell>
+                    <TableCell align="center">
+                      Interactions (
+                      {interactionTimeFilter === "daily"
+                        ? "Daily"
+                        : interactionTimeFilter === "weekly"
+                        ? "Weekly"
+                        : "Monthly"}
+                      )
+                    </TableCell>
                     <TableCell align="center">Response Time</TableCell>
                     <TableCell align="center">Conversion</TableCell>
                   </TableRow>
@@ -1769,7 +1976,7 @@ const Analytics = () => {
                           }
                           fontWeight={agent.hasAssignments ? "bold" : "normal"}
                         >
-                          {agent.hasAssignments ? agent.activeAssignments : "—"}
+                          {agent.hasAssignments ? agent.appliedLeads : "—"}
                         </Typography>
                       </TableCell>
                       <TableCell align="center">
@@ -1789,14 +1996,21 @@ const Analytics = () => {
                         {agent.hasAssignments ? (
                           <Box sx={{ textAlign: "center" }}>
                             <Typography variant="body2" fontWeight="bold">
-                              {agent.totalInteractions}
+                              {interactionTimeFilter === "daily"
+                                ? agent.dailyInteractions
+                                : interactionTimeFilter === "weekly"
+                                ? agent.weeklyInteractions
+                                : agent.monthlyInteractions}
                             </Typography>
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
-                              {agent.positiveInteractions}+ /{" "}
-                              {agent.negativeInteractions}-
+                              {interactionTimeFilter === "daily"
+                                ? "today"
+                                : interactionTimeFilter === "weekly"
+                                ? "this week"
+                                : "this month"}
                             </Typography>
                           </Box>
                         ) : (
@@ -1859,9 +2073,30 @@ const Analytics = () => {
       {/* Enhanced Interaction Metrics */}
       <Grid item xs={12} md={4}>
         <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: "bold", mb: 3 }}>
-            Interaction Analytics
-          </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              mb: 3,
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+              Interaction Analytics
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Time Filter</InputLabel>
+              <Select
+                value={interactionTimeFilter}
+                label="Time Filter"
+                onChange={(e) => setInteractionTimeFilter(e.target.value)}
+              >
+                <MenuItem value="daily">Daily</MenuItem>
+                <MenuItem value="weekly">Weekly</MenuItem>
+                <MenuItem value="monthly">Monthly</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
 
           <Stack spacing={3}>
             <Box>
@@ -1898,17 +2133,31 @@ const Analytics = () => {
 
             <Box>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                Daily Interactions
+                {interactionTimeFilter === "daily"
+                  ? "Daily"
+                  : interactionTimeFilter === "weekly"
+                  ? "Weekly"
+                  : "Monthly"}{" "}
+                Interactions
               </Typography>
               <Typography
                 variant="h4"
                 color="secondary.main"
                 sx={{ fontWeight: "bold" }}
               >
-                {assignmentData.interactionMetrics.dailyInteractions}
+                {interactionTimeFilter === "daily"
+                  ? assignmentData.interactionMetrics.dailyInteractions
+                  : interactionTimeFilter === "weekly"
+                  ? assignmentData.interactionMetrics.weeklyInteractions
+                  : assignmentData.interactionMetrics.monthlyInteractions}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Leads worked on today
+                Leads worked on{" "}
+                {interactionTimeFilter === "daily"
+                  ? "today"
+                  : interactionTimeFilter === "weekly"
+                  ? "this week"
+                  : "this month"}
               </Typography>
             </Box>
 
@@ -1927,7 +2176,25 @@ const Analytics = () => {
                   fontWeight="bold"
                   color="success.main"
                 >
-                  {assignmentData.interactionMetrics.positiveOutcomes}
+                  {
+                    assignmentData.interactionMetrics.interactionBreakdown
+                      .positive
+                  }
+                </Typography>
+              </Box>
+              <Box
+                sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
+              >
+                <Typography variant="body2">Neutral:</Typography>
+                <Typography
+                  variant="body2"
+                  fontWeight="bold"
+                  color="warning.main"
+                >
+                  {
+                    assignmentData.interactionMetrics.interactionBreakdown
+                      .neutral
+                  }
                 </Typography>
               </Box>
               <Box sx={{ display: "flex", justifyContent: "space-between" }}>
@@ -1937,7 +2204,10 @@ const Analytics = () => {
                   fontWeight="bold"
                   color="error.main"
                 >
-                  {assignmentData.interactionMetrics.negativeOutcomes}
+                  {
+                    assignmentData.interactionMetrics.interactionBreakdown
+                      .negative
+                  }
                 </Typography>
               </Box>
             </Box>
@@ -2018,15 +2288,23 @@ const Analytics = () => {
             Team Assignment Distribution
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Compare assignment workload across all team members with lead
-            assignments
+            Compare assignment workload and {interactionTimeFilter} interactions
+            across all team members with lead assignments
           </Typography>
           {assignmentData.agentPerformance.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart
-                data={assignmentData.agentPerformance.filter(
-                  (member) => member.hasAssignments
-                )}
+                data={assignmentData.agentPerformance
+                  .filter((member) => member.hasAssignments)
+                  .map((member) => ({
+                    ...member,
+                    filteredInteractions:
+                      interactionTimeFilter === "daily"
+                        ? member.dailyInteractions
+                        : interactionTimeFilter === "weekly"
+                        ? member.weeklyInteractions
+                        : member.monthlyInteractions,
+                  }))}
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
@@ -2041,10 +2319,16 @@ const Analytics = () => {
                     value,
                     name === "assignedLeads"
                       ? "Assigned Leads"
-                      : name === "completedLeads"
-                      ? "Completed Leads"
-                      : name === "totalInteractions"
-                      ? "Total Interactions"
+                      : name === "appliedLeads"
+                      ? "Applied Leads"
+                      : name === "filteredInteractions"
+                      ? `${
+                          interactionTimeFilter === "daily"
+                            ? "Daily"
+                            : interactionTimeFilter === "weekly"
+                            ? "Weekly"
+                            : "Monthly"
+                        } Interactions`
                       : name,
                   ]}
                 />
@@ -2054,14 +2338,20 @@ const Analytics = () => {
                   name="Assigned"
                 />
                 <Bar
-                  dataKey="completedLeads"
-                  fill={COLORS.success}
-                  name="Completed"
+                  dataKey="appliedLeads"
+                  fill={COLORS.warning}
+                  name="Applied"
                 />
                 <Bar
-                  dataKey="totalInteractions"
+                  dataKey="filteredInteractions"
                   fill={COLORS.info}
-                  name="Interactions"
+                  name={`${
+                    interactionTimeFilter === "daily"
+                      ? "Daily"
+                      : interactionTimeFilter === "weekly"
+                      ? "Weekly"
+                      : "Monthly"
+                  } Interactions`}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -2367,10 +2657,10 @@ const Analytics = () => {
                   color="success.contrastText"
                   sx={{ fontWeight: "bold" }}
                 >
-                  {assignmentData.assignmentStats.activeAssignments}
+                  {assignmentData.assignmentStats.appliedAssignments}
                 </Typography>
                 <Typography variant="body2" color="success.contrastText">
-                  Active Assignments
+                  Applied Assignments
                 </Typography>
               </Box>
             </Grid>
@@ -2696,84 +2986,86 @@ const Analytics = () => {
         </Box>
       ) : (
         <>
-          {/* Enhanced KPI Summary Cards - All counts based on lead status fields */}
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} sm={6} md={2}>
-              <KpiCard
-                title="Total Leads"
-                value={reportData.summary.totalLeads}
-                subtitle="All statuses"
-                icon={PeopleIcon}
-                color="primary"
-              />
+          {/* Enhanced KPI Summary Cards - Only show on Overview and Admissions tabs */}
+          {(activeTab === 0 || activeTab === 1) && (
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              <Grid item xs={12} sm={6} md={2}>
+                <KpiCard
+                  title="Total Leads"
+                  value={reportData.summary.totalLeads}
+                  subtitle="All statuses"
+                  icon={PeopleIcon}
+                  color="primary"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={2}>
+                <KpiCard
+                  title="Applied Status"
+                  value={reportData.summary.applied}
+                  subtitle="APPLIED status"
+                  icon={AssignmentIcon}
+                  color="info"
+                  statusCode="APPLIED"
+                  clickable={true}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={2}>
+                <KpiCard
+                  title="Admitted Status"
+                  value={reportData.summary.admitted}
+                  subtitle="ADMITTED status"
+                  icon={CheckCircleIcon}
+                  color="success"
+                  statusCode="ADMITTED"
+                  clickable={true}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={2}>
+                <KpiCard
+                  title="Enrolled Status"
+                  value={reportData.summary.enrolled}
+                  subtitle="ENROLLED status"
+                  icon={SchoolIcon}
+                  color="primary"
+                  statusCode="ENROLLED"
+                  clickable={true}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={2}>
+                <KpiCard
+                  title="In Review Status"
+                  value={reportData.summary.inReview}
+                  subtitle="IN_REVIEW status"
+                  icon={PendingIcon}
+                  color="warning"
+                  statusCode="IN_REVIEW"
+                  clickable={true}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={2}>
+                <KpiCard
+                  title="Contacted Status"
+                  value={reportData.summary.contacted}
+                  subtitle="CONTACTED status"
+                  icon={ReportIcon}
+                  color="default"
+                  statusCode="CONTACTED"
+                  clickable={true}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={2}>
+                <KpiCard
+                  title="Interested Status"
+                  value={reportData.summary.interested}
+                  subtitle="INTERESTED status"
+                  icon={ReportIcon}
+                  color="neutral"
+                  statusCode="INTERESTED"
+                  clickable={true}
+                />
+              </Grid>
             </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <KpiCard
-                title="Applied Status"
-                value={reportData.summary.applied}
-                subtitle="APPLIED status"
-                icon={AssignmentIcon}
-                color="info"
-                statusCode="APPLIED"
-                clickable={true}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <KpiCard
-                title="Admitted Status"
-                value={reportData.summary.admitted}
-                subtitle="ADMITTED status"
-                icon={CheckCircleIcon}
-                color="success"
-                statusCode="ADMITTED"
-                clickable={true}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <KpiCard
-                title="Enrolled Status"
-                value={reportData.summary.enrolled}
-                subtitle="ENROLLED status"
-                icon={SchoolIcon}
-                color="primary"
-                statusCode="ENROLLED"
-                clickable={true}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <KpiCard
-                title="In Review Status"
-                value={reportData.summary.inReview}
-                subtitle="IN_REVIEW status"
-                icon={PendingIcon}
-                color="warning"
-                statusCode="IN_REVIEW"
-                clickable={true}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <KpiCard
-                title="Contacted Status"
-                value={reportData.summary.contacted}
-                subtitle="CONTACTED status"
-                icon={ReportIcon}
-                color="default"
-                statusCode="CONTACTED"
-                clickable={true}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <KpiCard
-                title="Interested Status"
-                value={reportData.summary.interested}
-                subtitle="INTERESTED status"
-                icon={ReportIcon}
-                color="neutral"
-                statusCode="INTERESTED"
-                clickable={true}
-              />
-            </Grid>
-          </Grid>
+          )}
 
           {/* Tab Content */}
           {activeTab === 0 && renderOverviewTab()}

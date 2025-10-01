@@ -42,8 +42,54 @@ import {
   AccessTime as TimeIcon,
   MoreVert as MoreVertIcon,
 } from "@mui/icons-material";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, isValid, parseISO } from "date-fns";
 import { leadService } from "../../services/leadService";
+
+// Helper function to safely format dates
+const safeFormatDistanceToNow = (timestamp) => {
+  if (!timestamp) return "Unknown time";
+
+  let date;
+  if (typeof timestamp === "string") {
+    date = parseISO(timestamp);
+  } else {
+    date = new Date(timestamp);
+  }
+
+  if (!isValid(date)) {
+    return "Invalid date";
+  }
+
+  try {
+    return formatDistanceToNow(date);
+  } catch (error) {
+    console.warn("Error formatting date:", timestamp, error);
+    return "Unknown time";
+  }
+};
+
+// Helper function to safely format dates with custom format
+const safeFormat = (timestamp, formatString = "MMM dd, yyyy 'at' h:mm a") => {
+  if (!timestamp) return "Unknown date";
+
+  let date;
+  if (typeof timestamp === "string") {
+    date = parseISO(timestamp);
+  } else {
+    date = new Date(timestamp);
+  }
+
+  if (!isValid(date)) {
+    return "Invalid date";
+  }
+
+  try {
+    return format(date, formatString);
+  } catch (error) {
+    console.warn("Error formatting date:", timestamp, error);
+    return "Unknown date";
+  }
+};
 
 const interactionTypes = {
   phone: { icon: PhoneIcon, label: "Phone Call", color: "primary" },
@@ -617,7 +663,7 @@ const InteractionTimeline = ({ leadId, leadName }) => {
                       />
                     )}
                     <Typography variant="caption" color="text.secondary">
-                      {formatDistanceToNow(interaction.timestamp)} ago
+                      {safeFormatDistanceToNow(interaction.timestamp)} ago
                     </Typography>
                   </Box>
                 }
@@ -719,7 +765,7 @@ const InteractionTimeline = ({ leadId, leadName }) => {
                       />
                       <Typography variant="caption" color="text.secondary">
                         by {interaction.agent} •{" "}
-                        {format(
+                        {safeFormat(
                           interaction.timestamp,
                           "MMM dd, yyyy 'at' h:mm a"
                         )}

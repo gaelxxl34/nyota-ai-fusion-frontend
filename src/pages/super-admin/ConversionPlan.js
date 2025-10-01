@@ -60,6 +60,7 @@ import {
   LocationOn as LocationIcon,
   Warning as WarningIcon,
   Schedule as ScheduleIcon,
+  CalendarToday as CalendarTodayIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { useSnackbar } from "notistack";
@@ -242,6 +243,8 @@ const ConversionPlan = () => {
     country: "all",
     assignedTo: "all",
     searchTerm: "",
+    dateFrom: "",
+    dateTo: "",
   });
 
   // Assignment dialog state
@@ -632,6 +635,53 @@ const ConversionPlan = () => {
         });
         logger.debug("After search filter", {
           term: filters.searchTerm,
+          count: filtered.length,
+        });
+      }
+
+      // Date range filter
+      if (filters.dateFrom || filters.dateTo) {
+        filtered = filtered.filter((lead) => {
+          // Check multiple possible date fields for lead creation
+          const leadDate =
+            lead.createdAt ||
+            lead.created_at ||
+            lead.dateCreated ||
+            lead.date_created;
+
+          if (!leadDate) {
+            // If no date field exists, include the lead (don't filter out)
+            return true;
+          }
+
+          const leadDateObj = new Date(leadDate);
+
+          // Check if the date is valid
+          if (isNaN(leadDateObj.getTime())) {
+            return true; // Include invalid dates
+          }
+
+          let isInRange = true;
+
+          // Filter by "from" date
+          if (filters.dateFrom) {
+            const fromDate = new Date(filters.dateFrom);
+            fromDate.setHours(0, 0, 0, 0); // Start of day
+            isInRange = isInRange && leadDateObj >= fromDate;
+          }
+
+          // Filter by "to" date
+          if (filters.dateTo) {
+            const toDate = new Date(filters.dateTo);
+            toDate.setHours(23, 59, 59, 999); // End of day
+            isInRange = isInRange && leadDateObj <= toDate;
+          }
+
+          return isInRange;
+        });
+        logger.debug("After date filter", {
+          dateFrom: filters.dateFrom,
+          dateTo: filters.dateTo,
           count: filtered.length,
         });
       }
@@ -1363,35 +1413,8 @@ const ConversionPlan = () => {
                 </Box>
 
                 <Grid container spacing={3}>
+                  {/* First Row - Main Filters */}
                   <Grid item xs={12} sm={6} md={3}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="Search leads, emails, phones..."
-                      value={filters.searchTerm}
-                      onChange={(e) =>
-                        handleFilterChange("searchTerm", e.target.value)
-                      }
-                      InputProps={{
-                        startAdornment: (
-                          <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          background: "rgba(255, 255, 255, 0.8)",
-                          backdropFilter: "blur(10px)",
-                          "&:hover": {
-                            background: "rgba(255, 255, 255, 0.9)",
-                          },
-                          "&.Mui-focused": {
-                            background: "rgba(255, 255, 255, 1)",
-                          },
-                        },
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={2}>
                     <FormControl
                       fullWidth
                       size="small"
@@ -1453,7 +1476,7 @@ const ConversionPlan = () => {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={2}>
+                  <Grid item xs={12} sm={6} md={3}>
                     <FormControl
                       fullWidth
                       size="small"
@@ -1590,7 +1613,7 @@ const ConversionPlan = () => {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={2}>
+                  <Grid item xs={12} sm={6} md={3}>
                     <Button
                       fullWidth
                       variant="outlined"
@@ -1602,6 +1625,8 @@ const ConversionPlan = () => {
                           country: "all",
                           assignedTo: "all",
                           searchTerm: "",
+                          dateFrom: "",
+                          dateTo: "",
                         });
                       }}
                       sx={{
@@ -1615,6 +1640,182 @@ const ConversionPlan = () => {
                     >
                       Reset
                     </Button>
+                  </Grid>
+
+                  {/* Second Row - Date Range Filters */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="From Date"
+                      type="date"
+                      value={filters.dateFrom}
+                      onChange={(e) =>
+                        handleFilterChange("dateFrom", e.target.value)
+                      }
+                      InputLabelProps={{
+                        shrink: true,
+                      }}
+                      InputProps={{
+                        startAdornment: (
+                          <CalendarTodayIcon
+                            sx={{
+                              mr: 1,
+                              color: "text.secondary",
+                              fontSize: 16,
+                            }}
+                          />
+                        ),
+                      }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          background: "rgba(255, 255, 255, 0.8)",
+                          backdropFilter: "blur(10px)",
+                          "&:hover": {
+                            background: "rgba(255, 255, 255, 0.9)",
+                          },
+                          "&.Mui-focused": {
+                            background: "rgba(255, 255, 255, 1)",
+                          },
+                        },
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="To Date"
+                      type="date"
+                      value={filters.dateTo}
+                      onChange={(e) =>
+                        handleFilterChange("dateTo", e.target.value)
+                      }
+                      InputLabelProps={{
+                        shrink: true,
+                      }}
+                      InputProps={{
+                        startAdornment: (
+                          <CalendarTodayIcon
+                            sx={{
+                              mr: 1,
+                              color: "text.secondary",
+                              fontSize: 16,
+                            }}
+                          />
+                        ),
+                      }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          background: "rgba(255, 255, 255, 0.8)",
+                          backdropFilter: "blur(10px)",
+                          "&:hover": {
+                            background: "rgba(255, 255, 255, 0.9)",
+                          },
+                          "&.Mui-focused": {
+                            background: "rgba(255, 255, 255, 1)",
+                          },
+                        },
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={6}>
+                    {/* Quick Date Presets */}
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ height: "40px", alignItems: "center" }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "text.secondary", mr: 1 }}
+                      >
+                        Quick:
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          const today = new Date().toISOString().split("T")[0];
+                          setFilters((prev) => ({
+                            ...prev,
+                            dateFrom: today,
+                            dateTo: today,
+                          }));
+                        }}
+                        sx={{ minWidth: "auto", px: 1, fontSize: "0.75rem" }}
+                      >
+                        Today
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          const today = new Date();
+                          const weekAgo = new Date(
+                            today.getTime() - 7 * 24 * 60 * 60 * 1000
+                          );
+                          setFilters((prev) => ({
+                            ...prev,
+                            dateFrom: weekAgo.toISOString().split("T")[0],
+                            dateTo: today.toISOString().split("T")[0],
+                          }));
+                        }}
+                        sx={{ minWidth: "auto", px: 1, fontSize: "0.75rem" }}
+                      >
+                        7 Days
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          const today = new Date();
+                          const monthAgo = new Date(
+                            today.getFullYear(),
+                            today.getMonth() - 1,
+                            today.getDate()
+                          );
+                          setFilters((prev) => ({
+                            ...prev,
+                            dateFrom: monthAgo.toISOString().split("T")[0],
+                            dateTo: today.toISOString().split("T")[0],
+                          }));
+                        }}
+                        sx={{ minWidth: "auto", px: 1, fontSize: "0.75rem" }}
+                      >
+                        30 Days
+                      </Button>
+                    </Stack>
+                  </Grid>
+
+                  {/* Third Row - Search Input */}
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="Search leads by name, email, or phone..."
+                      value={filters.searchTerm}
+                      onChange={(e) =>
+                        handleFilterChange("searchTerm", e.target.value)
+                      }
+                      InputProps={{
+                        startAdornment: (
+                          <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />
+                        ),
+                      }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          background: "rgba(255, 255, 255, 0.8)",
+                          backdropFilter: "blur(10px)",
+                          "&:hover": {
+                            background: "rgba(255, 255, 255, 0.9)",
+                          },
+                          "&.Mui-focused": {
+                            background: "rgba(255, 255, 255, 1)",
+                          },
+                        },
+                      }}
+                    />
                   </Grid>
                 </Grid>
               </Paper>
