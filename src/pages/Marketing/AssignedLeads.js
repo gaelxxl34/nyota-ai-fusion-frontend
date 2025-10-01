@@ -29,6 +29,8 @@ import {
   ListSubheader,
   CircularProgress,
   Alert,
+  Skeleton,
+  Fade,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -80,7 +82,6 @@ const getStatusColor = (status) => {
   const colors = {
     INTERESTED: "primary",
     CONTACTED: "info",
-    FOLLOW_UP: "warning",
     WARM: "success",
     APPLIED: "secondary",
   };
@@ -125,6 +126,7 @@ const AssignedLeads = () => {
     assignDateRange: "all",
     lastContactRange: "all",
     dailyInteractionRange: "all",
+    urgency: "all", // New urgency filter
   });
 
   // Helper function to format dates consistently (like DataCenter.js)
@@ -213,6 +215,213 @@ const AssignedLeads = () => {
 
     return typeof dateValue === "string" ? dateValue : "Not available yet";
   };
+
+  // Helper function to extract last interaction outcome and type
+  const extractLastInteraction = useCallback((lead) => {
+    // First check if interactionSummary exists (preferred source)
+    if (
+      lead.interactionSummary &&
+      lead.interactionSummary.totalInteractions > 0
+    ) {
+      return {
+        lastInteractionOutcome:
+          lead.interactionSummary.lastInteractionOutcome || null,
+        lastInteractionType:
+          lead.interactionSummary.lastInteractionType || null,
+      };
+    }
+
+    // Fallback to timeline parsing if interactionSummary is not available
+    const hasRealInteractions =
+      lead.timeline &&
+      Array.isArray(lead.timeline) &&
+      lead.timeline.length > 0 &&
+      lead.timeline.some((entry) => entry.action === "INTERACTION"); // Fixed: use 'action' not 'type'
+
+    // If no real interactions exist, return null values
+    if (!hasRealInteractions) {
+      return { lastInteractionOutcome: null, lastInteractionType: null };
+    }
+
+    let lastInteractionOutcome = "neutral";
+    let lastInteractionType = "";
+
+    // Check timeline for real interactions
+    if (
+      lead.timeline &&
+      Array.isArray(lead.timeline) &&
+      lead.timeline.length > 0
+    ) {
+      // Sort timeline by date (newest first)
+      const sortedTimeline = [...lead.timeline].sort((a, b) => {
+        const dateA = a.date?._seconds
+          ? new Date(a.date._seconds * 1000)
+          : new Date(a.date || a.timestamp || 0);
+        const dateB = b.date?._seconds
+          ? new Date(b.date._seconds * 1000)
+          : new Date(b.date || b.timestamp || 0);
+        return dateB - dateA;
+      });
+
+      // Find the latest real interaction (not status changes)
+      const latestInteraction = sortedTimeline.find(
+        (entry) => entry.action === "INTERACTION" // Fixed: use 'action' not 'type'
+      );
+
+      if (latestInteraction && latestInteraction.interaction) {
+        const interaction = latestInteraction.interaction;
+
+        // Use the interaction outcome and type directly from the API
+        lastInteractionOutcome = interaction.outcome || "neutral";
+        lastInteractionType = interaction.type || "Interaction";
+
+        // Also check for interaction tag
+        if (interaction.interactionTag) {
+          lastInteractionType = interaction.interactionTag
+            .replace(/_/g, " ")
+            .split(" ")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+        }
+      }
+    }
+
+    return { lastInteractionOutcome, lastInteractionType };
+  }, []);
+
+  // Helper function to extract interaction tags from timeline
+  const extractInteractionTags = useCallback((lead) => {
+    // Check if there's real interaction data
+    if (
+      !lead.timeline ||
+      !Array.isArray(lead.timeline) ||
+      lead.timeline.length === 0
+    ) {
+      // No real interaction data available
+      return [];
+    }
+
+    // Extract all tags from timeline interactions
+    const tags = [];
+
+    // Look for interactions in the timeline
+    lead.timeline.forEach((entry) => {
+      // Fixed: check for action === "INTERACTION" instead of type === "INTERACTION"
+      if (entry.action === "INTERACTION" && entry.interaction) {
+        const interaction = entry.interaction;
+
+        // Priority 1: Use interaction tag if available (this is the most specific)
+        if (interaction.interactionTag) {
+          const formattedTag = interaction.interactionTag
+            .replace(/_/g, " ")
+            .split(" ")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+          tags.push(formattedTag);
+        }
+        // Priority 2: Only add interaction type if no specific tag exists
+        else if (interaction.type) {
+          tags.push(interaction.type.replace(/_/g, " "));
+        }
+
+        // Don't add channel information as it's not relevant for interaction tags
+        // The specific interaction tag is more valuable than knowing it was a phone call
+      } else if (entry.action === "STATUS_CHANGE") {
+        // Add status change as a tag for tracking
+        tags.push(`Status: ${entry.status}`);
+      }
+    });
+
+    // If no timeline interactions found, check interactionSummary for basic info
+    if (
+      tags.length === 0 &&
+      lead.interactionSummary &&
+      lead.interactionSummary.totalInteractions > 0
+    ) {
+      if (lead.interactionSummary.lastInteractionType) {
+        tags.push(
+          lead.interactionSummary.lastInteractionType.replace(/_/g, " ")
+        );
+      }
+    }
+
+    // Remove duplicates and return only real interaction tags
+    return [...new Set(tags)];
+  }, []);
+
+  // Helper function to determine lead priority
+  const determinePriority = useCallback(
+    (lead) => {
+      // Extract interaction data
+      const { lastInteractionOutcome } = extractLastInteraction(lead);
+      const interactionTags = lead.interactionTags || [];
+
+      // Define high-priority interaction tags (from InteractionTimeline component)
+      const highPriorityTags = [
+        "Application Started",
+        "Application Submitted",
+        "Application Assistance",
+        "Will Visit",
+        "Campus Visit",
+        "Parent Meeting",
+      ];
+
+      // Define low-priority interaction tags
+      const lowPriorityTags = [
+        "Scholarship Information",
+        "Financial Assistance Request",
+        "Payment Plan Inquiry",
+        "Lead Closed",
+      ];
+
+      // Check if lead has any high-priority tags
+      const hasHighPriorityTag = interactionTags.some((tag) =>
+        highPriorityTags.some((hpTag) =>
+          tag.toLowerCase().includes(hpTag.toLowerCase())
+        )
+      );
+
+      // Check if lead has any low-priority tags
+      const hasLowPriorityTag = interactionTags.some((tag) =>
+        lowPriorityTags.some((lpTag) =>
+          tag.toLowerCase().includes(lpTag.toLowerCase())
+        )
+      );
+
+      // Priority logic based on interaction outcome first
+      if (lastInteractionOutcome === "positive") {
+        // Positive interactions = engaged leads
+        if (hasHighPriorityTag) {
+          return "high"; // Positive outcome + high-priority tag = TOP priority
+        }
+        return "high"; // Any positive interaction is high priority
+      } else if (lastInteractionOutcome === "negative") {
+        // Negative interactions = disengaged leads
+        return "low"; // Always low priority for negative outcomes
+      } else if (lastInteractionOutcome === "neutral") {
+        // Neutral interactions = needs follow-up
+        if (hasHighPriorityTag) {
+          return "high"; // Neutral + high tag = still high priority
+        }
+        if (hasLowPriorityTag) {
+          return "low"; // Neutral + low tag = low priority
+        }
+        return "medium"; // Default neutral = medium priority
+      } else {
+        // No interactions yet - base priority on tags only
+        if (hasHighPriorityTag) {
+          return "high";
+        }
+        if (hasLowPriorityTag) {
+          return "low";
+        }
+
+        // Completely new lead with no interactions - medium priority
+        return "medium";
+      }
+    },
+    [extractLastInteraction]
+  );
 
   // Fetch assigned leads from the API
   const fetchAssignedLeads = useCallback(async () => {
@@ -330,180 +539,12 @@ const AssignedLeads = () => {
     } finally {
       setLoading(false);
     }
-  }, [enqueueSnackbar]);
-
-  // Helper function to determine lead priority
-  const determinePriority = (lead) => {
-    // Logic to determine priority based on lead data
-    if (lead.status === "APPLIED" || lead.status === "WARM") {
-      return "high";
-    } else if (lead.status === "INTERESTED") {
-      return "medium";
-    } else if (lead.status === "CONTACTED" || lead.status === "FOLLOW_UP") {
-      // Check recency - if recently contacted, higher priority
-      let createdDate;
-
-      // Handle Firestore date format properly
-      if (
-        typeof lead.createdAt === "string" &&
-        lead.createdAt.includes(" at ")
-      ) {
-        const [datePart, timePart] = lead.createdAt.split(" at ");
-        const timeWithoutTimezone = timePart.split(" ")[0];
-        createdDate = new Date(`${datePart} ${timeWithoutTimezone}`);
-      } else {
-        createdDate = new Date(lead.createdAt);
-      }
-
-      const now = new Date();
-      const daysSinceCreation = Math.floor(
-        (now - createdDate) / (1000 * 60 * 60 * 24)
-      );
-
-      if (daysSinceCreation < 3) {
-        return "high";
-      } else if (daysSinceCreation < 7) {
-        return "medium";
-      } else {
-        return "low";
-      }
-    }
-
-    return "low";
-  };
-
-  // Helper function to extract interaction tags from timeline
-  const extractInteractionTags = (lead) => {
-    // Check if there's real interaction data
-    if (
-      !lead.timeline ||
-      !Array.isArray(lead.timeline) ||
-      lead.timeline.length === 0
-    ) {
-      // No real interaction data available
-      return [];
-    }
-
-    // Extract all tags from timeline interactions
-    const tags = [];
-
-    // Look for interactions in the timeline
-    lead.timeline.forEach((entry) => {
-      // Fixed: check for action === "INTERACTION" instead of type === "INTERACTION"
-      if (entry.action === "INTERACTION" && entry.interaction) {
-        const interaction = entry.interaction;
-
-        // Priority 1: Use interaction tag if available (this is the most specific)
-        if (interaction.interactionTag) {
-          const formattedTag = interaction.interactionTag
-            .replace(/_/g, " ")
-            .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" ");
-          tags.push(formattedTag);
-        }
-        // Priority 2: Only add interaction type if no specific tag exists
-        else if (interaction.type) {
-          tags.push(interaction.type.replace(/_/g, " "));
-        }
-
-        // Don't add channel information as it's not relevant for interaction tags
-        // The specific interaction tag is more valuable than knowing it was a phone call
-      } else if (entry.action === "STATUS_CHANGE") {
-        // Add status change as a tag for tracking
-        tags.push(`Status: ${entry.status}`);
-      }
-    });
-
-    // If no timeline interactions found, check interactionSummary for basic info
-    if (
-      tags.length === 0 &&
-      lead.interactionSummary &&
-      lead.interactionSummary.totalInteractions > 0
-    ) {
-      if (lead.interactionSummary.lastInteractionType) {
-        tags.push(
-          lead.interactionSummary.lastInteractionType.replace(/_/g, " ")
-        );
-      }
-    }
-
-    // Remove duplicates and return only real interaction tags
-    return [...new Set(tags)];
-  };
-
-  // Helper function to extract last interaction outcome and type
-  const extractLastInteraction = (lead) => {
-    // First check if interactionSummary exists (preferred source)
-    if (
-      lead.interactionSummary &&
-      lead.interactionSummary.totalInteractions > 0
-    ) {
-      return {
-        lastInteractionOutcome:
-          lead.interactionSummary.lastInteractionOutcome || null,
-        lastInteractionType:
-          lead.interactionSummary.lastInteractionType || null,
-      };
-    }
-
-    // Fallback to timeline parsing if interactionSummary is not available
-    const hasRealInteractions =
-      lead.timeline &&
-      Array.isArray(lead.timeline) &&
-      lead.timeline.length > 0 &&
-      lead.timeline.some((entry) => entry.action === "INTERACTION"); // Fixed: use 'action' not 'type'
-
-    // If no real interactions exist, return null values
-    if (!hasRealInteractions) {
-      return { lastInteractionOutcome: null, lastInteractionType: null };
-    }
-
-    let lastInteractionOutcome = "neutral";
-    let lastInteractionType = "";
-
-    // Check timeline for real interactions
-    if (
-      lead.timeline &&
-      Array.isArray(lead.timeline) &&
-      lead.timeline.length > 0
-    ) {
-      // Sort timeline by date (newest first)
-      const sortedTimeline = [...lead.timeline].sort((a, b) => {
-        const dateA = a.date?._seconds
-          ? new Date(a.date._seconds * 1000)
-          : new Date(a.date || a.timestamp || 0);
-        const dateB = b.date?._seconds
-          ? new Date(b.date._seconds * 1000)
-          : new Date(b.date || b.timestamp || 0);
-        return dateB - dateA;
-      });
-
-      // Find the latest real interaction (not status changes)
-      const latestInteraction = sortedTimeline.find(
-        (entry) => entry.action === "INTERACTION" // Fixed: use 'action' not 'type'
-      );
-
-      if (latestInteraction && latestInteraction.interaction) {
-        const interaction = latestInteraction.interaction;
-
-        // Use the interaction outcome and type directly from the API
-        lastInteractionOutcome = interaction.outcome || "neutral";
-        lastInteractionType = interaction.type || "Interaction";
-
-        // Also check for interaction tag
-        if (interaction.interactionTag) {
-          lastInteractionType = interaction.interactionTag
-            .replace(/_/g, " ")
-            .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" ");
-        }
-      }
-    }
-
-    return { lastInteractionOutcome, lastInteractionType };
-  };
+  }, [
+    enqueueSnackbar,
+    determinePriority,
+    extractInteractionTags,
+    extractLastInteraction,
+  ]);
 
   // Load data on component mount
   useEffect(() => {
@@ -544,6 +585,7 @@ const AssignedLeads = () => {
       assignDateRange: "all",
       lastContactRange: "all",
       dailyInteractionRange: "all",
+      urgency: "all",
     });
     setSelectedStatus("all");
     setSearchTerm("");
@@ -616,6 +658,53 @@ const AssignedLeads = () => {
         setLoading(false);
       }
     }
+  };
+
+  // Helper function to calculate days since last contact
+  // MUST be defined before filteredLeads calculation
+  const getDaysSinceLastContact = (lastContact) => {
+    if (!lastContact) return null;
+
+    try {
+      let contactDate = null;
+
+      // Handle Firestore Timestamps
+      if (
+        typeof lastContact === "object" &&
+        (lastContact.seconds || lastContact._seconds)
+      ) {
+        const seconds = lastContact.seconds || lastContact._seconds;
+        contactDate = new Date(seconds * 1000);
+      }
+      // Handle string dates
+      else if (typeof lastContact === "string") {
+        if (lastContact.includes(" at ")) {
+          const [datePart, timePart] = lastContact.split(" at ");
+          if (datePart && timePart) {
+            const timeWithoutTimezone = timePart.split(" ")[0];
+            const combinedDateTime = `${datePart} ${timeWithoutTimezone}`;
+            contactDate = new Date(combinedDateTime);
+          }
+        } else {
+          contactDate = new Date(lastContact);
+        }
+      }
+      // Handle Date objects
+      else if (lastContact instanceof Date) {
+        contactDate = lastContact;
+      }
+
+      if (contactDate && !isNaN(contactDate.getTime())) {
+        const now = new Date();
+        const diffTime = Math.abs(now - contactDate);
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+      }
+    } catch (error) {
+      console.error("Error calculating days since last contact:", error);
+    }
+
+    return null;
   };
 
   const filteredLeads = assignedLeads.filter((lead) => {
@@ -753,6 +842,11 @@ const AssignedLeads = () => {
           const weekStart = new Date(today);
           weekStart.setDate(today.getDate() - today.getDay());
           return lastContact >= weekStart;
+        case "thisMonth":
+          return (
+            lastContact.getMonth() === today.getMonth() &&
+            lastContact.getFullYear() === today.getFullYear()
+          );
         case "last7days":
           const sevenDaysAgo = new Date(today);
           sevenDaysAgo.setDate(today.getDate() - 7);
@@ -791,6 +885,11 @@ const AssignedLeads = () => {
             const weekStart = new Date(today);
             weekStart.setDate(today.getDate() - today.getDay());
             return entryDate >= weekStart;
+          case "thisMonth":
+            return (
+              entryDate.getMonth() === today.getMonth() &&
+              entryDate.getFullYear() === today.getFullYear()
+            );
           case "last7days":
             const sevenDaysAgo = new Date(today);
             sevenDaysAgo.setDate(today.getDate() - 7);
@@ -807,6 +906,30 @@ const AssignedLeads = () => {
       return hasInteractionInRange;
     };
 
+    const matchesUrgency = () => {
+      if (filters.urgency === "all") return true;
+
+      const daysSince = getDaysSinceLastContact(lead.lastContact);
+
+      switch (filters.urgency) {
+        case "never":
+          return daysSince === null;
+        case "today":
+          return daysSince === 0;
+        case "1-2days":
+          return daysSince >= 1 && daysSince <= 2;
+        case "3-7days":
+          return daysSince >= 3 && daysSince <= 7;
+        case "7plus":
+          return daysSince !== null && daysSince > 7;
+        case "urgent":
+          // Combined filter: never contacted OR 3+ days since last contact
+          return daysSince === null || daysSince >= 3;
+        default:
+          return true;
+      }
+    };
+
     return (
       matchesSearch &&
       matchesStatus &&
@@ -815,7 +938,8 @@ const AssignedLeads = () => {
       matchesInteractionTag &&
       matchesAssignDate() &&
       matchesLastContact() &&
-      matchesDailyInteraction()
+      matchesDailyInteraction() &&
+      matchesUrgency()
     );
   });
 
@@ -823,7 +947,10 @@ const AssignedLeads = () => {
     all: filteredLeads.length,
     INTERESTED: filteredLeads.filter((l) => l.status === "INTERESTED").length,
     CONTACTED: filteredLeads.filter((l) => l.status === "CONTACTED").length,
-    FOLLOW_UP: filteredLeads.filter((l) => l.status === "FOLLOW_UP").length,
+    // Changed: Use neutral outcomes as follow-up indicator since FOLLOW_UP status doesn't exist
+    FOLLOW_UP: filteredLeads.filter(
+      (l) => l.lastInteractionOutcome === "neutral"
+    ).length,
     WARM: filteredLeads.filter((l) => l.status === "WARM").length,
     APPLIED: filteredLeads.filter((l) => l.status === "APPLIED").length,
   };
@@ -835,6 +962,9 @@ const AssignedLeads = () => {
     // Only count real interactions, not fake data
     positiveOutcomes: filteredLeads.filter(
       (l) => l.lastInteractionOutcome === "positive"
+    ).length,
+    neutralOutcomes: filteredLeads.filter(
+      (l) => l.lastInteractionOutcome === "neutral"
     ).length,
     negativeOutcomes: filteredLeads.filter(
       (l) => l.lastInteractionOutcome === "negative"
@@ -897,6 +1027,17 @@ const AssignedLeads = () => {
         return entryDate && entryDate.toDateString() === todayDateString;
       });
     }).length,
+    // Count leads contacted today
+    contactedToday: assignedLeads.filter((lead) => {
+      if (!lead.lastContact) return false;
+      const daysSince = getDaysSinceLastContact(lead.lastContact);
+      return daysSince === 0;
+    }).length,
+    // Count leads needing urgent attention (no contact in 3+ days)
+    needsUrgentAttention: assignedLeads.filter((lead) => {
+      const daysSince = getDaysSinceLastContact(lead.lastContact);
+      return daysSince === null || daysSince >= 3;
+    }).length,
   };
 
   return (
@@ -910,6 +1051,171 @@ const AssignedLeads = () => {
           Manage and convert your assigned leads into applications
         </Typography>
       </Box>
+
+      {/* Personal Performance Widget */}
+      {!loading && !error && assignedLeads.length > 0 && (
+        <Card
+          sx={{
+            mb: 4,
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            color: "white",
+            position: "relative",
+            overflow: "hidden",
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              right: 0,
+              width: "200px",
+              height: "200px",
+              background: "rgba(255, 255, 255, 0.1)",
+              borderRadius: "50%",
+              transform: "translate(50%, -50%)",
+            },
+          }}
+        >
+          <CardContent sx={{ position: "relative", zIndex: 1 }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                mb: 3,
+              }}
+            >
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  🎯 Today's Performance
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  Keep up the great work!
+                </Typography>
+              </Box>
+              <Chip
+                icon={<TrendingUpIcon />}
+                label={`${analyticsData.dailyInteractions} interactions`}
+                sx={{
+                  bgcolor: "rgba(255, 255, 255, 0.2)",
+                  color: "white",
+                  fontWeight: 600,
+                  "& .MuiChip-icon": { color: "white" },
+                }}
+              />
+            </Box>
+
+            <Grid container spacing={3}>
+              {/* Leads Contacted Today */}
+              <Grid item xs={12} md={4}>
+                <Box>
+                  <Typography
+                    variant="body2"
+                    sx={{ mb: 1, opacity: 0.9, fontWeight: 500 }}
+                  >
+                    Leads Contacted Today
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "baseline", mb: 1 }}>
+                    <Typography variant="h3" sx={{ fontWeight: 700, mr: 1 }}>
+                      {analyticsData.contactedToday}
+                    </Typography>
+                    <Typography variant="h6" sx={{ opacity: 0.8 }}>
+                      / {assignedLeads.length}
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      position: "relative",
+                      height: 8,
+                      bgcolor: "rgba(255,255,255,0.3)",
+                      borderRadius: 4,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        left: 0,
+                        top: 0,
+                        height: "100%",
+                        width: `${Math.min(
+                          (analyticsData.contactedToday /
+                            assignedLeads.length) *
+                            100,
+                          100
+                        )}%`,
+                        bgcolor: "white",
+                        borderRadius: 4,
+                        transition: "width 0.5s ease",
+                      }}
+                    />
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{ mt: 0.5, opacity: 0.8, display: "block" }}
+                  >
+                    {Math.round(
+                      (analyticsData.contactedToday / assignedLeads.length) *
+                        100
+                    )}
+                    % completion rate
+                  </Typography>
+                </Box>
+              </Grid>
+
+              {/* Interactions Made Today */}
+              <Grid item xs={12} md={4}>
+                <Box>
+                  <Typography
+                    variant="body2"
+                    sx={{ mb: 1, opacity: 0.9, fontWeight: 500 }}
+                  >
+                    Total Interactions Made
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "baseline", mb: 1 }}>
+                    <Typography variant="h3" sx={{ fontWeight: 700, mr: 1 }}>
+                      {analyticsData.dailyInteractions}
+                    </Typography>
+                    <Typography variant="h6" sx={{ opacity: 0.8 }}>
+                      today
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <CheckCircleIcon sx={{ fontSize: 16, opacity: 0.9 }} />
+                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                      {analyticsData.positiveOutcomes} positive outcomes
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+
+              {/* Urgent Attention Needed */}
+              <Grid item xs={12} md={4}>
+                <Box>
+                  <Typography
+                    variant="body2"
+                    sx={{ mb: 1, opacity: 0.9, fontWeight: 500 }}
+                  >
+                    Needs Urgent Attention
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "baseline", mb: 1 }}>
+                    <Typography variant="h3" sx={{ fontWeight: 700, mr: 1 }}>
+                      {analyticsData.needsUrgentAttention}
+                    </Typography>
+                    <Typography variant="h6" sx={{ opacity: 0.8 }}>
+                      leads
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <ScheduleIcon sx={{ fontSize: 16, opacity: 0.9 }} />
+                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                      Not contacted in 3+ days
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -952,76 +1258,91 @@ const AssignedLeads = () => {
           </Card>
         </Grid>
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              bgcolor: "success.main",
-              color: "white",
-              height: 140,
-              display: "flex",
-              alignItems: "center",
-            }}
+          <Tooltip
+            title="Shows leads with 'APPLIED' status. The smaller number shows leads who have application-related interactions (started, submitted, or assisted with application)."
+            arrow
+            placement="top"
           >
-            <CardContent
+            <Card
               sx={{
-                textAlign: "center",
-                width: "100%",
-                py: 2,
-                "&:last-child": { pb: 2 },
+                bgcolor: "success.main",
+                color: "white",
+                height: 140,
+                display: "flex",
+                alignItems: "center",
+                cursor: "help",
               }}
             >
-              <Typography variant="h3" sx={{ fontWeight: 600, mb: 1 }}>
-                {loading ? (
-                  <CircularProgress size={30} color="inherit" />
-                ) : (
-                  statusCounts.APPLIED || 0
-                )}
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 0.5 }}>
-                Applied
-              </Typography>
-              {analyticsData.applicationStarted > 0 && (
-                <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                  {analyticsData.applicationStarted} with applications
+              <CardContent
+                sx={{
+                  textAlign: "center",
+                  width: "100%",
+                  py: 2,
+                  "&:last-child": { pb: 2 },
+                }}
+              >
+                <Typography variant="h3" sx={{ fontWeight: 600, mb: 1 }}>
+                  {loading ? (
+                    <CircularProgress size={30} color="inherit" />
+                  ) : (
+                    statusCounts.APPLIED || 0
+                  )}
                 </Typography>
-              )}
-            </CardContent>
-          </Card>
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  Applied
+                </Typography>
+                {analyticsData.applicationStarted > 0 && (
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    {analyticsData.applicationStarted} started application
+                    process
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Tooltip>
         </Grid>
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              bgcolor: "warning.main",
-              color: "white",
-              height: 140,
-              display: "flex",
-              alignItems: "center",
-            }}
+          <Tooltip
+            title="Shows leads with neutral interaction outcomes - these are inconclusive conversations that need follow-up to move forward."
+            arrow
+            placement="top"
           >
-            <CardContent
+            <Card
               sx={{
-                textAlign: "center",
-                width: "100%",
-                py: 2,
-                "&:last-child": { pb: 2 },
+                bgcolor: "warning.main",
+                color: "white",
+                height: 140,
+                display: "flex",
+                alignItems: "center",
+                cursor: "help",
               }}
             >
-              <Typography variant="h3" sx={{ fontWeight: 600, mb: 1 }}>
-                {loading ? (
-                  <CircularProgress size={30} color="inherit" />
-                ) : (
-                  statusCounts.FOLLOW_UP || 0
-                )}
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 0.5 }}>
-                Need Follow-up
-              </Typography>
-              {analyticsData.highPriority > 0 && (
-                <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                  {analyticsData.highPriority} high priority
+              <CardContent
+                sx={{
+                  textAlign: "center",
+                  width: "100%",
+                  py: 2,
+                  "&:last-child": { pb: 2 },
+                }}
+              >
+                <Typography variant="h3" sx={{ fontWeight: 600, mb: 1 }}>
+                  {loading ? (
+                    <CircularProgress size={30} color="inherit" />
+                  ) : (
+                    statusCounts.FOLLOW_UP || 0
+                  )}
                 </Typography>
-              )}
-            </CardContent>
-          </Card>
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  Need Follow-up
+                </Typography>
+                {analyticsData.highPriority > 0 && (
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    {analyticsData.highPriority} high priority
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Tooltip>
         </Grid>
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
@@ -1254,20 +1575,6 @@ const AssignedLeads = () => {
         </MenuItem>
         <MenuItem
           onClick={() => {
-            setSelectedStatus("FOLLOW_UP");
-            handleFilterClose();
-          }}
-          selected={selectedStatus === "FOLLOW_UP"}
-        >
-          <Chip
-            label={`Follow-up (${statusCounts.FOLLOW_UP})`}
-            color="warning"
-            size="small"
-            sx={{ mr: 1 }}
-          />
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
             setSelectedStatus("WARM");
             handleFilterClose();
           }}
@@ -1338,6 +1645,56 @@ const AssignedLeads = () => {
             Worked on Today ({analyticsData.dailyInteractions})
           </Box>
         </MenuItem>
+        <Divider />
+        <ListSubheader>⏰ Contact Urgency</ListSubheader>
+        <MenuItem
+          onClick={() => {
+            setSearchTerm("");
+            setSelectedStatus("all");
+            // Use the urgency filter to show leads needing attention (3+ days or never contacted)
+            handleFilterChange("urgency", "urgent"); // This will match never contacted OR 3+ days
+            handleFilterClose();
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <ScheduleIcon sx={{ color: "#f57c00" }} fontSize="small" />
+            Need Contact Today ({analyticsData.needsUrgentAttention})
+          </Box>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setSearchTerm("");
+            setSelectedStatus("all");
+            // Filter to show only leads never contacted
+            handleFilterChange("urgency", "never");
+            handleFilterClose();
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <CancelIcon sx={{ color: "#d32f2f" }} fontSize="small" />
+            Never Contacted (
+            {
+              assignedLeads.filter(
+                (l) => getDaysSinceLastContact(l.lastContact) === null
+              ).length
+            }
+            )
+          </Box>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setSearchTerm("");
+            setSelectedStatus("all");
+            // Filter to show only leads contacted today
+            handleFilterChange("urgency", "today");
+            handleFilterClose();
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <CheckCircleIcon sx={{ color: "#2e7d32" }} fontSize="small" />
+            Contacted Today ({analyticsData.contactedToday})
+          </Box>
+        </MenuItem>
       </Menu>
 
       {/* Leads List */}
@@ -1363,12 +1720,183 @@ const AssignedLeads = () => {
 
       {/* Loading State */}
       {loading && (
-        <Box sx={{ textAlign: "center", py: 8 }}>
-          <CircularProgress />
-          <Typography variant="h6" color="text.secondary" sx={{ mt: 2 }}>
-            Loading your assigned leads...
-          </Typography>
-        </Box>
+        <Fade in={loading}>
+          <Box>
+            {/* Stats Cards Skeleton */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              {[1, 2, 3, 4, 5].map((item) => (
+                <Grid item xs={12} sm={6} md={2.4} key={item}>
+                  <Card
+                    sx={{ height: 140, display: "flex", alignItems: "center" }}
+                  >
+                    <CardContent
+                      sx={{
+                        textAlign: "center",
+                        width: "100%",
+                        py: 2,
+                        "&:last-child": { pb: 2 },
+                      }}
+                    >
+                      <Skeleton
+                        variant="text"
+                        width={80}
+                        height={60}
+                        sx={{ mx: "auto", mb: 1 }}
+                      />
+                      <Skeleton
+                        variant="text"
+                        width={120}
+                        height={20}
+                        sx={{ mx: "auto", mb: 0.5 }}
+                      />
+                      <Skeleton
+                        variant="text"
+                        width={100}
+                        height={16}
+                        sx={{ mx: "auto" }}
+                      />
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+
+            {/* Search and Filter Skeleton */}
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                <Skeleton variant="rounded" height={56} sx={{ flexGrow: 1 }} />
+                <Skeleton variant="rounded" width={150} height={56} />
+                <Skeleton variant="rounded" width={180} height={56} />
+              </Box>
+            </Box>
+
+            {/* Lead Cards Skeleton */}
+            <Grid container spacing={3}>
+              {[1, 2, 3, 4].map((item) => (
+                <Grid item xs={12} key={item}>
+                  <Card>
+                    <CardContent>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 2,
+                        }}
+                      >
+                        {/* Avatar Skeleton */}
+                        <Skeleton variant="circular" width={56} height={56} />
+
+                        {/* Content Skeleton */}
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              mb: 2,
+                            }}
+                          >
+                            <Box sx={{ width: "70%" }}>
+                              <Skeleton
+                                variant="text"
+                                width="60%"
+                                height={32}
+                                sx={{ mb: 1 }}
+                              />
+                              <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
+                                <Skeleton
+                                  variant="rounded"
+                                  width={100}
+                                  height={24}
+                                />
+                                <Skeleton
+                                  variant="rounded"
+                                  width={120}
+                                  height={24}
+                                />
+                              </Box>
+                            </Box>
+                            <Skeleton
+                              variant="rounded"
+                              width={150}
+                              height={24}
+                            />
+                          </Box>
+
+                          <Grid container spacing={2} sx={{ mb: 2 }}>
+                            <Grid item xs={12} md={6}>
+                              <Skeleton
+                                variant="text"
+                                width="80%"
+                                height={20}
+                                sx={{ mb: 1 }}
+                              />
+                              <Skeleton
+                                variant="text"
+                                width="75%"
+                                height={20}
+                                sx={{ mb: 1 }}
+                              />
+                              <Skeleton
+                                variant="text"
+                                width="70%"
+                                height={20}
+                              />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                              <Skeleton
+                                variant="text"
+                                width="85%"
+                                height={20}
+                                sx={{ mb: 1 }}
+                              />
+                              <Skeleton
+                                variant="text"
+                                width="80%"
+                                height={20}
+                                sx={{ mb: 1 }}
+                              />
+                              <Skeleton
+                                variant="text"
+                                width="75%"
+                                height={20}
+                                sx={{ mb: 1 }}
+                              />
+                              <Skeleton
+                                variant="text"
+                                width="70%"
+                                height={20}
+                              />
+                            </Grid>
+                          </Grid>
+
+                          <Skeleton
+                            variant="rounded"
+                            width="100%"
+                            height={48}
+                            sx={{ mb: 2 }}
+                          />
+
+                          <Box sx={{ display: "flex", gap: 1 }}>
+                            <Skeleton
+                              variant="rounded"
+                              width={120}
+                              height={36}
+                            />
+                            <Skeleton
+                              variant="rounded"
+                              width={140}
+                              height={36}
+                            />
+                          </Box>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        </Fade>
       )}
 
       {/* Error State */}
@@ -1388,348 +1916,503 @@ const AssignedLeads = () => {
       )}
 
       {!loading && !error && (
-        <Grid container spacing={3}>
-          {filteredLeads.map((lead) => (
-            <Grid item xs={12} key={lead.id}>
-              <Card sx={{ "&:hover": { boxShadow: 3 } }}>
-                <CardContent>
-                  <Box
-                    sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}
-                  >
-                    {/* Avatar */}
-                    <Avatar
-                      sx={{
-                        bgcolor: getPriorityColor(lead.priority) + ".main",
-                        width: 56,
-                        height: 56,
-                        fontSize: "1.2rem",
-                        fontWeight: 600,
-                      }}
+        <Fade in={!loading} timeout={800}>
+          <Grid container spacing={3}>
+            {filteredLeads.map((lead) => (
+              <Grid item xs={12} key={lead.id}>
+                <Card sx={{ "&:hover": { boxShadow: 3 } }}>
+                  <CardContent>
+                    <Box
+                      sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}
                     >
-                      {lead.avatar}
-                    </Avatar>
-
-                    {/* Lead Info */}
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Box
+                      {/* Avatar */}
+                      <Avatar
                         sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          mb: 1,
+                          bgcolor: getPriorityColor(lead.priority) + ".main",
+                          width: 56,
+                          height: 56,
+                          fontSize: "1.2rem",
+                          fontWeight: 600,
                         }}
                       >
-                        <Box>
-                          <Typography
-                            variant="h6"
-                            sx={{ fontWeight: 600, mb: 0.5 }}
-                          >
-                            {lead.name}
-                          </Typography>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              mb: 1,
-                            }}
-                          >
-                            <Chip
-                              label={lead.status?.replace("_", " ") || "NEW"}
-                              color={getStatusColor(lead.status)}
-                              size="small"
-                            />
-                            <Chip
-                              label={`${lead.priority} priority`}
-                              color={getPriorityColor(lead.priority)}
-                              size="small"
-                              variant="outlined"
-                            />
-                          </Box>
-                        </Box>
+                        {lead.avatar}
+                      </Avatar>
+
+                      {/* Lead Info */}
+                      <Box sx={{ flexGrow: 1 }}>
                         <Box
-                          sx={{ display: "flex", gap: 1, alignItems: "center" }}
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                            mb: 1,
+                          }}
                         >
-                          {/* Display Last Interaction Tag */}
-                          {lead.interactionTags &&
-                          lead.interactionTags.length > 0 ? (
-                            <Chip
-                              label={`Last: ${
-                                lead.interactionTags[
-                                  lead.interactionTags.length - 1
-                                ]
-                              }`}
-                              color={
-                                // Color based on tag priority
-                                lead.interactionTags[
-                                  lead.interactionTags.length - 1
-                                ].includes("Application") ||
-                                lead.interactionTags[
-                                  lead.interactionTags.length - 1
-                                ].includes("Will Visit") ||
-                                lead.interactionTags[
-                                  lead.interactionTags.length - 1
-                                ].includes("Parent")
-                                  ? "success"
-                                  : lead.interactionTags[
-                                      lead.interactionTags.length - 1
-                                    ].includes("Scholarship") ||
-                                    lead.interactionTags[
-                                      lead.interactionTags.length - 1
-                                    ].includes("Financial") ||
-                                    lead.interactionTags[
-                                      lead.interactionTags.length - 1
-                                    ].includes("Payment")
-                                  ? "error"
-                                  : "primary"
-                              }
-                              size="small"
-                              variant="filled"
-                              sx={{
-                                fontWeight: "bold",
-                                "& .MuiChip-label": {
-                                  color: "white",
-                                },
-                              }}
-                            />
-                          ) : (
-                            <Chip
-                              label="No Interactions"
-                              color="default"
-                              size="small"
-                              variant="outlined"
-                            />
-                          )}
-                        </Box>
-                      </Box>
-
-                      <Grid container spacing={2} sx={{ mb: 2 }}>
-                        <Grid item xs={12} md={6}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              mb: 1,
-                            }}
-                          >
-                            <EmailIcon color="action" fontSize="small" />
-                            <Typography variant="body2" color="text.secondary">
-                              {lead.email}
-                            </Typography>
-                          </Box>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              mb: 1,
-                            }}
-                          >
-                            <PhoneIcon color="action" fontSize="small" />
-                            <Typography variant="body2" color="text.secondary">
-                              {lead.phone}
-                            </Typography>
-                          </Box>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <SchoolIcon color="action" fontSize="small" />
-                            <Typography variant="body2" color="text.secondary">
-                              {lead.course}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              mb: 1,
-                            }}
-                          >
-                            <CalendarIcon color="action" fontSize="small" />
-                            <Typography variant="body2" color="text.secondary">
-                              Created: {formatDate(lead.createdDate)}
-                            </Typography>
-                          </Box>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              mb: 1,
-                            }}
-                          >
-                            <ScheduleIcon color="action" fontSize="small" />
-                            <Typography variant="body2" color="text.secondary">
-                              Assigned: {formatDate(lead.assignedDate)}
-                            </Typography>
-                          </Box>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              mb: 1,
-                            }}
-                          >
-                            <TrendingUpIcon color="action" fontSize="small" />
-                            <Typography variant="body2" color="text.secondary">
-                              Source: {lead.source || "Unknown"}
-                            </Typography>
-                          </Box>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <PersonIcon color="action" fontSize="small" />
-                            <Typography variant="body2" color="text.secondary">
-                              Last interacted: {formatDate(lead.lastContact)}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      </Grid>
-
-                      {/* Notes */}
-                      {lead.notes && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="body2" color="text.secondary">
-                            <strong>Notes:</strong> {lead.notes}
-                          </Typography>
-                        </Box>
-                      )}
-
-                      {/* Last Interaction Status */}
-                      {lead.lastInteractionOutcome ? (
-                        <Box sx={{ mb: 2 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              p: 1.5,
-                              backgroundColor: `${getOutcomeColor(
-                                lead.lastInteractionOutcome
-                              )}.50`,
-                              borderRadius: 1,
-                              border: `1px solid`,
-                              borderColor: `${getOutcomeColor(
-                                lead.lastInteractionOutcome
-                              )}.main`,
-                            }}
-                          >
+                          <Box>
                             <Box
                               sx={{
                                 display: "flex",
                                 alignItems: "center",
-                                justifyContent: "center",
-                                width: 24,
-                                height: 24,
-                                borderRadius: "50%",
-                                backgroundColor: `${getOutcomeColor(
-                                  lead.lastInteractionOutcome
-                                )}.main`,
-                                color: "white",
-                                fontSize: "12px",
-                                fontWeight: "bold",
+                                gap: 1,
+                                mb: 0.5,
                               }}
                             >
-                              {getOutcomeIcon(lead.lastInteractionOutcome)}
+                              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                {lead.name}
+                              </Typography>
+                              {/* Days Since Last Contact Badge */}
+                              {(() => {
+                                const daysSince = getDaysSinceLastContact(
+                                  lead.lastContact
+                                );
+                                if (daysSince === null) {
+                                  return (
+                                    <Tooltip title="No contact recorded yet - High priority!">
+                                      <Chip
+                                        icon={<ScheduleIcon />}
+                                        label="Never contacted"
+                                        size="small"
+                                        sx={{
+                                          bgcolor: "#d32f2f",
+                                          color: "white",
+                                          fontWeight: 700,
+                                          animation: "pulse 2s infinite",
+                                          "@keyframes pulse": {
+                                            "0%, 100%": { opacity: 1 },
+                                            "50%": { opacity: 0.7 },
+                                          },
+                                          "& .MuiChip-icon": { color: "white" },
+                                        }}
+                                      />
+                                    </Tooltip>
+                                  );
+                                } else if (daysSince === 0) {
+                                  return (
+                                    <Tooltip title="Contacted today - Great job!">
+                                      <Chip
+                                        icon={<CheckCircleIcon />}
+                                        label="Today"
+                                        size="small"
+                                        sx={{
+                                          bgcolor: "#2e7d32",
+                                          color: "white",
+                                          fontWeight: 600,
+                                          "& .MuiChip-icon": { color: "white" },
+                                        }}
+                                      />
+                                    </Tooltip>
+                                  );
+                                } else if (daysSince === 1) {
+                                  return (
+                                    <Tooltip title="Last contacted yesterday">
+                                      <Chip
+                                        icon={<ScheduleIcon />}
+                                        label="1 day ago"
+                                        size="small"
+                                        sx={{
+                                          bgcolor: "#388e3c",
+                                          color: "white",
+                                          fontWeight: 600,
+                                          "& .MuiChip-icon": { color: "white" },
+                                        }}
+                                      />
+                                    </Tooltip>
+                                  );
+                                } else if (daysSince === 2) {
+                                  return (
+                                    <Tooltip title="Last contacted 2 days ago - Follow up soon">
+                                      <Chip
+                                        icon={<ScheduleIcon />}
+                                        label="2 days ago"
+                                        size="small"
+                                        sx={{
+                                          bgcolor: "#f57c00",
+                                          color: "white",
+                                          fontWeight: 600,
+                                          "& .MuiChip-icon": { color: "white" },
+                                        }}
+                                      />
+                                    </Tooltip>
+                                  );
+                                } else if (daysSince >= 3 && daysSince <= 7) {
+                                  return (
+                                    <Tooltip
+                                      title={`Last contacted ${daysSince} days ago - Urgent follow up needed!`}
+                                    >
+                                      <Chip
+                                        icon={<ScheduleIcon />}
+                                        label={`${daysSince} days ago`}
+                                        size="small"
+                                        sx={{
+                                          bgcolor: "#e64a19",
+                                          color: "white",
+                                          fontWeight: 700,
+                                          animation: "pulse 2s infinite",
+                                          "@keyframes pulse": {
+                                            "0%, 100%": { opacity: 1 },
+                                            "50%": { opacity: 0.7 },
+                                          },
+                                          "& .MuiChip-icon": { color: "white" },
+                                        }}
+                                      />
+                                    </Tooltip>
+                                  );
+                                } else {
+                                  return (
+                                    <Tooltip
+                                      title={`Last contacted ${daysSince} days ago - VERY URGENT!`}
+                                    >
+                                      <Chip
+                                        icon={<CancelIcon />}
+                                        label={`${daysSince}+ days`}
+                                        size="small"
+                                        sx={{
+                                          bgcolor: "#b71c1c",
+                                          color: "white",
+                                          fontWeight: 700,
+                                          animation: "pulse 1.5s infinite",
+                                          "@keyframes pulse": {
+                                            "0%, 100%": { opacity: 1 },
+                                            "50%": { opacity: 0.6 },
+                                          },
+                                          "& .MuiChip-icon": { color: "white" },
+                                        }}
+                                      />
+                                    </Tooltip>
+                                  );
+                                }
+                              })()}
                             </Box>
-                            <Typography
-                              variant="body2"
+                            <Box
                               sx={{
-                                fontWeight: 600,
-                                color: `${getOutcomeColor(
-                                  lead.lastInteractionOutcome
-                                )}.dark`,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mb: 1,
                               }}
                             >
-                              Last interaction: {lead.lastInteractionOutcome}
-                            </Typography>
-                            {lead.lastInteractionType && (
-                              <>
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                  sx={{ mx: 1 }}
-                                >
-                                  •
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                >
-                                  {lead.lastInteractionType}
-                                </Typography>
-                              </>
-                            )}
+                              <Chip
+                                label={lead.status?.replace("_", " ") || "NEW"}
+                                color={getStatusColor(lead.status)}
+                                size="small"
+                              />
+                              <Chip
+                                label={`${lead.priority} priority`}
+                                color={getPriorityColor(lead.priority)}
+                                size="small"
+                                variant="outlined"
+                              />
+                            </Box>
                           </Box>
-                        </Box>
-                      ) : (
-                        <Box sx={{ mb: 2 }}>
                           <Box
                             sx={{
                               display: "flex",
-                              alignItems: "center",
                               gap: 1,
-                              p: 1.5,
-                              backgroundColor: `grey.100`,
-                              borderRadius: 1,
-                              border: `1px solid`,
-                              borderColor: `grey.300`,
+                              alignItems: "center",
                             }}
                           >
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontWeight: 600,
-                                color: `grey.600`,
-                              }}
-                            >
-                              No interaction logs available
-                            </Typography>
+                            {/* Display Last Interaction Tag */}
+                            {lead.interactionTags &&
+                            lead.interactionTags.length > 0 ? (
+                              <Chip
+                                label={`Last: ${
+                                  lead.interactionTags[
+                                    lead.interactionTags.length - 1
+                                  ]
+                                }`}
+                                color={
+                                  // Color based on tag priority
+                                  lead.interactionTags[
+                                    lead.interactionTags.length - 1
+                                  ].includes("Application") ||
+                                  lead.interactionTags[
+                                    lead.interactionTags.length - 1
+                                  ].includes("Will Visit") ||
+                                  lead.interactionTags[
+                                    lead.interactionTags.length - 1
+                                  ].includes("Parent")
+                                    ? "success"
+                                    : lead.interactionTags[
+                                        lead.interactionTags.length - 1
+                                      ].includes("Scholarship") ||
+                                      lead.interactionTags[
+                                        lead.interactionTags.length - 1
+                                      ].includes("Financial") ||
+                                      lead.interactionTags[
+                                        lead.interactionTags.length - 1
+                                      ].includes("Payment")
+                                    ? "error"
+                                    : "primary"
+                                }
+                                size="small"
+                                variant="filled"
+                                sx={{
+                                  fontWeight: "bold",
+                                  "& .MuiChip-label": {
+                                    color: "white",
+                                  },
+                                }}
+                              />
+                            ) : (
+                              <Chip
+                                label="No Interactions"
+                                color="default"
+                                size="small"
+                                variant="outlined"
+                              />
+                            )}
                           </Box>
                         </Box>
-                      )}
 
-                      {/* Action Buttons */}
-                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                        <Tooltip title="View Timeline">
+                        <Grid container spacing={2} sx={{ mb: 2 }}>
+                          <Grid item xs={12} md={6}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mb: 1,
+                              }}
+                            >
+                              <EmailIcon color="action" fontSize="small" />
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                {lead.email}
+                              </Typography>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mb: 1,
+                              }}
+                            >
+                              <PhoneIcon color="action" fontSize="small" />
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                {lead.phone}
+                              </Typography>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <SchoolIcon color="action" fontSize="small" />
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                {lead.course}
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={12} md={6}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mb: 1,
+                              }}
+                            >
+                              <CalendarIcon color="action" fontSize="small" />
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                Created: {formatDate(lead.createdDate)}
+                              </Typography>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mb: 1,
+                              }}
+                            >
+                              <ScheduleIcon color="action" fontSize="small" />
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                Assigned: {formatDate(lead.assignedDate)}
+                              </Typography>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mb: 1,
+                              }}
+                            >
+                              <TrendingUpIcon color="action" fontSize="small" />
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                Source: {lead.source || "Unknown"}
+                              </Typography>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <PersonIcon color="action" fontSize="small" />
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                Last interacted: {formatDate(lead.lastContact)}
+                              </Typography>
+                            </Box>
+                          </Grid>
+                        </Grid>
+
+                        {/* Notes */}
+                        {lead.notes && (
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              <strong>Notes:</strong> {lead.notes}
+                            </Typography>
+                          </Box>
+                        )}
+
+                        {/* Last Interaction Status */}
+                        {lead.lastInteractionOutcome ? (
+                          <Box sx={{ mb: 2 }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                p: 1.5,
+                                backgroundColor: `${getOutcomeColor(
+                                  lead.lastInteractionOutcome
+                                )}.50`,
+                                borderRadius: 1,
+                                border: `1px solid`,
+                                borderColor: `${getOutcomeColor(
+                                  lead.lastInteractionOutcome
+                                )}.main`,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: "50%",
+                                  backgroundColor: `${getOutcomeColor(
+                                    lead.lastInteractionOutcome
+                                  )}.main`,
+                                  color: "white",
+                                  fontSize: "12px",
+                                  fontWeight: "bold",
+                                }}
+                              >
+                                {getOutcomeIcon(lead.lastInteractionOutcome)}
+                              </Box>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 600,
+                                  color: `${getOutcomeColor(
+                                    lead.lastInteractionOutcome
+                                  )}.dark`,
+                                }}
+                              >
+                                Last interaction: {lead.lastInteractionOutcome}
+                              </Typography>
+                              {lead.lastInteractionType && (
+                                <>
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{ mx: 1 }}
+                                  >
+                                    •
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    {lead.lastInteractionType}
+                                  </Typography>
+                                </>
+                              )}
+                            </Box>
+                          </Box>
+                        ) : (
+                          <Box sx={{ mb: 2 }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                p: 1.5,
+                                backgroundColor: `grey.100`,
+                                borderRadius: 1,
+                                border: `1px solid`,
+                                borderColor: `grey.300`,
+                              }}
+                            >
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 600,
+                                  color: `grey.600`,
+                                }}
+                              >
+                                No interaction logs available
+                              </Typography>
+                            </Box>
+                          </Box>
+                        )}
+
+                        {/* Action Buttons */}
+                        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                          <Tooltip title="View Timeline">
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<TimelineIcon />}
+                              onClick={() => handleTimelineOpen(lead.id)}
+                            >
+                              Timeline
+                            </Button>
+                          </Tooltip>
                           <Button
                             variant="outlined"
                             size="small"
-                            startIcon={<TimelineIcon />}
-                            onClick={() => handleTimelineOpen(lead.id)}
+                            startIcon={<UpdateIcon />}
+                            onClick={() => handleStatusUpdateOpen(lead)}
                           >
-                            Timeline
+                            Update Status
                           </Button>
-                        </Tooltip>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<UpdateIcon />}
-                          onClick={() => handleStatusUpdateOpen(lead)}
-                        >
-                          Update Status
-                        </Button>
+                        </Box>
                       </Box>
                     </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Fade>
       )}
 
       {/* Action Menu */}
@@ -1925,7 +2608,6 @@ const AssignedLeads = () => {
               <MenuItem value="all">All Statuses</MenuItem>
               <MenuItem value="INTERESTED">Interested</MenuItem>
               <MenuItem value="CONTACTED">Contacted</MenuItem>
-              <MenuItem value="FOLLOW_UP">Follow-up Required</MenuItem>
               <MenuItem value="WARM">Warm</MenuItem>
               <MenuItem value="APPLIED">Applied</MenuItem>
             </Select>
@@ -2082,6 +2764,73 @@ const AssignedLeads = () => {
 
           <Divider sx={{ borderColor: "#d0d0d0" }} />
 
+          {/* Urgency Filter - NEW */}
+          <FormControl fullWidth>
+            <InputLabel
+              sx={{ color: "#666666", "&.Mui-focused": { color: "#1976d2" } }}
+            >
+              Contact Urgency
+            </InputLabel>
+            <Select
+              value={filters.urgency}
+              label="Contact Urgency"
+              onChange={(e) => handleFilterChange("urgency", e.target.value)}
+              sx={{
+                backgroundColor: "#ffffff",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#d0d0d0",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#1976d2",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#1976d2",
+                },
+              }}
+            >
+              <MenuItem value="all">All Urgency Levels</MenuItem>
+              <MenuItem value="urgent">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <ScheduleIcon sx={{ color: "#f57c00" }} fontSize="small" />
+                  🔥 Needs Urgent Attention (Never or 3+ Days)
+                </Box>
+              </MenuItem>
+              <Divider />
+              <MenuItem value="never">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <CancelIcon sx={{ color: "#d32f2f" }} fontSize="small" />
+                  Never Contacted (Most Urgent)
+                </Box>
+              </MenuItem>
+              <MenuItem value="7plus">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <CancelIcon sx={{ color: "#b71c1c" }} fontSize="small" />
+                  7+ Days (Very Urgent)
+                </Box>
+              </MenuItem>
+              <MenuItem value="3-7days">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <ScheduleIcon sx={{ color: "#e64a19" }} fontSize="small" />
+                  3-7 Days (Urgent)
+                </Box>
+              </MenuItem>
+              <MenuItem value="1-2days">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <ScheduleIcon sx={{ color: "#f57c00" }} fontSize="small" />
+                  1-2 Days (Follow Up Soon)
+                </Box>
+              </MenuItem>
+              <MenuItem value="today">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <CheckCircleIcon sx={{ color: "#2e7d32" }} fontSize="small" />
+                  Contacted Today
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
+
+          <Divider sx={{ borderColor: "#d0d0d0" }} />
+
           {/* Assign Date Range Filter */}
           <FormControl fullWidth>
             <InputLabel
@@ -2109,11 +2858,17 @@ const AssignedLeads = () => {
               }}
             >
               <MenuItem value="all">All Time</MenuItem>
+              <Divider />
+              <ListSubheader>📅 Quick Filters</ListSubheader>
               <MenuItem value="today">Today</MenuItem>
               <MenuItem value="yesterday">Yesterday</MenuItem>
-              <MenuItem value="thisWeek">This Week</MenuItem>
+              <MenuItem value="thisWeek">📊 This Week (Weekly View)</MenuItem>
+              <MenuItem value="thisMonth">
+                📊 This Month (Monthly View)
+              </MenuItem>
+              <Divider />
+              <ListSubheader>📆 Rolling Periods</ListSubheader>
               <MenuItem value="last7days">Last 7 Days</MenuItem>
-              <MenuItem value="thisMonth">This Month</MenuItem>
               <MenuItem value="last30days">Last 30 Days</MenuItem>
             </Select>
           </FormControl>
@@ -2145,9 +2900,16 @@ const AssignedLeads = () => {
               }}
             >
               <MenuItem value="all">Any Time</MenuItem>
+              <Divider />
+              <ListSubheader>📅 Quick Filters</ListSubheader>
               <MenuItem value="today">Today</MenuItem>
               <MenuItem value="yesterday">Yesterday</MenuItem>
-              <MenuItem value="thisWeek">This Week</MenuItem>
+              <MenuItem value="thisWeek">📊 This Week (Weekly View)</MenuItem>
+              <MenuItem value="thisMonth">
+                📊 This Month (Monthly View)
+              </MenuItem>
+              <Divider />
+              <ListSubheader>📆 Rolling Periods</ListSubheader>
               <MenuItem value="last7days">Last 7 Days</MenuItem>
               <MenuItem value="last30days">Last 30 Days</MenuItem>
             </Select>
@@ -2180,9 +2942,16 @@ const AssignedLeads = () => {
               }}
             >
               <MenuItem value="all">Any Time</MenuItem>
+              <Divider />
+              <ListSubheader>📅 Quick Filters</ListSubheader>
               <MenuItem value="today">Today</MenuItem>
               <MenuItem value="yesterday">Yesterday</MenuItem>
-              <MenuItem value="thisWeek">This Week</MenuItem>
+              <MenuItem value="thisWeek">📊 This Week (Weekly View)</MenuItem>
+              <MenuItem value="thisMonth">
+                📊 This Month (Monthly View)
+              </MenuItem>
+              <Divider />
+              <ListSubheader>📆 Rolling Periods</ListSubheader>
               <MenuItem value="last7days">Last 7 Days</MenuItem>
               <MenuItem value="last30days">Last 30 Days</MenuItem>
             </Select>
