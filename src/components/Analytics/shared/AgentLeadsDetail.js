@@ -324,7 +324,8 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
       } else if (activityFilter === "needsFollowup") {
         matchesActivity =
           lead.daysSinceLastInteraction > 3 ||
-          lead.daysSinceLastInteraction === null;
+          lead.daysSinceLastInteraction === null ||
+          lead.latestInteraction?.outcome?.toLowerCase() === "neutral";
       }
 
       return (
@@ -344,21 +345,46 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
         .length,
       needsFollowup: processedLeads.filter(
         (l) =>
-          l.daysSinceLastInteraction > 3 || l.daysSinceLastInteraction === null
+          l.daysSinceLastInteraction > 3 ||
+          l.daysSinceLastInteraction === null ||
+          l.latestInteraction?.outcome?.toLowerCase() === "neutral"
       ).length,
       hasApplication: processedLeads.filter((l) => l.hasApplication === true)
         .length,
-      // Outcome statistics
-      positiveOutcome: processedLeads.filter(
-        (l) => l.latestInteraction?.outcome?.toLowerCase() === "positive"
-      ).length,
-      neutralOutcome: processedLeads.filter(
-        (l) => l.latestInteraction?.outcome?.toLowerCase() === "neutral"
-      ).length,
-      negativeOutcome: processedLeads.filter(
-        (l) => l.latestInteraction?.outcome?.toLowerCase() === "negative"
-      ).length,
-      noInteractions: processedLeads.filter((l) => !l.latestInteraction).length,
+      // Outcome statistics - count ALL interactions with outcomes across all leads
+      positiveOutcome: processedLeads.reduce((count, lead) => {
+        const agentInteractions = getAgentInteractions(lead);
+        return (
+          count +
+          agentInteractions.filter(
+            (int) => int.outcome?.toLowerCase() === "positive"
+          ).length
+        );
+      }, 0),
+      neutralOutcome: processedLeads.reduce((count, lead) => {
+        const agentInteractions = getAgentInteractions(lead);
+        return (
+          count +
+          agentInteractions.filter(
+            (int) => int.outcome?.toLowerCase() === "neutral"
+          ).length
+        );
+      }, 0),
+      negativeOutcome: processedLeads.reduce((count, lead) => {
+        const agentInteractions = getAgentInteractions(lead);
+        return (
+          count +
+          agentInteractions.filter(
+            (int) => int.outcome?.toLowerCase() === "negative"
+          ).length
+        );
+      }, 0),
+      noInteractions: processedLeads.filter((l) => l.agentInteractions === 0)
+        .length,
+      // Total interactions count for verification
+      totalInteractions: processedLeads.reduce((count, lead) => {
+        return count + lead.agentInteractions;
+      }, 0),
     };
   }, [processedLeads]);
 
@@ -368,20 +394,69 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
         <CardContent>
           {/* Header */}
           <Box sx={{ mb: 3 }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-              Leads Assigned to {agent.name || agent.email}
-            </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 2,
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                Leads Assigned to {agent.name || agent.email}
+              </Typography>
+              {/* Quick Performance Metrics */}
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <Tooltip title="Average interactions per lead">
+                  <Chip
+                    icon={<TrendingUp />}
+                    label={`${(
+                      stats.totalInteractions / (stats.total || 1)
+                    ).toFixed(1)} avg/lead`}
+                    size="small"
+                    color="info"
+                    variant="outlined"
+                  />
+                </Tooltip>
+                <Tooltip title="Positive outcome rate">
+                  <Chip
+                    label={`${(
+                      (stats.positiveOutcome / (stats.totalInteractions || 1)) *
+                      100
+                    ).toFixed(0)}% positive`}
+                    size="small"
+                    color="success"
+                    variant="outlined"
+                  />
+                </Tooltip>
+              </Box>
+            </Box>
 
-            {/* Quick Stats */}
+            {/* Context Alert - More concise */}
+            <Alert severity="info" icon={false} sx={{ mb: 2, py: 1 }}>
+              <Typography variant="caption">
+                📊 <strong>All-time data</strong> • Use filters below to focus
+                on recent activity or specific outcomes
+              </Typography>
+            </Alert>
+
+            {/* Quick Stats - Reorganized with dividers */}
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
               <Chip
-                label={`Total: ${stats.total}`}
+                label={`Total Leads: ${stats.total}`}
                 color="primary"
-                variant="outlined"
+                variant="filled"
                 size="small"
               />
+              <Box
+                sx={{
+                  borderLeft: "2px solid",
+                  borderColor: "divider",
+                  mx: 0.5,
+                }}
+              />
               <Chip
-                label={`Active Today: ${stats.todayActivity}`}
+                label={`Today: ${stats.todayActivity}`}
                 color="success"
                 variant={activityFilter === "today" ? "filled" : "outlined"}
                 size="small"
@@ -393,7 +468,7 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
                 clickable
               />
               <Chip
-                label={`Active This Week: ${stats.weekActivity}`}
+                label={`This Week: ${stats.weekActivity}`}
                 color="info"
                 variant={activityFilter === "week" ? "filled" : "outlined"}
                 size="small"
@@ -402,8 +477,15 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
                 }
                 clickable
               />
+              <Box
+                sx={{
+                  borderLeft: "2px solid",
+                  borderColor: "divider",
+                  mx: 0.5,
+                }}
+              />
               <Chip
-                label={`No Activity: ${stats.noActivity}`}
+                label={`Inactive: ${stats.noActivity}`}
                 color="error"
                 variant={
                   activityFilter === "noActivity" ? "filled" : "outlined"
@@ -416,42 +498,76 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
                 }
                 clickable
               />
-              <Chip
-                label={`Needs Follow-up: ${stats.needsFollowup}`}
-                color="warning"
-                variant={
-                  activityFilter === "needsFollowup" ? "filled" : "outlined"
-                }
-                size="small"
-                onClick={() =>
-                  setActivityFilter(
-                    activityFilter === "needsFollowup" ? "all" : "needsFollowup"
-                  )
-                }
-                clickable
-              />
+              <Tooltip
+                title="Includes: No activity for 3+ days, never contacted, or neutral outcome (needs follow-up)"
+                arrow
+              >
+                <Chip
+                  label={`Needs Follow-up: ${stats.needsFollowup}`}
+                  color="warning"
+                  variant={
+                    activityFilter === "needsFollowup" ? "filled" : "outlined"
+                  }
+                  size="small"
+                  onClick={() =>
+                    setActivityFilter(
+                      activityFilter === "needsFollowup"
+                        ? "all"
+                        : "needsFollowup"
+                    )
+                  }
+                  clickable
+                />
+              </Tooltip>
             </Box>
 
             {/* Interaction Outcome Stats */}
             <Box
               sx={{
                 mt: 2,
-                p: 2,
-                bgcolor: "background.paper",
+                p: 2.5,
+                bgcolor: "primary.50",
                 borderRadius: 2,
-                border: "1px solid",
-                borderColor: "divider",
+                border: "2px solid",
+                borderColor: "primary.200",
               }}
             >
-              <Typography
-                variant="subtitle2"
-                sx={{ mb: 1.5, fontWeight: 600, color: "text.secondary" }}
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 2,
+                }}
               >
-                Interaction Outcomes
-              </Typography>
-              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                <Box>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ fontWeight: 600, color: "text.primary", mb: 0.5 }}
+                  >
+                    📞 Interaction Outcomes
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Total {stats.totalInteractions} interactions across{" "}
+                    {stats.total} leads
+                  </Typography>
+                </Box>
                 <Chip
-                  label={`Positive: ${stats.positiveOutcome}`}
+                  label={`${stats.totalInteractions} Total`}
+                  size="medium"
+                  color="primary"
+                  variant="filled"
+                  sx={{ fontWeight: 600 }}
+                />
+              </Box>
+
+              {/* Outcome breakdown with percentages */}
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1.5 }}>
+                <Chip
+                  label={`✓ Positive: ${stats.positiveOutcome} (${(
+                    (stats.positiveOutcome / (stats.totalInteractions || 1)) *
+                    100
+                  ).toFixed(0)}%)`}
                   color="success"
                   variant={outcomeFilter === "positive" ? "filled" : "outlined"}
                   size="small"
@@ -462,20 +578,33 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
                   }
                   clickable
                 />
+                <Tooltip
+                  title="Neutral outcomes require follow-up to move forward"
+                  arrow
+                >
+                  <Chip
+                    label={`⟳ Neutral (Follow-up): ${stats.neutralOutcome} (${(
+                      (stats.neutralOutcome / (stats.totalInteractions || 1)) *
+                      100
+                    ).toFixed(0)}%)`}
+                    color="warning"
+                    variant={
+                      outcomeFilter === "neutral" ? "filled" : "outlined"
+                    }
+                    size="small"
+                    onClick={() =>
+                      setOutcomeFilter(
+                        outcomeFilter === "neutral" ? "all" : "neutral"
+                      )
+                    }
+                    clickable
+                  />
+                </Tooltip>
                 <Chip
-                  label={`Neutral: ${stats.neutralOutcome}`}
-                  color="default"
-                  variant={outcomeFilter === "neutral" ? "filled" : "outlined"}
-                  size="small"
-                  onClick={() =>
-                    setOutcomeFilter(
-                      outcomeFilter === "neutral" ? "all" : "neutral"
-                    )
-                  }
-                  clickable
-                />
-                <Chip
-                  label={`Negative: ${stats.negativeOutcome}`}
+                  label={`✗ Negative: ${stats.negativeOutcome} (${(
+                    (stats.negativeOutcome / (stats.totalInteractions || 1)) *
+                    100
+                  ).toFixed(0)}%)`}
                   color="error"
                   variant={outcomeFilter === "negative" ? "filled" : "outlined"}
                   size="small"
@@ -486,18 +615,62 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
                   }
                   clickable
                 />
-                <Chip
-                  label={`No Interactions: ${stats.noInteractions}`}
-                  color="default"
-                  variant={outcomeFilter === "none" ? "filled" : "outlined"}
-                  size="small"
-                  onClick={() =>
-                    setOutcomeFilter(outcomeFilter === "none" ? "all" : "none")
-                  }
-                  clickable
-                />
               </Box>
+
+              {/* Only show "No Interactions" if there are leads without interactions */}
+              {stats.noInteractions > 0 && (
+                <Box
+                  sx={{
+                    mt: 1,
+                    pt: 1,
+                    borderTop: "1px dashed",
+                    borderColor: "divider",
+                  }}
+                >
+                  <Chip
+                    label={`⚠ ${stats.noInteractions} lead${
+                      stats.noInteractions !== 1 ? "s" : ""
+                    } with no interactions yet`}
+                    color="warning"
+                    variant={outcomeFilter === "none" ? "filled" : "outlined"}
+                    size="small"
+                    onClick={() =>
+                      setOutcomeFilter(
+                        outcomeFilter === "none" ? "all" : "none"
+                      )
+                    }
+                    clickable
+                  />
+                </Box>
+              )}
+
+              {stats.totalInteractions !==
+                stats.positiveOutcome +
+                  stats.neutralOutcome +
+                  stats.negativeOutcome && (
+                <Alert severity="info" sx={{ mt: 1.5, py: 0.5 }}>
+                  <Typography variant="caption">
+                    Note:{" "}
+                    {stats.totalInteractions -
+                      (stats.positiveOutcome +
+                        stats.neutralOutcome +
+                        stats.negativeOutcome)}{" "}
+                    interaction(s) don't have an outcome recorded
+                  </Typography>
+                </Alert>
+              )}
             </Box>
+
+            {/* Status Flow Explanation */}
+            <Alert severity="info" icon={false} sx={{ mt: 2, py: 0.5 }}>
+              <Typography variant="caption">
+                💡 <strong>Marketing Agent Flow:</strong> New (assigned) →
+                Contacted (reach out) → Interested (positive response) → Applied
+                (submitted application) → Enrolled (accepted) |
+                <strong> On Hold:</strong> Waiting for lead's response or
+                decision |<strong> Not Interested:</strong> Lead declined
+              </Typography>
+            </Alert>
 
             {/* Filters */}
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mt: 2 }}>
@@ -522,18 +695,103 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
                   value={statusFilter}
                   label="Status"
                   onChange={(e) => setStatusFilter(e.target.value)}
+                  renderValue={(selected) => {
+                    if (selected === "all") return "All Statuses";
+                    if (selected === "HAS_APPLICATION")
+                      return `Has Application (${stats.hasApplication})`;
+                    if (selected === "NEW") return "New";
+                    if (selected === "ON_HOLD") return "On Hold";
+                    return selected.replace(/_/g, " ");
+                  }}
                 >
                   <MenuItem value="all">All Statuses</MenuItem>
                   <MenuItem value="HAS_APPLICATION">
                     Has Application ({stats.hasApplication})
                   </MenuItem>
-                  <MenuItem value="NEW">New</MenuItem>
-                  <MenuItem value="CONTACTED">Contacted</MenuItem>
-                  <MenuItem value="INTERESTED">Interested</MenuItem>
-                  <MenuItem value="APPLIED">Applied</MenuItem>
-                  <MenuItem value="ENROLLED">Enrolled</MenuItem>
-                  <MenuItem value="NOT_INTERESTED">Not Interested</MenuItem>
-                  <MenuItem value="ON_HOLD">On Hold</MenuItem>
+                  <MenuItem value="NEW">
+                    <Box>
+                      <Typography variant="body2">New</Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", fontSize: "0.7rem" }}
+                      >
+                        Just assigned - Agent must make first contact
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="CONTACTED">
+                    <Box>
+                      <Typography variant="body2">Contacted</Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", fontSize: "0.7rem" }}
+                      >
+                        Agent reached out, awaiting response
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="INTERESTED">
+                    <Box>
+                      <Typography variant="body2">Interested</Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", fontSize: "0.7rem" }}
+                      >
+                        Lead showed interest - Guide to application
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="APPLIED">
+                    <Box>
+                      <Typography variant="body2">Applied</Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", fontSize: "0.7rem" }}
+                      >
+                        Application submitted - Track admission
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="ENROLLED">
+                    <Box>
+                      <Typography variant="body2">Enrolled</Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", fontSize: "0.7rem" }}
+                      >
+                        ✓ Success! Lead is now a student
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="NOT_INTERESTED">
+                    <Box>
+                      <Typography variant="body2">Not Interested</Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", fontSize: "0.7rem" }}
+                      >
+                        Lead declined - No further action needed
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="ON_HOLD">
+                    <Box>
+                      <Typography variant="body2">On Hold</Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", fontSize: "0.7rem" }}
+                      >
+                        Paused - Waiting for lead's response/decision
+                      </Typography>
+                    </Box>
+                  </MenuItem>
                 </Select>
               </FormControl>
 

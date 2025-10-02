@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Box,
   Card,
@@ -16,6 +16,9 @@ import {
   Alert,
   CircularProgress,
   Collapse,
+  Fade,
+  LinearProgress,
+  Skeleton,
 } from "@mui/material";
 import {
   Refresh,
@@ -529,6 +532,18 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
   // Fetch data when time filter changes
   useEffect(() => {
     fetchAssignmentPerformance();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch only when time filter changes - with debounce effect
+  useEffect(() => {
+    if (assignmentData.length > 0) {
+      // Only re-fetch if we already have data (not initial load)
+      const timeoutId = setTimeout(() => {
+        fetchAssignmentPerformance();
+      }, 300); // 300ms debounce for smooth transition
+
+      return () => clearTimeout(timeoutId);
+    }
   }, [timeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getStatusColor = (rate) => {
@@ -544,7 +559,8 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
     return "error";
   };
 
-  if (loading) {
+  // Only show full-page loading if we have no data yet (initial load)
+  if (loading && assignmentData.length === 0) {
     return (
       <Box
         sx={{
@@ -559,7 +575,7 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
     );
   }
 
-  if (error) {
+  if (error && assignmentData.length === 0) {
     return (
       <Alert severity="error" sx={{ m: 2 }}>
         {error}
@@ -585,301 +601,426 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
         size="small"
       />
 
+      {/* Loading Progress Bar */}
+      {loading && assignmentData.length > 0 && (
+        <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />
+      )}
+
       {/* Interaction Metrics */}
-      <InteractionMetrics
-        interactions={assignmentData}
-        title="Team Assignment Interactions"
-        timeFilter={timeFilter}
-      />
+      <Fade in={!loading || assignmentData.length > 0} timeout={500}>
+        <Box>
+          <InteractionMetrics
+            interactions={assignmentData}
+            title="Team Assignment Interactions"
+            timeFilter={timeFilter}
+          />
+        </Box>
+      </Fade>
 
       {/* Team Assignment Performance Table */}
-      <Card>
-        <CardContent>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              mb: 2,
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Lead Assignment Performance by Agent
-            </Typography>
-            <Tooltip title="Refresh assignment data">
-              <IconButton onClick={fetchAssignmentPerformance}>
-                <Refresh />
-              </IconButton>
-            </Tooltip>
-          </Box>
+      <Fade in={!loading || assignmentData.length > 0} timeout={500}>
+        <Card sx={{ position: "relative" }}>
+          {loading && assignmentData.length > 0 && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                bgcolor: "rgba(255, 255, 255, 0.95)",
+                zIndex: 10,
+                borderRadius: 1,
+                p: 3,
+                overflow: "hidden",
+              }}
+            >
+              <Box sx={{ mb: 2 }}>
+                <Skeleton variant="text" width="40%" height={32} />
+              </Box>
+              <Skeleton
+                variant="rectangular"
+                width="100%"
+                height={50}
+                sx={{ mb: 1 }}
+              />
+              {[1, 2, 3, 4, 5].map((item) => (
+                <Box
+                  key={item}
+                  sx={{
+                    display: "flex",
+                    gap: 2,
+                    mb: 1.5,
+                    alignItems: "center",
+                  }}
+                >
+                  <Skeleton variant="circular" width={40} height={40} />
+                  <Box sx={{ flex: 1, display: "flex", gap: 1 }}>
+                    <Skeleton variant="text" width="15%" height={24} />
+                    <Skeleton variant="text" width="10%" height={24} />
+                    <Skeleton variant="rounded" width="8%" height={28} />
+                    <Skeleton variant="rounded" width="8%" height={28} />
+                    <Skeleton variant="rounded" width="8%" height={28} />
+                    <Skeleton variant="rounded" width="8%" height={28} />
+                    <Skeleton variant="rounded" width="8%" height={28} />
+                    <Skeleton variant="rounded" width="10%" height={28} />
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          )}
+          <CardContent>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 2,
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                Lead Assignment Performance by Agent
+              </Typography>
+              <Tooltip title="Refresh assignment data">
+                <IconButton onClick={fetchAssignmentPerformance}>
+                  <Refresh />
+                </IconButton>
+              </Tooltip>
+            </Box>
 
-          {assignmentData.length === 0 ? (
-            <Alert severity="info">
-              No lead assignment data available for the selected time period.
-            </Alert>
-          ) : (
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <People fontSize="small" />
-                        Agent
-                      </Box>
-                    </TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell align="right">Total Assigned</TableCell>
-                    <TableCell align="right">New</TableCell>
-                    <TableCell align="right">Contacted</TableCell>
-                    <TableCell align="right">Interested</TableCell>
-                    <TableCell align="right">
-                      <Tooltip
-                        title="Leads with applications (In Review, Missing Document, Admitted, etc.)"
-                        arrow
-                      >
+            {assignmentData.length === 0 ? (
+              <Alert severity="info">
+                No lead assignment data available for the selected time period.
+              </Alert>
+            ) : (
+              <TableContainer sx={{ maxHeight: "calc(100vh - 400px)" }}>
+                <Table stickyHeader>
+                  <TableHead>
+                    <TableRow
+                      sx={{
+                        "& .MuiTableCell-head": {
+                          bgcolor: "background.paper",
+                          zIndex: 3,
+                          height: "64px", // Ensure consistent header height
+                        },
+                      }}
+                    >
+                      <TableCell>
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <People fontSize="small" />
+                          Agent
+                        </Box>
+                      </TableCell>
+                      <TableCell>Role</TableCell>
+                      <TableCell align="right">Total Assigned</TableCell>
+                      <TableCell align="right">New</TableCell>
+                      <TableCell align="right">Contacted</TableCell>
+                      <TableCell align="right">Interested</TableCell>
+                      <TableCell align="right">
+                        <Tooltip
+                          title="Leads with applications (In Review, Missing Document, Admitted, etc.)"
+                          arrow
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              justifyContent: "flex-end",
+                              cursor: "help",
+                            }}
+                          >
+                            <Assignment fontSize="small" />
+                            Applied
+                          </Box>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell align="right">Enrolled</TableCell>
+                      <TableCell align="right">
                         <Box
                           sx={{
                             display: "flex",
                             alignItems: "center",
                             gap: 1,
                             justifyContent: "flex-end",
-                            cursor: "help",
                           }}
                         >
-                          <Assignment fontSize="small" />
-                          Applied
-                        </Box>
-                      </Tooltip>
-                    </TableCell>
-                    <TableCell align="right">Enrolled</TableCell>
-                    <TableCell align="right">
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                          justifyContent: "flex-end",
-                        }}
-                      >
-                        <TrendingUp fontSize="small" />
-                        Interactions
-                      </Box>
-                    </TableCell>
-                    <TableCell align="right">Conversion Rate</TableCell>
-                    <TableCell>Last Activity</TableCell>
-                    <TableCell align="center">Details</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {assignmentData.map((member) => (
-                    <React.Fragment key={member.memberId}>
-                      <TableRow
-                        hover
-                        sx={{ cursor: "pointer" }}
-                        onClick={() =>
-                          setExpandedAgent(
-                            expandedAgent === member.memberId
-                              ? null
-                              : member.memberId
-                          )
-                        }
-                      >
-                        <TableCell>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <IconButton size="small">
-                              {expandedAgent === member.memberId ? (
-                                <ExpandLess />
-                              ) : (
-                                <ExpandMore />
-                              )}
-                            </IconButton>
-                            <Box>
-                              <Typography
-                                variant="body2"
-                                sx={{ fontWeight: 600 }}
-                              >
-                                {member.memberName}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {member.memberEmail}
-                              </Typography>
-                            </Box>
+                          <TrendingUp fontSize="small" />
+                          <Box sx={{ textAlign: "right" }}>
+                            <Typography
+                              variant="caption"
+                              display="block"
+                              sx={{ fontWeight: 600 }}
+                            >
+                              Interactions
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              display="block"
+                              sx={{ fontSize: "0.65rem" }}
+                            >
+                              {timeFilter === "daily"
+                                ? "(Today)"
+                                : timeFilter === "weekly"
+                                ? "(This Week)"
+                                : timeFilter === "monthly"
+                                ? "(This Month)"
+                                : "(All Time)"}
+                            </Typography>
                           </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">{member.role}</Typography>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Chip
-                            label={member.totalAssigned}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Chip
-                            label={member.newAssignments}
-                            size="small"
-                            color="default"
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Chip
-                            label={member.contactedAssignments}
-                            size="small"
-                            color="info"
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Chip
-                            label={member.interestedAssignments}
-                            size="small"
-                            color="warning"
-                            variant="filled"
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Chip
-                            label={member.appliedAssignments}
-                            size="small"
-                            color="info"
-                            variant="filled"
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Chip
-                            label={member.enrolledAssignments}
-                            size="small"
-                            color="success"
-                            variant="filled"
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Box
-                            sx={{
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "flex-end",
-                              gap: 0.5,
-                            }}
-                          >
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right">Conversion Rate</TableCell>
+                      <TableCell>Last Activity</TableCell>
+                      <TableCell align="center">Details</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {assignmentData.map((member) => (
+                      <React.Fragment key={member.memberId}>
+                        <TableRow
+                          hover
+                          sx={{
+                            cursor: "pointer",
+                            position:
+                              expandedAgent === member.memberId
+                                ? "sticky"
+                                : "relative",
+                            top:
+                              expandedAgent === member.memberId ? 64 : "auto", // Match header height of 64px
+                            zIndex: expandedAgent === member.memberId ? 2 : 1,
+                            bgcolor: "background.paper",
+                            "&:hover": {
+                              bgcolor:
+                                expandedAgent === member.memberId
+                                  ? "action.hover"
+                                  : "action.hover",
+                            },
+                          }}
+                          onClick={() =>
+                            setExpandedAgent(
+                              expandedAgent === member.memberId
+                                ? null
+                                : member.memberId
+                            )
+                          }
+                        >
+                          <TableCell>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <IconButton size="small">
+                                {expandedAgent === member.memberId ? (
+                                  <ExpandLess />
+                                ) : (
+                                  <ExpandMore />
+                                )}
+                              </IconButton>
+                              <Box>
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontWeight: 600 }}
+                                >
+                                  {member.memberName}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  {member.memberEmail}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {member.role}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
                             <Chip
-                              label={
-                                timeFilter === "daily"
-                                  ? `${member.dailyInteractions || 0} today`
-                                  : timeFilter === "weekly"
-                                  ? `${
-                                      member.weeklyInteractions || 0
-                                    } this week`
-                                  : member.interactions
-                              }
+                              label={member.totalAssigned}
                               size="small"
-                              color={getInteractionColor(
-                                timeFilter === "daily"
-                                  ? member.dailyInteractions || 0
-                                  : timeFilter === "weekly"
-                                  ? member.weeklyInteractions || 0
-                                  : member.interactions || 0
-                              )}
+                              color="primary"
                               variant="outlined"
                             />
-                            {member.activityLevel && (
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  color:
-                                    member.activityLevel === "Very Active"
-                                      ? "success.main"
-                                      : member.activityLevel === "Active"
-                                      ? "info.main"
-                                      : member.activityLevel === "Moderate"
-                                      ? "warning.main"
-                                      : "text.secondary",
-                                }}
-                              >
-                                {member.activityLevel}
-                              </Typography>
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Chip
-                            label={`${member.conversionRate}%`}
-                            size="small"
-                            color={getStatusColor(member.conversionRate)}
-                            variant="filled"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" color="text.secondary">
-                            {member.lastActivity}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Tooltip
-                            title={
-                              expandedAgent === member.memberId
-                                ? "Collapse details"
-                                : "Expand details"
-                            }
-                          >
-                            <IconButton size="small">
-                              {expandedAgent === member.memberId ? (
-                                <ExpandLess />
-                              ) : (
-                                <ExpandMore />
-                              )}
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-
-                      {/* Expanded Detail Row */}
-                      <TableRow>
-                        <TableCell
-                          style={{ paddingBottom: 0, paddingTop: 0 }}
-                          colSpan={12}
-                        >
-                          <Collapse
-                            in={expandedAgent === member.memberId}
-                            timeout="auto"
-                            unmountOnExit
-                          >
-                            <AgentLeadsDetail
-                              agent={{
-                                name: member.memberName,
-                                email: member.memberEmail,
-                              }}
-                              leads={member.assignedLeads || []}
-                              agentEmail={member.memberEmail}
-                              leadApplicationMap={leadApplicationMap}
+                          </TableCell>
+                          <TableCell align="right">
+                            <Chip
+                              label={member.newAssignments}
+                              size="small"
+                              color="default"
+                              variant="outlined"
                             />
-                          </Collapse>
-                        </TableCell>
-                      </TableRow>
-                    </React.Fragment>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </CardContent>
-      </Card>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Chip
+                              label={member.contactedAssignments}
+                              size="small"
+                              color="info"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Chip
+                              label={member.interestedAssignments}
+                              size="small"
+                              color="warning"
+                              variant="filled"
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Chip
+                              label={member.appliedAssignments}
+                              size="small"
+                              color="info"
+                              variant="filled"
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Chip
+                              label={member.enrolledAssignments}
+                              size="small"
+                              color="success"
+                              variant="filled"
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "flex-end",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Tooltip
+                                title={
+                                  timeFilter === "daily"
+                                    ? `${
+                                        member.dailyInteractions || 0
+                                      } interactions today out of ${
+                                        member.interactions
+                                      } total`
+                                    : timeFilter === "weekly"
+                                    ? `${
+                                        member.weeklyInteractions || 0
+                                      } interactions this week out of ${
+                                        member.interactions
+                                      } total`
+                                    : `${member.interactions} total interactions (all time)`
+                                }
+                                arrow
+                              >
+                                <Chip
+                                  label={
+                                    timeFilter === "daily"
+                                      ? `${member.dailyInteractions || 0}`
+                                      : timeFilter === "weekly"
+                                      ? `${member.weeklyInteractions || 0}`
+                                      : member.interactions
+                                  }
+                                  size="small"
+                                  color={getInteractionColor(
+                                    timeFilter === "daily"
+                                      ? member.dailyInteractions || 0
+                                      : timeFilter === "weekly"
+                                      ? member.weeklyInteractions || 0
+                                      : member.interactions || 0
+                                  )}
+                                  variant="outlined"
+                                />
+                              </Tooltip>
+                              {member.activityLevel && (
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color:
+                                      member.activityLevel === "Very Active"
+                                        ? "success.main"
+                                        : member.activityLevel === "Active"
+                                        ? "info.main"
+                                        : member.activityLevel === "Moderate"
+                                        ? "warning.main"
+                                        : "text.secondary",
+                                  }}
+                                >
+                                  {member.activityLevel}
+                                </Typography>
+                              )}
+                            </Box>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Chip
+                              label={`${member.conversionRate}%`}
+                              size="small"
+                              color={getStatusColor(member.conversionRate)}
+                              variant="filled"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" color="text.secondary">
+                              {member.lastActivity}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Tooltip
+                              title={
+                                expandedAgent === member.memberId
+                                  ? "Collapse details"
+                                  : "Expand details"
+                              }
+                            >
+                              <IconButton size="small">
+                                {expandedAgent === member.memberId ? (
+                                  <ExpandLess />
+                                ) : (
+                                  <ExpandMore />
+                                )}
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Expanded Detail Row */}
+                        <TableRow>
+                          <TableCell
+                            style={{ paddingBottom: 0, paddingTop: 0 }}
+                            colSpan={12}
+                          >
+                            <Collapse
+                              in={expandedAgent === member.memberId}
+                              timeout="auto"
+                              unmountOnExit
+                            >
+                              <AgentLeadsDetail
+                                agent={{
+                                  name: member.memberName,
+                                  email: member.memberEmail,
+                                }}
+                                leads={member.assignedLeads || []}
+                                agentEmail={member.memberEmail}
+                                leadApplicationMap={leadApplicationMap}
+                              />
+                            </Collapse>
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </CardContent>
+        </Card>
+      </Fade>
     </Box>
   );
 };

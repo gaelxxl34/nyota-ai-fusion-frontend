@@ -105,6 +105,11 @@ const AssignedLeads = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Time period state - persisted in localStorage
+  const [timePeriod, setTimePeriod] = useState(() => {
+    return localStorage.getItem("assignedLeadsTimePeriod") || "today";
+  });
+
   // Filter and search states
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
@@ -215,6 +220,195 @@ const AssignedLeads = () => {
 
     return typeof dateValue === "string" ? dateValue : "Not available yet";
   };
+
+  // ============================================
+  // TIME PERIOD HELPERS
+  // ============================================
+
+  /**
+   * Get date range for the selected time period
+   * @returns {Object} { startDate, endDate, label, prevStartDate, prevEndDate }
+   */
+  const getDateRange = useCallback(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    switch (timePeriod) {
+      case "today": {
+        const startDate = new Date(today);
+        const endDate = new Date(today);
+        endDate.setHours(23, 59, 59, 999);
+
+        // Yesterday for comparison
+        const prevStartDate = new Date(today);
+        prevStartDate.setDate(today.getDate() - 1);
+        const prevEndDate = new Date(prevStartDate);
+        prevEndDate.setHours(23, 59, 59, 999);
+
+        return {
+          startDate,
+          endDate,
+          label: `Today (${startDate.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })})`,
+          prevStartDate,
+          prevEndDate,
+          prevLabel: "Yesterday",
+        };
+      }
+
+      case "week": {
+        // Current week (Monday to Sunday)
+        const dayOfWeek = today.getDay();
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23, 59, 59, 999);
+
+        // Previous week for comparison
+        const prevMonday = new Date(monday);
+        prevMonday.setDate(monday.getDate() - 7);
+        const prevSunday = new Date(prevMonday);
+        prevSunday.setDate(prevMonday.getDate() + 6);
+        prevSunday.setHours(23, 59, 59, 999);
+
+        return {
+          startDate: monday,
+          endDate: sunday,
+          label: `This Week (${monday.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })} - ${sunday.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })})`,
+          prevStartDate: prevMonday,
+          prevEndDate: prevSunday,
+          prevLabel: "Last Week",
+        };
+      }
+
+      case "month": {
+        // Current month
+        const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        endDate.setHours(23, 59, 59, 999);
+
+        // Previous month for comparison
+        const prevStartDate = new Date(
+          now.getFullYear(),
+          now.getMonth() - 1,
+          1
+        );
+        const prevEndDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        prevEndDate.setHours(23, 59, 59, 999);
+
+        return {
+          startDate,
+          endDate,
+          label: `This Month (${startDate.toLocaleDateString("en-US", {
+            month: "long",
+            year: "numeric",
+          })})`,
+          prevStartDate,
+          prevEndDate,
+          prevLabel: "Last Month",
+        };
+      }
+
+      case "all":
+      default:
+        return {
+          startDate: null,
+          endDate: null,
+          label: "All Time",
+          prevStartDate: null,
+          prevEndDate: null,
+          prevLabel: null,
+        };
+    }
+  }, [timePeriod]);
+
+  /**
+   * Check if a date is within the selected time period
+   * @param {*} dateValue - Date to check
+   * @param {boolean} isPrevious - Check against previous period
+   * @returns {boolean}
+   */
+  const isDateInRange = useCallback(
+    (dateValue, isPrevious = false) => {
+      if (!dateValue) return false;
+
+      const { startDate, endDate, prevStartDate, prevEndDate } = getDateRange();
+
+      // All time period - include everything
+      if (!startDate || !endDate) return true;
+
+      // Parse the date
+      let checkDate = null;
+      try {
+        if (dateValue instanceof Date) {
+          checkDate = dateValue;
+        } else if (
+          typeof dateValue === "object" &&
+          (dateValue.seconds || dateValue._seconds)
+        ) {
+          const seconds = dateValue.seconds || dateValue._seconds;
+          checkDate = new Date(seconds * 1000);
+        } else if (typeof dateValue === "string") {
+          if (dateValue.includes(" at ")) {
+            const [datePart, timePart] = dateValue.split(" at ");
+            if (datePart && timePart) {
+              const timeWithoutTimezone = timePart.split(" ")[0];
+              const combinedDateTime = `${datePart} ${timeWithoutTimezone}`;
+              checkDate = new Date(combinedDateTime);
+            }
+          } else {
+            checkDate = new Date(dateValue);
+          }
+        } else if (typeof dateValue === "number") {
+          checkDate =
+            dateValue > 1000000000000
+              ? new Date(dateValue)
+              : new Date(dateValue * 1000);
+        }
+
+        if (!checkDate || isNaN(checkDate.getTime())) {
+          return false;
+        }
+
+        // Check against appropriate range
+        if (isPrevious) {
+          return (
+            prevStartDate &&
+            prevEndDate &&
+            checkDate >= prevStartDate &&
+            checkDate <= prevEndDate
+          );
+        } else {
+          return checkDate >= startDate && checkDate <= endDate;
+        }
+      } catch (error) {
+        console.error("Error checking date range:", error);
+        return false;
+      }
+    },
+    [getDateRange]
+  );
+
+  /**
+   * Handle time period change
+   */
+  const handleTimePeriodChange = useCallback((newPeriod) => {
+    setTimePeriod(newPeriod);
+    localStorage.setItem("assignedLeadsTimePeriod", newPeriod);
+  }, []);
+
+  // ============================================
+  // END TIME PERIOD HELPERS
+  // ============================================
 
   // Helper function to extract last interaction outcome and type
   const extractLastInteraction = useCallback((lead) => {
@@ -957,12 +1151,55 @@ const AssignedLeads = () => {
 
   // Additional analytics for better insights
   const analyticsData = {
+    // Card 1: Total Assigned (Always all-time)
     totalAssigned: assignedLeads.length,
     totalFiltered: filteredLeads.length,
-    // Only count real interactions, not fake data
-    positiveOutcomes: filteredLeads.filter(
+
+    // Card 2: Applied - Filter by time period
+    appliedInPeriod:
+      timePeriod === "all"
+        ? assignedLeads.filter((l) => l.status === "APPLIED").length
+        : assignedLeads.filter((lead) => {
+            if (lead.status !== "APPLIED") return false;
+            // Check if application date is within period
+            return lead.applicationDate
+              ? isDateInRange(lead.applicationDate)
+              : false;
+          }).length,
+    appliedAllTime: assignedLeads.filter((l) => l.status === "APPLIED").length,
+
+    // Card 3: Follow-up - Filter by time period (leads with neutral outcomes in period)
+    followUpInPeriod:
+      timePeriod === "all"
+        ? filteredLeads.filter((l) => l.lastInteractionOutcome === "neutral")
+            .length
+        : assignedLeads.filter((lead) => {
+            // Check if last interaction was neutral AND within the time period
+            if (lead.lastInteractionOutcome !== "neutral") return false;
+            return lead.lastInteractionAt
+              ? isDateInRange(lead.lastInteractionAt)
+              : false;
+          }).length,
+    followUpAllTime: filteredLeads.filter(
+      (l) => l.lastInteractionOutcome === "neutral"
+    ).length,
+
+    // Card 4: Positive Interactions - Filter by time period
+    positiveInPeriod:
+      timePeriod === "all"
+        ? filteredLeads.filter((l) => l.lastInteractionOutcome === "positive")
+            .length
+        : assignedLeads.filter((lead) => {
+            if (lead.lastInteractionOutcome !== "positive") return false;
+            return lead.lastInteractionAt
+              ? isDateInRange(lead.lastInteractionAt)
+              : false;
+          }).length,
+    positiveAllTime: filteredLeads.filter(
       (l) => l.lastInteractionOutcome === "positive"
     ).length,
+
+    // Other metrics
     neutralOutcomes: filteredLeads.filter(
       (l) => l.lastInteractionOutcome === "neutral"
     ).length,
@@ -970,74 +1207,70 @@ const AssignedLeads = () => {
       (l) => l.lastInteractionOutcome === "negative"
     ).length,
     highPriority: filteredLeads.filter((l) => l.priority === "high").length,
-    // Only count real interaction tags, not fake ones
+
+    // Application started count
     applicationStarted: filteredLeads.filter(
       (l) =>
         l.interactionTags &&
         l.interactionTags.length > 0 &&
         l.interactionTags.some((tag) => tag.includes("Application"))
     ).length,
-    // Count interactions performed today
+
+    // Card 5: Interactions in current time period
     dailyInteractions: assignedLeads.filter((lead) => {
       if (!lead.timeline || !Array.isArray(lead.timeline)) return false;
 
-      const today = new Date();
-      const todayDateString = today.toDateString();
-
       return lead.timeline.some((entry) => {
         if (entry.action !== "INTERACTION") return false;
-
-        // Parse the interaction date using the same logic as our date parser
-        let entryDate = null;
-
-        if (entry.date) {
-          try {
-            // Handle Firestore Timestamps
-            if (
-              typeof entry.date === "object" &&
-              (entry.date.seconds || entry.date._seconds)
-            ) {
-              const seconds = entry.date.seconds || entry.date._seconds;
-              entryDate = new Date(seconds * 1000);
-            }
-            // Handle string dates
-            else if (typeof entry.date === "string") {
-              if (entry.date.includes(" at ")) {
-                const [datePart, timePart] = entry.date.split(" at ");
-                if (datePart && timePart) {
-                  const timeWithoutTimezone = timePart.split(" ")[0];
-                  const combinedDateTime = `${datePart} ${timeWithoutTimezone}`;
-                  entryDate = new Date(combinedDateTime);
-                }
-              } else {
-                entryDate = new Date(entry.date);
-              }
-            }
-            // Handle Date objects
-            else if (entry.date instanceof Date) {
-              entryDate = entry.date;
-            }
-          } catch (error) {
-            console.error("Error parsing interaction date:", error, entry.date);
-            return false;
-          }
-        }
-
-        // Check if the interaction was made today
-        return entryDate && entryDate.toDateString() === todayDateString;
+        return isDateInRange(entry.date);
       });
     }).length,
-    // Count leads contacted today
+
+    // Leads contacted in current time period
     contactedToday: assignedLeads.filter((lead) => {
       if (!lead.lastContact) return false;
-      const daysSince = getDaysSinceLastContact(lead.lastContact);
-      return daysSince === 0;
+      return isDateInRange(lead.lastContact);
     }).length,
+
     // Count leads needing urgent attention (no contact in 3+ days)
     needsUrgentAttention: assignedLeads.filter((lead) => {
       const daysSince = getDaysSinceLastContact(lead.lastContact);
       return daysSince === null || daysSince >= 3;
     }).length,
+  };
+
+  // Calculate previous period analytics for comparison
+  const previousAnalyticsData = {
+    dailyInteractions: assignedLeads.filter((lead) => {
+      if (!lead.timeline || !Array.isArray(lead.timeline)) return false;
+
+      return lead.timeline.some((entry) => {
+        if (entry.action !== "INTERACTION") return false;
+        return isDateInRange(entry.date, true); // Check previous period
+      });
+    }).length,
+    contactedPrevious: assignedLeads.filter((lead) => {
+      if (!lead.lastContact) return false;
+      return isDateInRange(lead.lastContact, true); // Check previous period
+    }).length,
+    appliedPrevious:
+      timePeriod === "all"
+        ? 0
+        : assignedLeads.filter((lead) => {
+            if (lead.status !== "APPLIED") return false;
+            return lead.applicationDate
+              ? isDateInRange(lead.applicationDate, true)
+              : false;
+          }).length,
+    positivePrevious:
+      timePeriod === "all"
+        ? 0
+        : assignedLeads.filter((lead) => {
+            if (lead.lastInteractionOutcome !== "positive") return false;
+            return lead.lastInteractionAt
+              ? isDateInRange(lead.lastInteractionAt, true)
+              : false;
+          }).length,
   };
 
   return (
@@ -1051,6 +1284,240 @@ const AssignedLeads = () => {
           Manage and convert your assigned leads into applications
         </Typography>
       </Box>
+
+      {/* Time Period Selector */}
+      <Card
+        sx={{
+          mb: 3,
+          background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+          boxShadow: 2,
+        }}
+      >
+        <CardContent sx={{ py: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              justifyContent: "space-between",
+              alignItems: { xs: "stretch", md: "center" },
+              gap: 2,
+            }}
+          >
+            {/* Time Period Toggle */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
+                flexWrap: "wrap",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <CalendarIcon sx={{ color: "primary.main" }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  View Performance:
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  bgcolor: "rgba(255, 255, 255, 0.9)",
+                  p: 0.5,
+                  borderRadius: 2,
+                  boxShadow: 1,
+                }}
+              >
+                {[
+                  { value: "today", label: "Today", icon: "📅" },
+                  { value: "week", label: "This Week", icon: "📊" },
+                  { value: "month", label: "This Month", icon: "📆" },
+                  { value: "all", label: "All Time", icon: "📈" },
+                ].map((period) => (
+                  <Button
+                    key={period.value}
+                    variant={timePeriod === period.value ? "contained" : "text"}
+                    size="small"
+                    onClick={() => handleTimePeriodChange(period.value)}
+                    sx={{
+                      minWidth: { xs: "auto", sm: 100 },
+                      fontWeight: timePeriod === period.value ? 700 : 500,
+                      transition: "all 0.3s ease",
+                      ...(timePeriod === period.value
+                        ? {
+                            boxShadow: 2,
+                            transform: "scale(1.05)",
+                          }
+                        : {
+                            color: "text.secondary",
+                            "&:hover": {
+                              bgcolor: "rgba(0, 0, 0, 0.04)",
+                            },
+                          }),
+                    }}
+                    startIcon={
+                      <span style={{ fontSize: "1.2rem" }}>{period.icon}</span>
+                    }
+                  >
+                    {period.label}
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+
+            {/* Date Range Display */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                bgcolor: "rgba(255, 255, 255, 0.9)",
+                px: 2,
+                py: 1,
+                borderRadius: 2,
+                boxShadow: 1,
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {getDateRange().label}
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Historical Comparison */}
+          {timePeriod !== "all" && getDateRange().prevLabel && (
+            <Box
+              sx={{
+                mt: 2,
+                pt: 2,
+                borderTop: "1px solid rgba(0, 0, 0, 0.1)",
+                display: "flex",
+                flexDirection: { xs: "column", sm: "row" },
+                gap: 2,
+                alignItems: { xs: "stretch", sm: "center" },
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <TimelineIcon sx={{ color: "primary.main", fontSize: 20 }} />
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 600, color: "text.secondary" }}
+                >
+                  Comparison with {getDateRange().prevLabel}:
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 3,
+                  flexWrap: "wrap",
+                }}
+              >
+                {/* Contacts Comparison */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <PhoneIcon sx={{ fontSize: 18, color: "info.main" }} />
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    Leads Contacted:
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={previousAnalyticsData.contactedPrevious}
+                    sx={{
+                      bgcolor: "rgba(0, 0, 0, 0.06)",
+                      fontWeight: 600,
+                      minWidth: 40,
+                    }}
+                  />
+                  {analyticsData.contactedToday !==
+                    previousAnalyticsData.contactedPrevious && (
+                    <Chip
+                      size="small"
+                      icon={
+                        analyticsData.contactedToday >
+                        previousAnalyticsData.contactedPrevious ? (
+                          <TrendingUpIcon />
+                        ) : (
+                          <TrendingUpIcon
+                            sx={{ transform: "rotate(180deg)" }}
+                          />
+                        )
+                      }
+                      label={`${
+                        analyticsData.contactedToday >
+                        previousAnalyticsData.contactedPrevious
+                          ? "+"
+                          : ""
+                      }${
+                        analyticsData.contactedToday -
+                        previousAnalyticsData.contactedPrevious
+                      }`}
+                      color={
+                        analyticsData.contactedToday >
+                        previousAnalyticsData.contactedPrevious
+                          ? "success"
+                          : "error"
+                      }
+                      sx={{ fontWeight: 700 }}
+                    />
+                  )}
+                </Box>
+
+                {/* Interactions Comparison */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <TimelineIcon
+                    sx={{ fontSize: 18, color: "secondary.main" }}
+                  />
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    Total Activities:
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={previousAnalyticsData.dailyInteractions}
+                    sx={{
+                      bgcolor: "rgba(0, 0, 0, 0.06)",
+                      fontWeight: 600,
+                      minWidth: 40,
+                    }}
+                  />
+                  {analyticsData.dailyInteractions !==
+                    previousAnalyticsData.dailyInteractions && (
+                    <Chip
+                      size="small"
+                      icon={
+                        analyticsData.dailyInteractions >
+                        previousAnalyticsData.dailyInteractions ? (
+                          <TrendingUpIcon />
+                        ) : (
+                          <TrendingUpIcon
+                            sx={{ transform: "rotate(180deg)" }}
+                          />
+                        )
+                      }
+                      label={`${
+                        analyticsData.dailyInteractions >
+                        previousAnalyticsData.dailyInteractions
+                          ? "+"
+                          : ""
+                      }${
+                        analyticsData.dailyInteractions -
+                        previousAnalyticsData.dailyInteractions
+                      }`}
+                      color={
+                        analyticsData.dailyInteractions >
+                        previousAnalyticsData.dailyInteractions
+                          ? "success"
+                          : "error"
+                      }
+                      sx={{ fontWeight: 700 }}
+                    />
+                  )}
+                </Box>
+              </Box>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Personal Performance Widget */}
       {!loading && !error && assignedLeads.length > 0 && (
@@ -1085,10 +1552,16 @@ const AssignedLeads = () => {
             >
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-                  🎯 Today's Performance
+                  🎯 {getDateRange().label} Performance
                 </Typography>
                 <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                  Keep up the great work!
+                  {timePeriod === "today"
+                    ? "Keep up the great work!"
+                    : timePeriod === "week"
+                    ? "Your weekly progress"
+                    : timePeriod === "month"
+                    ? "Your monthly performance"
+                    : "Your overall statistics"}
                 </Typography>
               </Box>
               <Chip
@@ -1104,14 +1577,17 @@ const AssignedLeads = () => {
             </Box>
 
             <Grid container spacing={3}>
-              {/* Leads Contacted Today */}
+              {/* Leads Contacted in Period */}
               <Grid item xs={12} md={4}>
                 <Box>
                   <Typography
                     variant="body2"
                     sx={{ mb: 1, opacity: 0.9, fontWeight: 500 }}
                   >
-                    Leads Contacted Today
+                    Leads Contacted{" "}
+                    {timePeriod === "all"
+                      ? "Ever"
+                      : getDateRange().label.split("(")[0]}
                   </Typography>
                   <Box sx={{ display: "flex", alignItems: "baseline", mb: 1 }}>
                     <Typography variant="h3" sx={{ fontWeight: 700, mr: 1 }}>
@@ -1161,7 +1637,7 @@ const AssignedLeads = () => {
                 </Box>
               </Grid>
 
-              {/* Interactions Made Today */}
+              {/* Interactions Made in Period */}
               <Grid item xs={12} md={4}>
                 <Box>
                   <Typography
@@ -1175,7 +1651,7 @@ const AssignedLeads = () => {
                       {analyticsData.dailyInteractions}
                     </Typography>
                     <Typography variant="h6" sx={{ opacity: 0.8 }}>
-                      today
+                      {timePeriod === "all" ? "total" : "in period"}
                     </Typography>
                   </Box>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -1219,12 +1695,13 @@ const AssignedLeads = () => {
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
+        {/* Card 1: Total Assigned (Always All-Time) */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               bgcolor: "primary.main",
               color: "white",
-              height: 140,
+              height: 160,
               display: "flex",
               alignItems: "center",
             }}
@@ -1244,22 +1721,37 @@ const AssignedLeads = () => {
                   analyticsData.totalFiltered
                 )}
               </Typography>
-              <Typography variant="body2" sx={{ mb: 0.5 }}>
+              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>
                 {getActiveFilterCount() > 0
                   ? "Filtered Results"
                   : "Total Assigned"}
               </Typography>
-              {getActiveFilterCount() > 0 && (
-                <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                  of {analyticsData.totalAssigned} total
-                </Typography>
-              )}
+              <Typography
+                variant="caption"
+                sx={{
+                  opacity: 0.9,
+                  display: "block",
+                  bgcolor: "rgba(255, 255, 255, 0.2)",
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 1,
+                  mt: 1,
+                }}
+              >
+                {getActiveFilterCount() > 0
+                  ? `of ${analyticsData.totalAssigned} total`
+                  : "📊 All Time"}
+              </Typography>
             </CardContent>
           </Card>
         </Grid>
+
+        {/* Card 2: Applied (Adapts to Time Period) */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Tooltip
-            title="Shows leads with 'APPLIED' status. The smaller number shows leads who have application-related interactions (started, submitted, or assisted with application)."
+            title={`Shows leads who applied ${
+              timePeriod === "all" ? "ever" : "during the selected time period"
+            }. Application date is used to determine if it falls within the period.`}
             arrow
             placement="top"
           >
@@ -1267,7 +1759,7 @@ const AssignedLeads = () => {
               sx={{
                 bgcolor: "success.main",
                 color: "white",
-                height: 140,
+                height: 160,
                 display: "flex",
                 alignItems: "center",
                 cursor: "help",
@@ -1285,25 +1777,53 @@ const AssignedLeads = () => {
                   {loading ? (
                     <CircularProgress size={30} color="inherit" />
                   ) : (
-                    statusCounts.APPLIED || 0
+                    analyticsData.appliedInPeriod
                   )}
                 </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>
                   Applied
                 </Typography>
-                {analyticsData.applicationStarted > 0 && (
-                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    {analyticsData.applicationStarted} started application
-                    process
-                  </Typography>
-                )}
+                <Typography
+                  variant="caption"
+                  sx={{
+                    opacity: 0.9,
+                    display: "block",
+                    bgcolor: "rgba(255, 255, 255, 0.2)",
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 1,
+                    mt: 1,
+                  }}
+                >
+                  {timePeriod === "today"
+                    ? "📅 Today"
+                    : timePeriod === "week"
+                    ? "📊 This Week"
+                    : timePeriod === "month"
+                    ? "📆 This Month"
+                    : "📈 All Time"}
+                </Typography>
+                {timePeriod !== "all" &&
+                  analyticsData.appliedAllTime >
+                    analyticsData.appliedInPeriod && (
+                    <Typography
+                      variant="caption"
+                      sx={{ opacity: 0.8, fontSize: "0.65rem" }}
+                    >
+                      {analyticsData.appliedAllTime} total
+                    </Typography>
+                  )}
               </CardContent>
             </Card>
           </Tooltip>
         </Grid>
+
+        {/* Card 3: Follow-up (Adapts to Time Period) */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Tooltip
-            title="Shows leads with neutral interaction outcomes - these are inconclusive conversations that need follow-up to move forward."
+            title={`Shows leads with neutral interaction outcomes ${
+              timePeriod === "all" ? "overall" : "during the selected period"
+            } - these need follow-up to move forward.`}
             arrow
             placement="top"
           >
@@ -1311,7 +1831,7 @@ const AssignedLeads = () => {
               sx={{
                 bgcolor: "warning.main",
                 color: "white",
-                height: 140,
+                height: 160,
                 display: "flex",
                 alignItems: "center",
                 cursor: "help",
@@ -1329,14 +1849,37 @@ const AssignedLeads = () => {
                   {loading ? (
                     <CircularProgress size={30} color="inherit" />
                   ) : (
-                    statusCounts.FOLLOW_UP || 0
+                    analyticsData.followUpInPeriod
                   )}
                 </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>
                   Need Follow-up
                 </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    opacity: 0.9,
+                    display: "block",
+                    bgcolor: "rgba(255, 255, 255, 0.2)",
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 1,
+                    mt: 1,
+                  }}
+                >
+                  {timePeriod === "today"
+                    ? "📅 Today"
+                    : timePeriod === "week"
+                    ? "📊 This Week"
+                    : timePeriod === "month"
+                    ? "📆 This Month"
+                    : "📈 All Time"}
+                </Typography>
                 {analyticsData.highPriority > 0 && (
-                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{ opacity: 0.8, fontSize: "0.65rem" }}
+                  >
                     {analyticsData.highPriority} high priority
                   </Typography>
                 )}
@@ -1344,48 +1887,84 @@ const AssignedLeads = () => {
             </Card>
           </Tooltip>
         </Grid>
+
+        {/* Card 4: Positive Interactions (Adapts to Time Period) */}
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              bgcolor: "info.main",
-              color: "white",
-              height: 140,
-              display: "flex",
-              alignItems: "center",
-            }}
+          <Tooltip
+            title={`Shows leads with positive interaction outcomes ${
+              timePeriod === "all" ? "overall" : "during the selected period"
+            } - these are engaged and progressing well.`}
+            arrow
+            placement="top"
           >
-            <CardContent
+            <Card
               sx={{
-                textAlign: "center",
-                width: "100%",
-                py: 2,
-                "&:last-child": { pb: 2 },
+                bgcolor: "info.main",
+                color: "white",
+                height: 160,
+                display: "flex",
+                alignItems: "center",
+                cursor: "help",
               }}
             >
-              <Typography variant="h3" sx={{ fontWeight: 600, mb: 1 }}>
-                {loading ? (
-                  <CircularProgress size={30} color="inherit" />
-                ) : (
-                  analyticsData.positiveOutcomes
-                )}
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 0.5 }}>
-                Positive Interactions
-              </Typography>
-              {analyticsData.negativeOutcomes > 0 && (
-                <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                  {analyticsData.negativeOutcomes} negative outcomes
+              <CardContent
+                sx={{
+                  textAlign: "center",
+                  width: "100%",
+                  py: 2,
+                  "&:last-child": { pb: 2 },
+                }}
+              >
+                <Typography variant="h3" sx={{ fontWeight: 600, mb: 1 }}>
+                  {loading ? (
+                    <CircularProgress size={30} color="inherit" />
+                  ) : (
+                    analyticsData.positiveInPeriod
+                  )}
                 </Typography>
-              )}
-            </CardContent>
-          </Card>
+                <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>
+                  Positive Interactions
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    opacity: 0.9,
+                    display: "block",
+                    bgcolor: "rgba(255, 255, 255, 0.2)",
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 1,
+                    mt: 1,
+                  }}
+                >
+                  {timePeriod === "today"
+                    ? "📅 Today"
+                    : timePeriod === "week"
+                    ? "📊 This Week"
+                    : timePeriod === "month"
+                    ? "📆 This Month"
+                    : "📈 All Time"}
+                </Typography>
+                {analyticsData.negativeOutcomes > 0 && (
+                  <Typography
+                    variant="caption"
+                    sx={{ opacity: 0.8, fontSize: "0.65rem" }}
+                  >
+                    {analyticsData.negativeOutcomes} negative
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Tooltip>
         </Grid>
+
+        {/* Card 5: Interactions (Adapts to Time Period) */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               bgcolor: "secondary.main",
               color: "white",
-              height: 140,
+              height: 160,
               display: "flex",
               alignItems: "center",
             }}
@@ -1405,11 +1984,34 @@ const AssignedLeads = () => {
                   analyticsData.dailyInteractions
                 )}
               </Typography>
-              <Typography variant="body2" sx={{ mb: 0.5 }}>
-                Interactions Today
+              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>
+                Interactions Made
               </Typography>
-              <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                Leads worked on today
+              <Typography
+                variant="caption"
+                sx={{
+                  opacity: 0.9,
+                  display: "block",
+                  bgcolor: "rgba(255, 255, 255, 0.2)",
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 1,
+                  mt: 1,
+                }}
+              >
+                {timePeriod === "today"
+                  ? "📅 Today"
+                  : timePeriod === "week"
+                  ? "📊 This Week"
+                  : timePeriod === "month"
+                  ? "📆 This Month"
+                  : "📈 All Time"}
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{ opacity: 0.8, fontSize: "0.65rem" }}
+              >
+                {analyticsData.contactedToday} leads contacted
               </Typography>
             </CardContent>
           </Card>
@@ -1642,7 +2244,15 @@ const AssignedLeads = () => {
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <TrendingUpIcon color="secondary" fontSize="small" />
-            Worked on Today ({analyticsData.dailyInteractions})
+            Worked on{" "}
+            {timePeriod === "today"
+              ? "Today"
+              : timePeriod === "week"
+              ? "This Week"
+              : timePeriod === "month"
+              ? "This Month"
+              : ""}{" "}
+            ({analyticsData.dailyInteractions})
           </Box>
         </MenuItem>
         <Divider />
@@ -1685,14 +2295,25 @@ const AssignedLeads = () => {
           onClick={() => {
             setSearchTerm("");
             setSelectedStatus("all");
-            // Filter to show only leads contacted today
-            handleFilterChange("urgency", "today");
+            // Filter to show only leads contacted in current period
+            handleFilterChange(
+              "urgency",
+              timePeriod === "today" ? "today" : "all"
+            );
             handleFilterClose();
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <CheckCircleIcon sx={{ color: "#2e7d32" }} fontSize="small" />
-            Contacted Today ({analyticsData.contactedToday})
+            Contacted{" "}
+            {timePeriod === "today"
+              ? "Today"
+              : timePeriod === "week"
+              ? "This Week"
+              : timePeriod === "month"
+              ? "This Month"
+              : "Ever"}{" "}
+            ({analyticsData.contactedToday})
           </Box>
         </MenuItem>
       </Menu>
