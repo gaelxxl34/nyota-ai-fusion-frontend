@@ -93,14 +93,6 @@ const InteractionMetrics = ({
       0
     ) || 0;
 
-  // Get the most active agent
-  const mostActiveAgent =
-    interactions && interactions.length > 0
-      ? [...interactions].sort(
-          (a, b) => (b.dailyInteractions || 0) - (a.dailyInteractions || 0)
-        )[0]
-      : null;
-
   return (
     <Card sx={{ mb: 2 }}>
       <CardContent>

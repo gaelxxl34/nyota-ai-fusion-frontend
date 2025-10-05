@@ -171,11 +171,18 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
   const [outcomeFilter, setOutcomeFilter] = useState("all");
   const [activityFilter, setActivityFilter] = useState("all");
 
-  // Get today's date for filtering
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const weekAgo = new Date(today);
-  weekAgo.setDate(today.getDate() - 7);
+  // Get today's date for filtering - wrapped in useMemo to prevent recreating on every render
+  const today = useMemo(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, []);
+
+  const weekAgo = useMemo(() => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - 7);
+    return date;
+  }, [today]);
 
   // Extract agent's interactions from leads
   const getAgentInteractions = useCallback(
@@ -403,7 +410,7 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
         return count + lead.agentInteractions;
       }, 0),
     };
-  }, [processedLeads]);
+  }, [processedLeads, getAgentInteractions]);
 
   return (
     <Box sx={{ mt: 2, mb: 2 }}>

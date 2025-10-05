@@ -74,7 +74,6 @@ import {
   Flag as FlagIcon,
   Refresh as RefreshIcon,
   Download as DownloadIcon,
-  CalendarToday as CalendarIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { useSnackbar } from "notistack";
