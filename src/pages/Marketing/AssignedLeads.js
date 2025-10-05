@@ -84,6 +84,8 @@ const getStatusColor = (status) => {
     CONTACTED: "info",
     WARM: "success",
     APPLIED: "secondary",
+    DEFERRED: "warning",
+    EXPIRED: "default",
   };
   return colors[status] || "default";
 };
@@ -1147,6 +1149,8 @@ const AssignedLeads = () => {
     ).length,
     WARM: filteredLeads.filter((l) => l.status === "WARM").length,
     APPLIED: filteredLeads.filter((l) => l.status === "APPLIED").length,
+    EXPIRED: filteredLeads.filter((l) => l.status === "EXPIRED").length,
+    DEFERRED: filteredLeads.filter((l) => l.status === "DEFERRED").length,
   };
 
   // Additional analytics for better insights
@@ -1206,6 +1210,9 @@ const AssignedLeads = () => {
     negativeOutcomes: filteredLeads.filter(
       (l) => l.lastInteractionOutcome === "negative"
     ).length,
+    positiveOutcomes: filteredLeads.filter(
+      (l) => l.lastInteractionOutcome === "positive"
+    ).length,
     highPriority: filteredLeads.filter((l) => l.priority === "high").length,
 
     // Application started count
@@ -1237,6 +1244,31 @@ const AssignedLeads = () => {
       const daysSince = getDaysSinceLastContact(lead.lastContact);
       return daysSince === null || daysSince >= 3;
     }).length,
+
+    // Card 6: Expired - Filter by time period
+    expiredInPeriod:
+      timePeriod === "all"
+        ? assignedLeads.filter((l) => l.status === "EXPIRED").length
+        : assignedLeads.filter((lead) => {
+            if (lead.status !== "EXPIRED") return false;
+            // Check if the status was changed to EXPIRED within the period
+            // Use updatedAt as proxy for when status changed
+            return lead.updatedAt ? isDateInRange(lead.updatedAt) : false;
+          }).length,
+    expiredAllTime: assignedLeads.filter((l) => l.status === "EXPIRED").length,
+
+    // Card 7: Deferred - Filter by time period
+    deferredInPeriod:
+      timePeriod === "all"
+        ? assignedLeads.filter((l) => l.status === "DEFERRED").length
+        : assignedLeads.filter((lead) => {
+            if (lead.status !== "DEFERRED") return false;
+            // Check if the status was changed to DEFERRED within the period
+            // Use updatedAt as proxy for when status changed
+            return lead.updatedAt ? isDateInRange(lead.updatedAt) : false;
+          }).length,
+    deferredAllTime: assignedLeads.filter((l) => l.status === "DEFERRED")
+      .length,
   };
 
   // Calculate previous period analytics for comparison
@@ -1696,7 +1728,7 @@ const AssignedLeads = () => {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {/* Card 1: Total Assigned (Always All-Time) */}
-        <Grid item xs={12} sm={6} md={2.4}>
+        <Grid item xs={12} sm={6} md={2}>
           <Card
             sx={{
               bgcolor: "primary.main",
@@ -1747,7 +1779,7 @@ const AssignedLeads = () => {
         </Grid>
 
         {/* Card 2: Applied (Adapts to Time Period) */}
-        <Grid item xs={12} sm={6} md={2.4}>
+        <Grid item xs={12} sm={6} md={2}>
           <Tooltip
             title={`Shows leads who applied ${
               timePeriod === "all" ? "ever" : "during the selected time period"
@@ -1819,7 +1851,7 @@ const AssignedLeads = () => {
         </Grid>
 
         {/* Card 3: Follow-up (Adapts to Time Period) */}
-        <Grid item xs={12} sm={6} md={2.4}>
+        <Grid item xs={12} sm={6} md={2}>
           <Tooltip
             title={`Shows leads with neutral interaction outcomes ${
               timePeriod === "all" ? "overall" : "during the selected period"
@@ -1889,7 +1921,7 @@ const AssignedLeads = () => {
         </Grid>
 
         {/* Card 4: Positive Interactions (Adapts to Time Period) */}
-        <Grid item xs={12} sm={6} md={2.4}>
+        <Grid item xs={12} sm={6} md={2}>
           <Tooltip
             title={`Shows leads with positive interaction outcomes ${
               timePeriod === "all" ? "overall" : "during the selected period"
@@ -1959,7 +1991,7 @@ const AssignedLeads = () => {
         </Grid>
 
         {/* Card 5: Interactions (Adapts to Time Period) */}
-        <Grid item xs={12} sm={6} md={2.4}>
+        <Grid item xs={12} sm={6} md={2}>
           <Card
             sx={{
               bgcolor: "secondary.main",
@@ -2015,6 +2047,146 @@ const AssignedLeads = () => {
               </Typography>
             </CardContent>
           </Card>
+        </Grid>
+
+        {/* Card 6: Expired Leads (NEW) */}
+        <Grid item xs={12} sm={6} md={2}>
+          <Tooltip
+            title="Shows leads that have been marked as EXPIRED - these leads have gone cold or are too old to pursue effectively."
+            arrow
+            placement="top"
+          >
+            <Card
+              sx={{
+                bgcolor: "#9e9e9e",
+                color: "white",
+                height: 160,
+                display: "flex",
+                alignItems: "center",
+                cursor: "help",
+              }}
+            >
+              <CardContent
+                sx={{
+                  textAlign: "center",
+                  width: "100%",
+                  py: 2,
+                  "&:last-child": { pb: 2 },
+                }}
+              >
+                <Typography variant="h3" sx={{ fontWeight: 600, mb: 1 }}>
+                  {loading ? (
+                    <CircularProgress size={30} color="inherit" />
+                  ) : (
+                    analyticsData.expiredInPeriod
+                  )}
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>
+                  Expired
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    opacity: 0.9,
+                    display: "block",
+                    bgcolor: "rgba(255, 255, 255, 0.2)",
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 1,
+                    mt: 1,
+                  }}
+                >
+                  {timePeriod === "today"
+                    ? "📅 Today"
+                    : timePeriod === "week"
+                    ? "📊 This Week"
+                    : timePeriod === "month"
+                    ? "📆 This Month"
+                    : "📈 All Time"}
+                </Typography>
+                {timePeriod !== "all" &&
+                  analyticsData.expiredAllTime >
+                    analyticsData.expiredInPeriod && (
+                    <Typography
+                      variant="caption"
+                      sx={{ opacity: 0.8, fontSize: "0.65rem" }}
+                    >
+                      {analyticsData.expiredAllTime} total
+                    </Typography>
+                  )}
+              </CardContent>
+            </Card>
+          </Tooltip>
+        </Grid>
+
+        {/* Card 7: Deferred Leads (NEW) */}
+        <Grid item xs={12} sm={6} md={2}>
+          <Tooltip
+            title="Shows leads that have been deferred to the next intake - these students are interested but will apply later."
+            arrow
+            placement="top"
+          >
+            <Card
+              sx={{
+                bgcolor: "#ff9800",
+                color: "white",
+                height: 160,
+                display: "flex",
+                alignItems: "center",
+                cursor: "help",
+              }}
+            >
+              <CardContent
+                sx={{
+                  textAlign: "center",
+                  width: "100%",
+                  py: 2,
+                  "&:last-child": { pb: 2 },
+                }}
+              >
+                <Typography variant="h3" sx={{ fontWeight: 600, mb: 1 }}>
+                  {loading ? (
+                    <CircularProgress size={30} color="inherit" />
+                  ) : (
+                    analyticsData.deferredInPeriod
+                  )}
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>
+                  Deferred to Next Intake
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    opacity: 0.9,
+                    display: "block",
+                    bgcolor: "rgba(255, 255, 255, 0.2)",
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 1,
+                    mt: 1,
+                  }}
+                >
+                  {timePeriod === "today"
+                    ? "📅 Today"
+                    : timePeriod === "week"
+                    ? "📊 This Week"
+                    : timePeriod === "month"
+                    ? "📆 This Month"
+                    : "📈 All Time"}
+                </Typography>
+                {timePeriod !== "all" &&
+                  analyticsData.deferredAllTime >
+                    analyticsData.deferredInPeriod && (
+                    <Typography
+                      variant="caption"
+                      sx={{ opacity: 0.8, fontSize: "0.65rem" }}
+                    >
+                      {analyticsData.deferredAllTime} total
+                    </Typography>
+                  )}
+              </CardContent>
+            </Card>
+          </Tooltip>
         </Grid>
       </Grid>
 
@@ -2201,6 +2373,46 @@ const AssignedLeads = () => {
             color="secondary"
             size="small"
             sx={{ mr: 1 }}
+          />
+        </MenuItem>
+        <Divider />
+        <ListSubheader sx={{ color: "text.secondary", fontWeight: "bold" }}>
+          📊 Status Tracking
+        </ListSubheader>
+        <MenuItem
+          onClick={() => {
+            setSelectedStatus("DEFERRED");
+            handleFilterClose();
+          }}
+          selected={selectedStatus === "DEFERRED"}
+        >
+          <Chip
+            label={`Deferred (${statusCounts.DEFERRED})`}
+            sx={{
+              mr: 1,
+              bgcolor: "#ff9800",
+              color: "white",
+              "& .MuiChip-label": { color: "white" },
+            }}
+            size="small"
+          />
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setSelectedStatus("EXPIRED");
+            handleFilterClose();
+          }}
+          selected={selectedStatus === "EXPIRED"}
+        >
+          <Chip
+            label={`Expired (${statusCounts.EXPIRED})`}
+            sx={{
+              mr: 1,
+              bgcolor: "#9e9e9e",
+              color: "white",
+              "& .MuiChip-label": { color: "white" },
+            }}
+            size="small"
           />
         </MenuItem>
         <Divider />
@@ -3097,6 +3309,49 @@ const AssignedLeads = () => {
                 label="New Status"
                 onChange={(e) => setNewStatus(e.target.value)}
               >
+                <ListSubheader>Active Lead Statuses</ListSubheader>
+                <MenuItem value="INTERESTED">
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      INTERESTED
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Lead has shown initial interest
+                    </Typography>
+                  </Box>
+                </MenuItem>
+                <MenuItem value="CONTACTED">
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      CONTACTED
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      First contact has been made
+                    </Typography>
+                  </Box>
+                </MenuItem>
+                <MenuItem value="WARM">
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      WARM
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Lead is actively engaged and interested
+                    </Typography>
+                  </Box>
+                </MenuItem>
+                <MenuItem value="APPLIED">
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      APPLIED
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Student has submitted application
+                    </Typography>
+                  </Box>
+                </MenuItem>
+                <Divider sx={{ my: 1 }} />
+                <ListSubheader>Inactive Lead Statuses</ListSubheader>
                 <MenuItem value="DEFERRED">
                   <Box>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -3227,10 +3482,16 @@ const AssignedLeads = () => {
               }}
             >
               <MenuItem value="all">All Statuses</MenuItem>
+              <Divider />
+              <ListSubheader>Active Statuses</ListSubheader>
               <MenuItem value="INTERESTED">Interested</MenuItem>
               <MenuItem value="CONTACTED">Contacted</MenuItem>
               <MenuItem value="WARM">Warm</MenuItem>
               <MenuItem value="APPLIED">Applied</MenuItem>
+              <Divider />
+              <ListSubheader>Inactive Statuses</ListSubheader>
+              <MenuItem value="DEFERRED">Deferred to Next Intake</MenuItem>
+              <MenuItem value="EXPIRED">Expired / Cold</MenuItem>
             </Select>
           </FormControl>
 

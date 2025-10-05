@@ -115,6 +115,8 @@ const getStatusColor = (status) => {
     ENROLLED: "success",
     NOT_INTERESTED: "error",
     ON_HOLD: "warning",
+    DEFERRED: "warning",
+    EXPIRED: "default",
   };
   return colors[statusStr] || "default";
 };
@@ -351,6 +353,21 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
       ).length,
       hasApplication: processedLeads.filter((l) => l.hasApplication === true)
         .length,
+      // Status counts for EXPIRED and DEFERRED
+      expiredLeads: processedLeads.filter((l) => {
+        const leadStatus =
+          typeof l.status === "string"
+            ? l.status.toUpperCase()
+            : l.status?.code || l.status?.name || "";
+        return leadStatus === "EXPIRED";
+      }).length,
+      deferredLeads: processedLeads.filter((l) => {
+        const leadStatus =
+          typeof l.status === "string"
+            ? l.status.toUpperCase()
+            : l.status?.code || l.status?.name || "";
+        return leadStatus === "DEFERRED";
+      }).length,
       // Outcome statistics - count ALL interactions with outcomes across all leads
       positiveOutcome: processedLeads.reduce((count, lead) => {
         const agentInteractions = getAgentInteractions(lead);
@@ -519,6 +536,65 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
                   clickable
                 />
               </Tooltip>
+              <Box
+                sx={{
+                  borderLeft: "2px solid",
+                  borderColor: "divider",
+                  mx: 0.5,
+                }}
+              />
+              <Tooltip
+                title="Leads deferred to next intake - students still interested but will apply later"
+                arrow
+              >
+                <Chip
+                  label={`Deferred: ${stats.deferredLeads}`}
+                  sx={{
+                    bgcolor:
+                      statusFilter === "DEFERRED" ? "#ff9800" : "transparent",
+                    color: statusFilter === "DEFERRED" ? "white" : "#ff9800",
+                    borderColor: "#ff9800",
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    "& .MuiChip-label": {
+                      color: statusFilter === "DEFERRED" ? "white" : "#ff9800",
+                    },
+                  }}
+                  size="small"
+                  onClick={() =>
+                    setStatusFilter(
+                      statusFilter === "DEFERRED" ? "all" : "DEFERRED"
+                    )
+                  }
+                  clickable
+                />
+              </Tooltip>
+              <Tooltip
+                title="Leads marked as expired - gone cold or too old to pursue"
+                arrow
+              >
+                <Chip
+                  label={`Expired: ${stats.expiredLeads}`}
+                  sx={{
+                    bgcolor:
+                      statusFilter === "EXPIRED" ? "#9e9e9e" : "transparent",
+                    color: statusFilter === "EXPIRED" ? "white" : "#9e9e9e",
+                    borderColor: "#9e9e9e",
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    "& .MuiChip-label": {
+                      color: statusFilter === "EXPIRED" ? "white" : "#9e9e9e",
+                    },
+                  }}
+                  size="small"
+                  onClick={() =>
+                    setStatusFilter(
+                      statusFilter === "EXPIRED" ? "all" : "EXPIRED"
+                    )
+                  }
+                  clickable
+                />
+              </Tooltip>
             </Box>
 
             {/* Interaction Outcome Stats */}
@@ -668,7 +744,9 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
                 Contacted (reach out) → Interested (positive response) → Applied
                 (submitted application) → Enrolled (accepted) |
                 <strong> On Hold:</strong> Waiting for lead's response or
-                decision |<strong> Not Interested:</strong> Lead declined
+                decision |<strong> Not Interested:</strong> Lead declined |
+                <strong> Deferred:</strong> Will apply next intake |
+                <strong> Expired:</strong> Gone cold / no longer pursuing
               </Typography>
             </Alert>
 
@@ -701,6 +779,8 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
                       return `Has Application (${stats.hasApplication})`;
                     if (selected === "NEW") return "New";
                     if (selected === "ON_HOLD") return "On Hold";
+                    if (selected === "DEFERRED") return "Deferred";
+                    if (selected === "EXPIRED") return "Expired";
                     return selected.replace(/_/g, " ");
                   }}
                 >
@@ -789,6 +869,30 @@ const AgentLeadsDetail = ({ agent, leads, agentEmail, leadApplicationMap }) => {
                         sx={{ display: "block", fontSize: "0.7rem" }}
                       >
                         Paused - Waiting for lead's response/decision
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="DEFERRED">
+                    <Box>
+                      <Typography variant="body2">Deferred</Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", fontSize: "0.7rem" }}
+                      >
+                        Student wants to apply for next intake
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="EXPIRED">
+                    <Box>
+                      <Typography variant="body2">Expired</Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", fontSize: "0.7rem" }}
+                      >
+                        Lead has gone cold - No longer pursuing
                       </Typography>
                     </Box>
                   </MenuItem>

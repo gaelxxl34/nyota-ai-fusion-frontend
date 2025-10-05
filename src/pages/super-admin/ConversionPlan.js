@@ -1,4 +1,31 @@
-import React, { useState, useEffect, useMemo } from "react";
+/**
+ * ConversionPlan Component - Lead Management Dashboard
+ *
+ * UI/UX Improvements Applied:
+ * - Simplified color system with solid colors (removed gradients)
+ * - Reduced visual clutter and improved information hierarchy
+ * - Compact stat cards with better readability
+ * - Streamlined table design with consistent styling
+ * - Simplified filter section for better usability
+ * - Optimized team sidebar with cleaner layout
+ * - Removed unnecessary animations and hover effects
+ * - Cleaned up unused imports for better performance
+ *
+ * Key Features:
+ * - Lead filtering and search functionality
+ * - Bulk lead assignment to team members
+ * - Real-time data refresh with caching
+ * - Country-based lead organization
+ * - Team member capacity tracking
+ */
+
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import {
   Box,
   Grid,
@@ -31,14 +58,10 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   Checkbox,
-  Divider,
   Alert,
   LinearProgress,
   Badge,
-  IconButton,
-  Tooltip,
   Stack,
-  ButtonGroup,
   Skeleton,
 } from "@mui/material";
 import {
@@ -46,21 +69,12 @@ import {
   PersonAdd as PersonAddIcon,
   Search as SearchIcon,
   Phone as PhoneIcon,
-  Email as EmailIcon,
   Group as GroupIcon,
   TrendingUp as TrendingUpIcon,
   Flag as FlagIcon,
   Refresh as RefreshIcon,
   Download as DownloadIcon,
-  Analytics as AnalyticsIcon,
-  Timeline as TimelineIcon,
-  Business as BusinessIcon,
-  FilterList as FilterListIcon,
-  CheckCircle as CheckCircleIcon,
-  LocationOn as LocationIcon,
-  Warning as WarningIcon,
-  Schedule as ScheduleIcon,
-  CalendarToday as CalendarTodayIcon,
+  CalendarToday as CalendarIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { useSnackbar } from "notistack";
@@ -72,8 +86,8 @@ const ConversionPlan = () => {
   const { user, getUserRole } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
 
-  // Comprehensive country mapping with flags and names - MOVED TO TOP TO AVOID HOISTING ISSUES
-  const getCountryInfo = (countryCode) => {
+  // Comprehensive country mapping with flags and names - MEMOIZED FOR PERFORMANCE
+  const getCountryInfo = useCallback((countryCode) => {
     // Remove + and normalize country code
     const cleanCode = countryCode?.toString().replace("+", "");
 
@@ -205,7 +219,7 @@ const ConversionPlan = () => {
         code: cleanCode,
       }
     );
-  };
+  }, []); // Memoized - no dependencies needed
 
   // Use the caching hook for leads and team data
   const {
@@ -237,15 +251,18 @@ const ConversionPlan = () => {
   // State management for UI
   const [filteredLeads, setFilteredLeads] = useState([]);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(200);
+  const [rowsPerPage, setRowsPerPage] = useState(50); // Reduced from 200 for faster initial render
   const [filters, setFilters] = useState({
     status: "all",
     country: "all",
     assignedTo: "all",
     searchTerm: "",
-    dateFrom: "",
-    dateTo: "",
+    startDate: "", // Single date - filters from this date to today
   });
+
+  // Debounced search term for performance
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const searchDebounceRef = useRef(null);
 
   // Assignment dialog state
   const [assignmentDialog, setAssignmentDialog] = useState({
@@ -263,273 +280,46 @@ const ConversionPlan = () => {
   // State for dynamic countries
   const [availableCountries, setAvailableCountries] = useState({});
 
-  // Extract unique country codes from leads data
+  // Debounce search input for performance (300ms delay)
+  useEffect(() => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(filters.searchTerm);
+    }, 300);
+
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [filters.searchTerm]);
+
+  // Extract unique country codes from leads data - OPTIMIZED
   const availableCountriesFromLeads = useMemo(() => {
     if (!leads.length) return {};
 
     logger.debug("Extracting countries from leads", { count: leads.length });
-    const countryCodes = new Set();
 
-    leads.forEach((lead, index) => {
-      // Use the countryCode field that was already extracted in the hook
+    // Use a Map for O(1) lookups instead of Set
+    const countryCodesMap = new Map();
+
+    // Single pass through leads - much faster
+    for (const lead of leads) {
       const countryCode = lead.countryCode || lead.country_code;
 
-      if (countryCode) {
-        countryCodes.add(countryCode);
-
-        // Debug logging for first few leads
-        // trimmed verbose per-lead logging
-      } else if (lead.phone) {
-        // Fallback: extract from phone if countryCode is missing
-        let cleanPhone = lead.phone.replace(/\D/g, "");
-
-        // Remove leading zeros
-        while (cleanPhone.startsWith("0")) {
-          cleanPhone = cleanPhone.substring(1);
-        }
-
-        // Complete country code mapping (same as hook)
-        const countryCodeMap = {
-          // 3-digit codes (most common for our region)
-          212: "Morocco",
-          213: "Algeria",
-          216: "Tunisia",
-          218: "Libya",
-          220: "Gambia",
-          221: "Senegal",
-          222: "Mauritania",
-          223: "Mali",
-          224: "Guinea",
-          225: "Ivory Coast",
-          226: "Burkina Faso",
-          227: "Niger",
-          228: "Togo",
-          229: "Benin",
-          230: "Mauritius",
-          231: "Liberia",
-          232: "Sierra Leone",
-          233: "Ghana",
-          234: "Nigeria",
-          235: "Chad",
-          236: "Central African Republic",
-          237: "Cameroon",
-          238: "Cape Verde",
-          239: "Sao Tome and Principe",
-          240: "Equatorial Guinea",
-          241: "Gabon",
-          242: "Republic of Congo",
-          243: "Democratic Republic of Congo",
-          244: "Angola",
-          245: "Guinea-Bissau",
-          246: "British Indian Ocean Territory",
-          248: "Seychelles",
-          249: "Sudan",
-          250: "Rwanda",
-          251: "Ethiopia",
-          252: "Somalia",
-          253: "Djibouti",
-          254: "Kenya",
-          255: "Tanzania",
-          256: "Uganda",
-          257: "Burundi",
-          258: "Mozambique",
-          260: "Zambia",
-          261: "Madagascar",
-          262: "Reunion",
-          263: "Zimbabwe",
-          264: "Namibia",
-          265: "Malawi",
-          266: "Lesotho",
-          267: "Botswana",
-          268: "Swaziland",
-          269: "Comoros",
-          290: "Saint Helena",
-          291: "Eritrea",
-          297: "Aruba",
-          298: "Faroe Islands",
-          299: "Greenland",
-          350: "Gibraltar",
-          351: "Portugal",
-          352: "Luxembourg",
-          353: "Ireland",
-          354: "Iceland",
-          355: "Albania",
-          356: "Malta",
-          357: "Cyprus",
-          358: "Finland",
-          359: "Bulgaria",
-          370: "Lithuania",
-          371: "Latvia",
-          372: "Estonia",
-          373: "Moldova",
-          374: "Armenia",
-          375: "Belarus",
-          376: "Andorra",
-          377: "Monaco",
-          378: "San Marino",
-          380: "Ukraine",
-          381: "Serbia",
-          382: "Montenegro",
-          383: "Kosovo",
-          385: "Croatia",
-          386: "Slovenia",
-          387: "Bosnia and Herzegovina",
-          389: "North Macedonia",
-          420: "Czech Republic",
-          421: "Slovakia",
-          423: "Liechtenstein",
-          500: "Falkland Islands",
-          501: "Belize",
-          502: "Guatemala",
-          503: "El Salvador",
-          504: "Honduras",
-          505: "Nicaragua",
-          506: "Costa Rica",
-          507: "Panama",
-          508: "Saint Pierre and Miquelon",
-          509: "Haiti",
-          590: "Guadeloupe",
-          591: "Bolivia",
-          592: "Guyana",
-          593: "Ecuador",
-          594: "French Guiana",
-          595: "Paraguay",
-          596: "Martinique",
-          597: "Suriname",
-          598: "Uruguay",
-          599: "Netherlands Antilles",
-          670: "East Timor",
-          672: "Antarctica",
-          673: "Brunei",
-          674: "Nauru",
-          675: "Papua New Guinea",
-          676: "Tonga",
-          677: "Solomon Islands",
-          678: "Vanuatu",
-          679: "Fiji",
-          680: "Palau",
-          681: "Wallis and Futuna",
-          682: "Cook Islands",
-          683: "Niue",
-          684: "American Samoa",
-          685: "Samoa",
-          686: "Kiribati",
-          687: "New Caledonia",
-          688: "Tuvalu",
-          689: "French Polynesia",
-          690: "Tokelau",
-          691: "Micronesia",
-          692: "Marshall Islands",
-          850: "North Korea",
-          852: "Hong Kong",
-          853: "Macau",
-          855: "Cambodia",
-          856: "Laos",
-          880: "Bangladesh",
-          886: "Taiwan",
-          960: "Maldives",
-          961: "Lebanon",
-          962: "Jordan",
-          963: "Syria",
-          964: "Iraq",
-          965: "Kuwait",
-          966: "Saudi Arabia",
-          967: "Yemen",
-          968: "Oman",
-          970: "Palestine",
-          971: "United Arab Emirates",
-          972: "Israel",
-          973: "Bahrain",
-          974: "Qatar",
-          975: "Bhutan",
-          976: "Mongolia",
-          977: "Nepal",
-          992: "Tajikistan",
-          993: "Turkmenistan",
-          994: "Azerbaijan",
-          995: "Georgia",
-          996: "Kyrgyzstan",
-          998: "Uzbekistan",
-
-          // 2-digit codes
-          20: "Egypt",
-          27: "South Africa",
-          30: "Greece",
-          31: "Netherlands",
-          32: "Belgium",
-          33: "France",
-          34: "Spain",
-          36: "Hungary",
-          39: "Italy",
-          40: "Romania",
-          41: "Switzerland",
-          43: "Austria",
-          44: "United Kingdom",
-          45: "Denmark",
-          46: "Sweden",
-          47: "Norway",
-          48: "Poland",
-          49: "Germany",
-          51: "Peru",
-          52: "Mexico",
-          53: "Cuba",
-          54: "Argentina",
-          55: "Brazil",
-          56: "Chile",
-          57: "Colombia",
-          58: "Venezuela",
-          60: "Malaysia",
-          61: "Australia",
-          62: "Indonesia",
-          63: "Philippines",
-          64: "New Zealand",
-          65: "Singapore",
-          66: "Thailand",
-          81: "Japan",
-          82: "South Korea",
-          84: "Vietnam",
-          86: "China",
-          90: "Turkey",
-          91: "India",
-          92: "Pakistan",
-          93: "Afghanistan",
-          94: "Sri Lanka",
-          95: "Myanmar",
-          98: "Iran",
-
-          // 1-digit codes
-          1: "United States/Canada",
-          7: "Russia/Kazakhstan",
-        };
-
-        // Try to match country codes by length (longest first for accuracy)
-        const codeLengths = [4, 3, 2, 1];
-
-        for (const length of codeLengths) {
-          if (cleanPhone.length >= length) {
-            const potentialCode = cleanPhone.substring(0, length);
-            if (countryCodeMap[potentialCode]) {
-              countryCodes.add(potentialCode);
-              break;
-            }
-          }
-        }
-
-        // Debug logging for first few leads
-        // trimmed verbose per-lead fallback logging
+      if (countryCode && !countryCodesMap.has(countryCode)) {
+        countryCodesMap.set(countryCode, getCountryInfo(countryCode));
       }
-    });
+    }
 
-    logger.debug("Found country codes", Array.from(countryCodes));
+    logger.debug("Found country codes", Array.from(countryCodesMap.keys()));
 
-    // Convert to array and create mapping
-    const availableCountries = {};
-    countryCodes.forEach((code) => {
-      availableCountries[code] = getCountryInfo(code);
-    });
-
-    return availableCountries;
-  }, [leads]);
+    // Convert Map to object for component compatibility
+    return Object.fromEntries(countryCodesMap);
+  }, [leads, getCountryInfo]);
 
   // Update available countries when leads change
   useEffect(() => {
@@ -549,167 +339,152 @@ const ConversionPlan = () => {
     }
   };
 
-  // Filter leads based on current filters
-  useEffect(() => {
+  // Filter leads based on current filters - OPTIMIZED with useMemo
+  const filteredLeadsData = useMemo(() => {
     try {
-      // Debug: Log the first few leads to understand data structure
-      if (leads.length > 0) {
-        logger.debug("Filter debug sample", {
-          sampleLeadId: leads[0].id,
-          totalLeads: leads.length,
-          filters,
-        });
+      // Early return for empty leads
+      if (!leads || leads.length === 0) {
+        return [];
       }
 
-      let filtered = [...leads];
+      logger.debug("Filter debug sample", {
+        sampleLeadId: leads[0]?.id,
+        totalLeads: leads.length,
+        filters,
+      });
 
-      // Status filter
-      if (filters.status !== "all") {
-        filtered = filtered.filter((lead) => {
+      // Single-pass filtering with combined conditions for better performance
+      const filtered = leads.filter((lead) => {
+        // Status filter - early return
+        if (filters.status !== "all") {
           const leadStatus = lead.status?.toLowerCase();
-          return leadStatus === filters.status.toLowerCase();
-        });
-        logger.debug("After status filter", {
-          status: filters.status,
-          count: filtered.length,
-        });
-      }
-
-      // Country filter
-      if (filters.country !== "all") {
-        filtered = filtered.filter((lead) => {
-          // Check multiple possible country code fields
-          const countryCode = lead.countryCode || lead.country_code;
-          const isMatch = countryCode === filters.country;
-
-          // Debug logging for country filtering
-          if (filtered.length < 5) {
-            // omit noisy country filter debug
+          if (leadStatus !== filters.status.toLowerCase()) {
+            return false;
           }
-
-          return isMatch;
-        });
-        logger.debug("After country filter", {
-          country: filters.country,
-          count: filtered.length,
-        });
-      }
-
-      // Assignment filter
-      if (filters.assignedTo !== "all") {
-        if (filters.assignedTo === "unassigned") {
-          filtered = filtered.filter((lead) => {
-            // Check multiple possible assignment fields
-            const assignedTo =
-              lead.assignedTo || lead.assigned_to || lead.assignedAgent;
-            return !assignedTo || assignedTo === "" || assignedTo === null;
-          });
-        } else {
-          filtered = filtered.filter((lead) => {
-            // Check multiple possible assignment fields and match with email
-            const assignedTo =
-              lead.assignedTo || lead.assigned_to || lead.assignedAgent;
-            return assignedTo === filters.assignedTo;
-          });
         }
-        logger.debug("After assignment filter", {
-          assignedTo: filters.assignedTo,
-          count: filtered.length,
-        });
-      }
 
-      // Search filter
-      if (filters.searchTerm) {
-        const searchLower = filters.searchTerm.toLowerCase();
-        filtered = filtered.filter((lead) => {
-          // Add safety checks for undefined/null fields
+        // Country filter - early return
+        if (filters.country !== "all") {
+          const countryCode = lead.countryCode || lead.country_code;
+          if (countryCode !== filters.country) {
+            return false;
+          }
+        }
+
+        // Assignment filter - early return
+        if (filters.assignedTo !== "all") {
+          const assignedTo =
+            lead.assignedTo || lead.assigned_to || lead.assignedAgent;
+
+          if (filters.assignedTo === "unassigned") {
+            if (assignedTo && assignedTo !== "" && assignedTo !== null) {
+              return false;
+            }
+          } else {
+            if (assignedTo !== filters.assignedTo) {
+              return false;
+            }
+          }
+        }
+
+        // Search filter using DEBOUNCED term - early return
+        if (debouncedSearchTerm) {
+          const searchLower = debouncedSearchTerm.toLowerCase();
           const name = (lead.name || "").toLowerCase();
           const email = (lead.email || "").toLowerCase();
           const phone = (lead.phone || "").toLowerCase();
 
-          return (
-            name.includes(searchLower) ||
-            email.includes(searchLower) ||
-            phone.includes(searchLower)
-          );
-        });
-        logger.debug("After search filter", {
-          term: filters.searchTerm,
-          count: filtered.length,
-        });
-      }
+          if (
+            !name.includes(searchLower) &&
+            !email.includes(searchLower) &&
+            !phone.includes(searchLower)
+          ) {
+            return false;
+          }
+        }
 
-      // Date range filter
-      if (filters.dateFrom || filters.dateTo) {
-        filtered = filtered.filter((lead) => {
-          // Check multiple possible date fields for lead creation
+        // Date filter - from selected date to today - early return
+        if (filters.startDate) {
           const leadDate =
             lead.createdAt ||
             lead.created_at ||
             lead.dateCreated ||
             lead.date_created;
 
-          if (!leadDate) {
-            // If no date field exists, include the lead (don't filter out)
-            return true;
+          if (leadDate) {
+            const leadDateObj = new Date(leadDate);
+
+            // Only filter if date is valid
+            if (!isNaN(leadDateObj.getTime())) {
+              // Check if lead date is on or after the start date
+              const startDate = new Date(filters.startDate);
+              startDate.setHours(0, 0, 0, 0);
+
+              // Check if lead date is before today (end of today)
+              const today = new Date();
+              today.setHours(23, 59, 59, 999);
+
+              // Lead must be between startDate and today
+              if (leadDateObj < startDate || leadDateObj > today) {
+                return false;
+              }
+            }
           }
+        }
 
-          const leadDateObj = new Date(leadDate);
-
-          // Check if the date is valid
-          if (isNaN(leadDateObj.getTime())) {
-            return true; // Include invalid dates
-          }
-
-          let isInRange = true;
-
-          // Filter by "from" date
-          if (filters.dateFrom) {
-            const fromDate = new Date(filters.dateFrom);
-            fromDate.setHours(0, 0, 0, 0); // Start of day
-            isInRange = isInRange && leadDateObj >= fromDate;
-          }
-
-          // Filter by "to" date
-          if (filters.dateTo) {
-            const toDate = new Date(filters.dateTo);
-            toDate.setHours(23, 59, 59, 999); // End of day
-            isInRange = isInRange && leadDateObj <= toDate;
-          }
-
-          return isInRange;
-        });
-        logger.debug("After date filter", {
-          dateFrom: filters.dateFrom,
-          dateTo: filters.dateTo,
-          count: filtered.length,
-        });
-      }
+        // If all filters pass, include the lead
+        return true;
+      });
 
       logger.info("Filtered leads computed", { count: filtered.length });
-      setFilteredLeads(filtered);
-      setPage(0); // Reset to first page when filtering
+      return filtered;
     } catch (error) {
       console.error("❌ Error in filtering logic:", error);
       // Fallback to showing all leads if filtering fails
-      setFilteredLeads(leads);
+      return leads;
     }
-  }, [leads, filters]);
+  }, [leads, filters, debouncedSearchTerm]);
 
-  // Statistics calculations
-  const stats = useMemo(
-    () => ({
-      totalLeads: filteredLeads.length,
-      unassigned: filteredLeads.filter((lead) => !lead.assignedTo).length,
-      contacted: filteredLeads.filter((lead) => lead.status === "contacted")
-        .length,
-      interested: filteredLeads.filter((lead) => lead.status === "interested")
-        .length,
-      highPriority: filteredLeads.filter((lead) => lead.priority === "high")
-        .length,
-    }),
-    [filteredLeads]
-  );
+  // Update filtered leads state when filtered data changes
+  useEffect(() => {
+    setFilteredLeads(filteredLeadsData);
+    setPage(0); // Reset to first page when filtering
+  }, [filteredLeadsData]);
+
+  // Statistics calculations - OPTIMIZED with single pass
+  const stats = useMemo(() => {
+    // Single pass through filtered leads instead of 5 separate iterations
+    return filteredLeads.reduce(
+      (acc, lead) => {
+        acc.totalLeads++;
+
+        if (!lead.assignedTo) {
+          acc.unassigned++;
+        }
+
+        if (lead.status === "contacted") {
+          acc.contacted++;
+        }
+
+        if (lead.status === "interested") {
+          acc.interested++;
+        }
+
+        if (lead.priority === "high") {
+          acc.highPriority++;
+        }
+
+        return acc;
+      },
+      {
+        totalLeads: 0,
+        unassigned: 0,
+        contacted: 0,
+        interested: 0,
+        highPriority: 0,
+      }
+    );
+  }, [filteredLeads]);
 
   // Check if user is an agent and deny access - AFTER all hooks
   const userRole = getUserRole();
@@ -878,382 +653,249 @@ const ConversionPlan = () => {
   return (
     <Box
       sx={{
-        bgcolor: "#f8fafc",
+        bgcolor: "#f9fafb",
         minHeight: "100vh",
         p: 3,
       }}
     >
-      {/* Professional Header */}
-      <Paper
-        elevation={0}
-        sx={{
-          mb: 4,
-          p: 4,
-          bgcolor: "#ffffff",
-          borderRadius: 2,
-          border: "1px solid #e2e8f0",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-        }}
-      >
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 2,
-          }}
+      {/* Simplified Header */}
+      <Box sx={{ mb: 3 }}>
+        <Typography
+          variant="h4"
+          fontWeight="600"
+          sx={{ color: "#111827", mb: 0.5 }}
         >
-          <Box>
-            <Typography
-              variant="h4"
-              fontWeight="600"
-              sx={{
-                color: "#1e293b",
-                mb: 1,
-              }}
-            >
-              Lead Conversion Management
-            </Typography>
-            <Typography
-              variant="body1"
-              sx={{ color: "#64748b", fontWeight: 400 }}
-            >
-              Strategic lead assignment and conversion optimization platform
-            </Typography>
-          </Box>
+          Lead Conversion Management
+        </Typography>
+        <Typography variant="body2" sx={{ color: "#6b7280" }}>
+          Manage and assign leads to your marketing team
+        </Typography>
+      </Box>
 
-          <Stack direction="row" spacing={2}>
-            <Tooltip title="Real-time Analytics">
-              <IconButton
-                sx={{
-                  bgcolor: "#f1f5f9",
-                  color: "#475569",
-                  border: "1px solid #e2e8f0",
-                  "&:hover": {
-                    bgcolor: "#e2e8f0",
-                    borderColor: "#cbd5e1",
-                  },
-                }}
-              >
-                <AnalyticsIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Performance Dashboard">
-              <IconButton
-                sx={{
-                  bgcolor: "#f1f5f9",
-                  color: "#475569",
-                  border: "1px solid #e2e8f0",
-                  "&:hover": {
-                    bgcolor: "#e2e8f0",
-                    borderColor: "#cbd5e1",
-                  },
-                }}
-              >
-                <TimelineIcon />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        </Box>
-
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            mt: 3,
-            p: 3,
-            bgcolor: "#f8fafc",
-            borderRadius: 2,
-            border: "1px solid #e2e8f0",
-          }}
-        >
-          <BusinessIcon sx={{ color: "#475569" }} />
-          <Typography variant="body2" sx={{ color: "#64748b" }}>
-            Enterprise-grade lead management with intelligent assignment
-            algorithms and real-time performance tracking
-          </Typography>
-        </Box>
-      </Paper>
-
-      {/* Professional Statistics Dashboard */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      {/* Simplified Statistics Dashboard with Progressive Loading */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
+            elevation={0}
             sx={{
-              height: "100%",
               bgcolor: "#ffffff",
-              borderRadius: 2,
-              transition: "all 0.2s ease-in-out",
+              border: "1px solid #e5e7eb",
+              borderRadius: 1.5,
+              transition: "border-color 0.2s",
               "&:hover": {
-                transform: "translateY(-2px)",
-                boxShadow: "0 8px 25px rgba(0,0,0,0.08)",
+                borderColor: "#d1d5db",
               },
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
             }}
           >
-            <CardContent sx={{ textAlign: "center", py: 4, px: 3 }}>
+            <CardContent sx={{ p: 2.5 }}>
               <Box
                 sx={{
                   display: "flex",
-                  justifyContent: "center",
                   alignItems: "center",
-                  mb: 2.5,
+                  gap: 1.5,
+                  mb: 1.5,
                 }}
               >
-                <Avatar
-                  sx={{
-                    bgcolor: "#f8fafc",
-                    width: 56,
-                    height: 56,
-                  }}
+                <GroupIcon sx={{ fontSize: 20, color: "#6b7280" }} />
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  fontWeight={500}
                 >
-                  <GroupIcon sx={{ fontSize: 24, color: "#475569" }} />
-                </Avatar>
+                  Total Leads
+                </Typography>
               </Box>
-              <Typography
-                variant="h4"
-                fontWeight="700"
-                sx={{ color: "#1e293b", mb: 0.5 }}
-              >
-                {stats.totalLeads}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ color: "#64748b", fontWeight: 500, mb: 0.5 }}
-              >
-                Total Leads
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{ color: "#94a3b8", fontSize: "0.75rem" }}
-              >
-                Active pipeline
-              </Typography>
+              {loading ? (
+                <Skeleton variant="text" width={80} height={40} />
+              ) : (
+                <Typography
+                  variant="h4"
+                  fontWeight="700"
+                  sx={{ color: "#111827" }}
+                >
+                  {stats.totalLeads}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
 
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
+            elevation={0}
             sx={{
-              height: "100%",
-              bgcolor: "#ffffff",
-              borderRadius: 2,
-              transition: "all 0.2s ease-in-out",
+              bgcolor: "#fffbeb",
+              border: "1px solid #fde68a",
+              borderRadius: 1.5,
+              transition: "border-color 0.2s",
               "&:hover": {
-                transform: "translateY(-2px)",
-                boxShadow: "0 8px 25px rgba(251,191,36,0.12)",
+                borderColor: "#fcd34d",
               },
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
             }}
           >
-            <CardContent sx={{ textAlign: "center", py: 4, px: 3 }}>
+            <CardContent sx={{ p: 2.5 }}>
               <Box
                 sx={{
                   display: "flex",
-                  justifyContent: "center",
                   alignItems: "center",
-                  mb: 2.5,
+                  gap: 1.5,
+                  mb: 1.5,
                 }}
               >
-                <Avatar
-                  sx={{
-                    bgcolor: "#fef3c7",
-                    width: 56,
-                    height: 56,
-                  }}
+                <PersonAddIcon sx={{ fontSize: 20, color: "#d97706" }} />
+                <Typography
+                  variant="body2"
+                  sx={{ color: "#92400e", fontWeight: 500 }}
                 >
-                  <PersonAddIcon sx={{ fontSize: 24, color: "#d97706" }} />
-                </Avatar>
+                  Unassigned
+                </Typography>
               </Box>
-              <Typography
-                variant="h4"
-                fontWeight="700"
-                sx={{ color: "#d97706", mb: 0.5 }}
-              >
-                {stats.unassigned}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ color: "#92400e", fontWeight: 500, mb: 0.5 }}
-              >
-                Unassigned
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{ color: "#a16207", fontSize: "0.75rem" }}
-              >
-                Requires attention
-              </Typography>
+              {loading ? (
+                <Skeleton variant="text" width={80} height={40} />
+              ) : (
+                <Typography
+                  variant="h4"
+                  fontWeight="700"
+                  sx={{ color: "#92400e" }}
+                >
+                  {stats.unassigned}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
 
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
+            elevation={0}
             sx={{
-              height: "100%",
-              bgcolor: "#ffffff",
-              borderRadius: 2,
-              transition: "all 0.2s ease-in-out",
+              bgcolor: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              borderRadius: 1.5,
+              transition: "border-color 0.2s",
               "&:hover": {
-                transform: "translateY(-2px)",
-                boxShadow: "0 8px 25px rgba(59,130,246,0.12)",
+                borderColor: "#93c5fd",
               },
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
             }}
           >
-            <CardContent sx={{ textAlign: "center", py: 4, px: 3 }}>
+            <CardContent sx={{ p: 2.5 }}>
               <Box
                 sx={{
                   display: "flex",
-                  justifyContent: "center",
                   alignItems: "center",
-                  mb: 2.5,
+                  gap: 1.5,
+                  mb: 1.5,
                 }}
               >
-                <Avatar
-                  sx={{
-                    bgcolor: "#dbeafe",
-                    width: 56,
-                    height: 56,
-                  }}
+                <PhoneIcon sx={{ fontSize: 20, color: "#2563eb" }} />
+                <Typography
+                  variant="body2"
+                  sx={{ color: "#1e40af", fontWeight: 500 }}
                 >
-                  <PhoneIcon sx={{ fontSize: 24, color: "#1d4ed8" }} />
-                </Avatar>
+                  Contacted
+                </Typography>
               </Box>
-              <Typography
-                variant="h4"
-                fontWeight="700"
-                sx={{ color: "#1d4ed8", mb: 0.5 }}
-              >
-                {stats.contacted}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ color: "#1e40af", fontWeight: 500, mb: 0.5 }}
-              >
-                Contacted
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{ color: "#3730a3", fontSize: "0.75rem" }}
-              >
-                In progress
-              </Typography>
+              {loading ? (
+                <Skeleton variant="text" width={80} height={40} />
+              ) : (
+                <Typography
+                  variant="h4"
+                  fontWeight="700"
+                  sx={{ color: "#1e40af" }}
+                >
+                  {stats.contacted}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
 
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
+            elevation={0}
             sx={{
-              height: "100%",
-              bgcolor: "#ffffff",
-              borderRadius: 2,
-              transition: "all 0.2s ease-in-out",
+              bgcolor: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              borderRadius: 1.5,
+              transition: "border-color 0.2s",
               "&:hover": {
-                transform: "translateY(-2px)",
-                boxShadow: "0 8px 25px rgba(16,185,129,0.12)",
+                borderColor: "#86efac",
               },
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
             }}
           >
-            <CardContent sx={{ textAlign: "center", py: 4, px: 3 }}>
+            <CardContent sx={{ p: 2.5 }}>
               <Box
                 sx={{
                   display: "flex",
-                  justifyContent: "center",
                   alignItems: "center",
-                  mb: 2.5,
+                  gap: 1.5,
+                  mb: 1.5,
                 }}
               >
-                <Avatar
-                  sx={{
-                    bgcolor: "#d1fae5",
-                    width: 56,
-                    height: 56,
-                  }}
+                <TrendingUpIcon sx={{ fontSize: 20, color: "#16a34a" }} />
+                <Typography
+                  variant="body2"
+                  sx={{ color: "#166534", fontWeight: 500 }}
                 >
-                  <TrendingUpIcon sx={{ fontSize: 24, color: "#047857" }} />
-                </Avatar>
+                  Interested
+                </Typography>
               </Box>
-              <Typography
-                variant="h4"
-                fontWeight="700"
-                sx={{ color: "#047857", mb: 0.5 }}
-              >
-                {stats.interested}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ color: "#065f46", fontWeight: 500, mb: 0.5 }}
-              >
-                Interested
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{ color: "#059669", fontSize: "0.75rem" }}
-              >
-                Warm prospects
-              </Typography>
+              {loading ? (
+                <Skeleton variant="text" width={80} height={40} />
+              ) : (
+                <Typography
+                  variant="h4"
+                  fontWeight="700"
+                  sx={{ color: "#166534" }}
+                >
+                  {stats.interested}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
 
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
+            elevation={0}
             sx={{
-              height: "100%",
-              bgcolor: "#ffffff",
-              borderRadius: 2,
-              transition: "all 0.2s ease-in-out",
+              bgcolor: "#fef2f2",
+              border: "1px solid #fecaca",
+              borderRadius: 1.5,
+              transition: "border-color 0.2s",
               "&:hover": {
-                transform: "translateY(-2px)",
-                boxShadow: "0 8px 25px rgba(239,68,68,0.12)",
+                borderColor: "#fca5a5",
               },
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
             }}
           >
-            <CardContent sx={{ textAlign: "center", py: 4, px: 3 }}>
+            <CardContent sx={{ p: 2.5 }}>
               <Box
                 sx={{
                   display: "flex",
-                  justifyContent: "center",
                   alignItems: "center",
-                  mb: 2.5,
+                  gap: 1.5,
+                  mb: 1.5,
                 }}
               >
-                <Avatar
-                  sx={{
-                    bgcolor: "#fee2e2",
-                    width: 56,
-                    height: 56,
-                  }}
+                <FlagIcon sx={{ fontSize: 20, color: "#dc2626" }} />
+                <Typography
+                  variant="body2"
+                  sx={{ color: "#991b1b", fontWeight: 500 }}
                 >
-                  <FlagIcon sx={{ fontSize: 24, color: "#dc2626" }} />
-                </Avatar>
+                  High Priority
+                </Typography>
               </Box>
-              <Typography
-                variant="h4"
-                fontWeight="700"
-                sx={{ color: "#dc2626", mb: 0.5 }}
-              >
-                {stats.highPriority}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ color: "#991b1b", fontWeight: 500, mb: 0.5 }}
-              >
-                High Priority
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{ color: "#b91c1c", fontSize: "0.75rem" }}
-              >
-                Urgent follow-up
-              </Typography>
+              {loading ? (
+                <Skeleton variant="text" width={80} height={40} />
+              ) : (
+                <Typography
+                  variant="h4"
+                  fontWeight="700"
+                  sx={{ color: "#991b1b" }}
+                >
+                  {stats.highPriority}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -1287,144 +929,120 @@ const ConversionPlan = () => {
       )}
 
       <Grid container spacing={3}>
-        {/* Professional Leads Management Center */}
+        {/* Simplified Leads Management Center */}
         <Grid item xs={12} lg={8}>
           <Paper
             elevation={0}
             sx={{
-              p: 4,
+              p: 3,
               bgcolor: "#ffffff",
-              borderRadius: 2,
-              border: "1px solid #e2e8f0",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+              borderRadius: 1.5,
+              border: "1px solid #e5e7eb",
             }}
           >
-            {/* Professional Header with Actions */}
-            <Box sx={{ mb: 4 }}>
+            {/* Simplified Header with Actions */}
+            <Box sx={{ mb: 3 }}>
               <Box
                 sx={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  mb: 3,
+                  mb: 2,
                 }}
               >
                 <Box>
                   <Typography
-                    variant="h5"
-                    fontWeight="700"
-                    sx={{
-                      background:
-                        "linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)",
-                      backgroundClip: "text",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      mb: 0.5,
-                    }}
+                    variant="h6"
+                    fontWeight="600"
+                    sx={{ color: "#111827" }}
                   >
-                    Lead Management Center
+                    Lead Management
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Advanced lead processing and assignment workflow
+                    {filteredLeads.length} leads
                   </Typography>
                 </Box>
 
-                <ButtonGroup variant="contained" sx={{ boxShadow: 3 }}>
-                  <Tooltip title="Refresh Data">
-                    <Button
-                      startIcon={<RefreshIcon />}
-                      onClick={handleRefresh}
-                      disabled={refreshing}
-                      sx={{
-                        background:
-                          "linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)",
-                        "&:hover": {
-                          background:
-                            "linear-gradient(45deg, #1976D2 30%, #1E88E5 90%)",
-                        },
-                      }}
-                    >
-                      Refresh
-                    </Button>
-                  </Tooltip>
-                  <Tooltip title="Export Data">
-                    <Button
-                      startIcon={<DownloadIcon />}
-                      sx={{
-                        background:
-                          "linear-gradient(45deg, #4CAF50 30%, #66BB6A 90%)",
-                        "&:hover": {
-                          background:
-                            "linear-gradient(45deg, #388E3C 30%, #4CAF50 90%)",
-                        },
-                      }}
-                    >
-                      Export
-                    </Button>
-                  </Tooltip>
-                  <Tooltip title="Bulk Assignment">
-                    <Button
-                      startIcon={<AssignmentIcon />}
-                      onClick={() =>
-                        setAssignmentDialog((prev) => ({
-                          ...prev,
-                          open: true,
-                          selectedLeads:
-                            selectedLeads.length > 0 ? selectedLeads : [],
-                        }))
-                      }
-                      disabled={selectedLeads.length === 0}
-                      sx={{
-                        background:
-                          "linear-gradient(45deg, #FF5722 30%, #FF7043 90%)",
-                        "&:hover": {
-                          background:
-                            "linear-gradient(45deg, #D84315 30%, #FF5722 90%)",
-                        },
-                      }}
-                    >
-                      Assign ({selectedLeads.length})
-                    </Button>
-                  </Tooltip>
-                </ButtonGroup>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    startIcon={<RefreshIcon />}
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    variant="outlined"
+                  >
+                    Refresh
+                  </Button>
+                  <Button
+                    size="small"
+                    startIcon={<DownloadIcon />}
+                    variant="outlined"
+                  >
+                    Export
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={<AssignmentIcon />}
+                    onClick={() =>
+                      setAssignmentDialog((prev) => ({
+                        ...prev,
+                        open: true,
+                        selectedLeads:
+                          selectedLeads.length > 0 ? selectedLeads : [],
+                      }))
+                    }
+                    disabled={selectedLeads.length === 0}
+                  >
+                    Assign ({selectedLeads.length})
+                  </Button>
+                </Stack>
               </Box>
 
-              {/* Professional Filter Controls */}
+              {/* Simplified Filter Controls */}
               <Paper
                 elevation={0}
                 sx={{
-                  p: 3,
-                  mb: 3,
-                  background:
-                    "linear-gradient(135deg, rgba(33, 150, 243, 0.03) 0%, rgba(33, 203, 243, 0.03) 100%)",
-                  border: "1px solid rgba(33, 150, 243, 0.1)",
-                  borderRadius: 2,
+                  p: 2,
+                  mb: 2,
+                  bgcolor: "#f9fafb",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 1.5,
                 }}
               >
-                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                  <FilterListIcon sx={{ mr: 1, color: "primary.main" }} />
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="600"
-                    color="primary"
-                  >
-                    Advanced Filters
-                  </Typography>
-                </Box>
-
-                <Grid container spacing={3}>
-                  {/* First Row - Main Filters */}
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl
+                <Grid container spacing={2}>
+                  {/* Search Input - Full Width */}
+                  <Grid item xs={12}>
+                    <TextField
                       fullWidth
                       size="small"
+                      placeholder="Search by name, email, or phone..."
+                      value={filters.searchTerm}
+                      onChange={(e) =>
+                        handleFilterChange("searchTerm", e.target.value)
+                      }
+                      InputProps={{
+                        startAdornment: (
+                          <SearchIcon
+                            sx={{
+                              mr: 1,
+                              color: "text.secondary",
+                              fontSize: 20,
+                            }}
+                          />
+                        ),
+                      }}
                       sx={{
                         "& .MuiOutlinedInput-root": {
-                          background: "rgba(255, 255, 255, 0.8)",
-                          backdropFilter: "blur(10px)",
+                          bgcolor: "white",
                         },
                       }}
-                    >
+                    />
+                  </Grid>
+
+                  {/* Filter Dropdowns */}
+                  <Grid item xs={12} sm={6} md={2.4}>
+                    <FormControl fullWidth size="small">
                       <InputLabel>Status</InputLabel>
                       <Select
                         value={filters.status}
@@ -1432,61 +1050,17 @@ const ConversionPlan = () => {
                         onChange={(e) =>
                           handleFilterChange("status", e.target.value)
                         }
+                        sx={{ bgcolor: "white" }}
                       >
-                        <MenuItem value="all">
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <CheckCircleIcon sx={{ fontSize: 16 }} />
-                            All Status
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="contacted">
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <PhoneIcon
-                              sx={{ fontSize: 16, color: "info.main" }}
-                            />
-                            Contacted
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="interested">
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <TrendingUpIcon
-                              sx={{ fontSize: 16, color: "success.main" }}
-                            />
-                            Interested
-                          </Box>
-                        </MenuItem>
+                        <MenuItem value="all">All Status</MenuItem>
+                        <MenuItem value="contacted">Contacted</MenuItem>
+                        <MenuItem value="interested">Interested</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl
-                      fullWidth
-                      size="small"
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          background: "rgba(255, 255, 255, 0.8)",
-                          backdropFilter: "blur(10px)",
-                        },
-                      }}
-                    >
+
+                  <Grid item xs={12} sm={6} md={2.4}>
+                    <FormControl fullWidth size="small">
                       <InputLabel>Country</InputLabel>
                       <Select
                         value={filters.country}
@@ -1494,70 +1068,30 @@ const ConversionPlan = () => {
                         onChange={(e) =>
                           handleFilterChange("country", e.target.value)
                         }
+                        sx={{ bgcolor: "white" }}
                       >
-                        <MenuItem value="all">
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <LocationIcon sx={{ fontSize: 16 }} />
-                            All Countries
-                          </Box>
-                        </MenuItem>
+                        <MenuItem value="all">All Countries</MenuItem>
                         {Object.entries(availableCountries).length > 0
                           ? Object.entries(availableCountries).map(
                               ([code, country]) => (
                                 <MenuItem key={code} value={code}>
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
-                                    }}
-                                  >
-                                    <Typography sx={{ fontSize: 16 }}>
-                                      {country.flag}
-                                    </Typography>
-                                    {country.name}
-                                  </Box>
+                                  {country.flag} {country.name}
                                 </MenuItem>
                               )
                             )
                           : Object.entries(countryMapping).map(
                               ([code, country]) => (
                                 <MenuItem key={code} value={code}>
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
-                                    }}
-                                  >
-                                    <Typography sx={{ fontSize: 16 }}>
-                                      {country.flag}
-                                    </Typography>
-                                    {country.name}
-                                  </Box>
+                                  {country.flag} {country.name}
                                 </MenuItem>
                               )
                             )}
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl
-                      fullWidth
-                      size="small"
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          background: "rgba(255, 255, 255, 0.8)",
-                          backdropFilter: "blur(10px)",
-                        },
-                      }}
-                    >
+
+                  <Grid item xs={12} sm={6} md={2.4}>
+                    <FormControl fullWidth size="small">
                       <InputLabel>Assignment</InputLabel>
                       <Select
                         value={filters.assignedTo}
@@ -1565,59 +1099,90 @@ const ConversionPlan = () => {
                         onChange={(e) =>
                           handleFilterChange("assignedTo", e.target.value)
                         }
+                        sx={{ bgcolor: "white" }}
                       >
-                        <MenuItem value="all">
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <GroupIcon sx={{ fontSize: 16 }} />
-                            All Assignments
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="unassigned">
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <WarningIcon
-                              sx={{ fontSize: 16, color: "warning.main" }}
-                            />
-                            Unassigned
-                          </Box>
-                        </MenuItem>
+                        <MenuItem value="all">All</MenuItem>
+                        <MenuItem value="unassigned">Unassigned</MenuItem>
                         {teamMembers.map((member) => (
                           <MenuItem key={member.id} value={member.email}>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <Avatar
-                                sx={{ width: 20, height: 20, fontSize: 12 }}
-                              >
-                                {member.name.charAt(0)}
-                              </Avatar>
-                              {member.name} ({member.email})
-                            </Box>
+                            {member.name}
                           </MenuItem>
                         ))}
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Button
+
+                  {/* Streamlined Date Picker matching other filters */}
+                  <Grid item xs={12} sm={6} md={2.4}>
+                    <TextField
                       fullWidth
-                      variant="outlined"
                       size="small"
+                      type="date"
+                      label="Date Filter"
+                      value={filters.startDate}
+                      onChange={(e) =>
+                        handleFilterChange("startDate", e.target.value)
+                      }
+                      InputLabelProps={{
+                        shrink: true,
+                        sx: {
+                          fontSize: "0.875rem",
+                          fontWeight: 500,
+                          color: "#6b7280",
+                        },
+                      }}
+                      inputProps={{
+                        max: new Date().toISOString().split("T")[0],
+                      }}
+                      sx={{
+                        bgcolor: "white",
+                        "& .MuiOutlinedInput-root": {
+                          fontSize: "0.875rem",
+                          "& fieldset": {
+                            borderColor: "#e5e7eb",
+                          },
+                          "&:hover fieldset": {
+                            borderColor: "#d1d5db",
+                          },
+                          "&.Mui-focused fieldset": {
+                            borderColor: "#3b82f6",
+                            borderWidth: "1px",
+                          },
+                        },
+                        "& .MuiInputBase-input": {
+                          color: filters.startDate ? "#111827" : "#9ca3af",
+                        },
+                      }}
+                    />
+                    {filters.startDate && (
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: "#059669",
+                          fontSize: "0.688rem",
+                          display: "block",
+                          mt: 0.5,
+                          fontWeight: 500,
+                        }}
+                      >
+                        ✓{" "}
+                        {new Date(filters.startDate).toLocaleDateString(
+                          "en-US",
+                          {
+                            month: "short",
+                            day: "numeric",
+                          }
+                        )}{" "}
+                        → Today
+                      </Typography>
+                    )}
+                  </Grid>
+
+                  {/* Reset Button */}
+                  <Grid item xs={12}>
+                    <Button
+                      size="small"
+                      variant="text"
                       startIcon={<RefreshIcon />}
                       onClick={() => {
                         setFilters({
@@ -1625,297 +1190,70 @@ const ConversionPlan = () => {
                           country: "all",
                           assignedTo: "all",
                           searchTerm: "",
-                          dateFrom: "",
-                          dateTo: "",
+                          startDate: "",
                         });
                       }}
                       sx={{
-                        height: "40px",
-                        background: "rgba(255, 255, 255, 0.8)",
-                        backdropFilter: "blur(10px)",
+                        color: "#6b7280",
+                        textTransform: "uppercase",
+                        fontSize: "0.813rem",
+                        letterSpacing: 0.5,
+                        fontWeight: 500,
                         "&:hover": {
-                          background: "rgba(255, 255, 255, 0.9)",
+                          bgcolor: "#f3f4f6",
+                          color: "#111827",
                         },
                       }}
                     >
-                      Reset
+                      Clear Filters
                     </Button>
-                  </Grid>
-
-                  {/* Second Row - Date Range Filters */}
-                  <Grid item xs={12} sm={6} md={3}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      label="From Date"
-                      type="date"
-                      value={filters.dateFrom}
-                      onChange={(e) =>
-                        handleFilterChange("dateFrom", e.target.value)
-                      }
-                      InputLabelProps={{
-                        shrink: true,
-                      }}
-                      InputProps={{
-                        startAdornment: (
-                          <CalendarTodayIcon
-                            sx={{
-                              mr: 1,
-                              color: "text.secondary",
-                              fontSize: 16,
-                            }}
-                          />
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          background: "rgba(255, 255, 255, 0.8)",
-                          backdropFilter: "blur(10px)",
-                          "&:hover": {
-                            background: "rgba(255, 255, 255, 0.9)",
-                          },
-                          "&.Mui-focused": {
-                            background: "rgba(255, 255, 255, 1)",
-                          },
-                        },
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      label="To Date"
-                      type="date"
-                      value={filters.dateTo}
-                      onChange={(e) =>
-                        handleFilterChange("dateTo", e.target.value)
-                      }
-                      InputLabelProps={{
-                        shrink: true,
-                      }}
-                      InputProps={{
-                        startAdornment: (
-                          <CalendarTodayIcon
-                            sx={{
-                              mr: 1,
-                              color: "text.secondary",
-                              fontSize: 16,
-                            }}
-                          />
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          background: "rgba(255, 255, 255, 0.8)",
-                          backdropFilter: "blur(10px)",
-                          "&:hover": {
-                            background: "rgba(255, 255, 255, 0.9)",
-                          },
-                          "&.Mui-focused": {
-                            background: "rgba(255, 255, 255, 1)",
-                          },
-                        },
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={6}>
-                    {/* Quick Date Presets */}
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      sx={{ height: "40px", alignItems: "center" }}
-                    >
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "text.secondary", mr: 1 }}
-                      >
-                        Quick:
-                      </Typography>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => {
-                          const today = new Date().toISOString().split("T")[0];
-                          setFilters((prev) => ({
-                            ...prev,
-                            dateFrom: today,
-                            dateTo: today,
-                          }));
-                        }}
-                        sx={{ minWidth: "auto", px: 1, fontSize: "0.75rem" }}
-                      >
-                        Today
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => {
-                          const today = new Date();
-                          const weekAgo = new Date(
-                            today.getTime() - 7 * 24 * 60 * 60 * 1000
-                          );
-                          setFilters((prev) => ({
-                            ...prev,
-                            dateFrom: weekAgo.toISOString().split("T")[0],
-                            dateTo: today.toISOString().split("T")[0],
-                          }));
-                        }}
-                        sx={{ minWidth: "auto", px: 1, fontSize: "0.75rem" }}
-                      >
-                        7 Days
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => {
-                          const today = new Date();
-                          const monthAgo = new Date(
-                            today.getFullYear(),
-                            today.getMonth() - 1,
-                            today.getDate()
-                          );
-                          setFilters((prev) => ({
-                            ...prev,
-                            dateFrom: monthAgo.toISOString().split("T")[0],
-                            dateTo: today.toISOString().split("T")[0],
-                          }));
-                        }}
-                        sx={{ minWidth: "auto", px: 1, fontSize: "0.75rem" }}
-                      >
-                        30 Days
-                      </Button>
-                    </Stack>
-                  </Grid>
-
-                  {/* Third Row - Search Input */}
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="Search leads by name, email, or phone..."
-                      value={filters.searchTerm}
-                      onChange={(e) =>
-                        handleFilterChange("searchTerm", e.target.value)
-                      }
-                      InputProps={{
-                        startAdornment: (
-                          <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          background: "rgba(255, 255, 255, 0.8)",
-                          backdropFilter: "blur(10px)",
-                          "&:hover": {
-                            background: "rgba(255, 255, 255, 0.9)",
-                          },
-                          "&.Mui-focused": {
-                            background: "rgba(255, 255, 255, 1)",
-                          },
-                        },
-                      }}
-                    />
                   </Grid>
                 </Grid>
               </Paper>
             </Box>
 
-            {/* Professional Data Table */}
+            {/* Simplified Data Table */}
             <TableContainer
               sx={{
-                background: "rgba(255, 255, 255, 0.9)",
-                backdropFilter: "blur(10px)",
-                borderRadius: 2,
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
+                bgcolor: "white",
+                borderRadius: 1.5,
+                border: "1px solid #e5e7eb",
               }}
             >
               <Table sx={{ minWidth: 650 }}>
                 <TableHead>
                   <TableRow
                     sx={{
-                      background:
-                        "linear-gradient(135deg, rgba(33, 150, 243, 0.08) 0%, rgba(33, 203, 243, 0.08) 100%)",
+                      bgcolor: "#f9fafb",
                       "& .MuiTableCell-head": {
-                        fontWeight: 700,
-                        fontSize: "0.875rem",
-                        color: "primary.main",
-                        borderBottom: "2px solid rgba(33, 150, 243, 0.2)",
-                        py: 2,
+                        fontWeight: 600,
+                        fontSize: "0.813rem",
+                        color: "#374151",
+                        borderBottom: "1px solid #e5e7eb",
+                        py: 1.5,
                       },
                     }}
                   >
                     <TableCell padding="checkbox">
-                      <Tooltip title="Select All Leads">
-                        <Checkbox
-                          checked={selectAll}
-                          onChange={handleSelectAll}
-                          indeterminate={
-                            selectedLeads.length > 0 &&
-                            selectedLeads.length <
-                              filteredLeads.slice(
-                                page * rowsPerPage,
-                                page * rowsPerPage + rowsPerPage
-                              ).length
-                          }
-                          sx={{
-                            color: "primary.main",
-                            "&.Mui-checked": {
-                              color: "primary.main",
-                            },
-                          }}
-                        />
-                      </Tooltip>
+                      <Checkbox
+                        checked={selectAll}
+                        onChange={handleSelectAll}
+                        indeterminate={
+                          selectedLeads.length > 0 &&
+                          selectedLeads.length <
+                            filteredLeads.slice(
+                              page * rowsPerPage,
+                              page * rowsPerPage + rowsPerPage
+                            ).length
+                        }
+                      />
                     </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <GroupIcon sx={{ fontSize: 16 }} />
-                        Lead Information
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <PhoneIcon sx={{ fontSize: 16 }} />
-                        Contact Details
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <CheckCircleIcon sx={{ fontSize: 16 }} />
-                        Status
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <FlagIcon sx={{ fontSize: 16 }} />
-                        Priority
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <PersonAddIcon sx={{ fontSize: 16 }} />
-                        Assigned To
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <AssignmentIcon sx={{ fontSize: 16 }} />
-                        Actions
-                      </Box>
-                    </TableCell>
+                    <TableCell>Lead</TableCell>
+                    <TableCell>Contact</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Priority</TableCell>
+                    <TableCell>Assigned To</TableCell>
+                    <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -2000,85 +1338,136 @@ const ConversionPlan = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    // Actual data rows
+                    // Simplified data rows
                     filteredLeads
                       .slice(
                         page * rowsPerPage,
                         page * rowsPerPage + rowsPerPage
                       )
-                      .map((lead, index) => (
-                        <TableRow
-                          key={lead.id}
-                          hover
-                          sx={{
-                            "&:nth-of-type(odd)": {
-                              backgroundColor: "rgba(33, 150, 243, 0.02)",
-                            },
-                            "&:hover": {
-                              backgroundColor: "rgba(33, 150, 243, 0.08)",
-                              transform: "scale(1.001)",
-                              boxShadow: "0 4px 20px rgba(33, 150, 243, 0.15)",
-                            },
-                            transition: "all 0.2s ease-in-out",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <TableCell padding="checkbox">
-                            <Checkbox
-                              checked={selectedLeads.includes(lead.id)}
-                              onChange={() => handleLeadSelect(lead.id)}
-                              sx={{
-                                color: "primary.main",
-                                "&.Mui-checked": {
-                                  color: "primary.main",
-                                },
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 2,
-                              }}
-                            >
-                              <Avatar
+                      .map((lead, index) => {
+                        const countryInfo =
+                          availableCountries[
+                            lead.countryCode || lead.country_code
+                          ] ||
+                          countryMapping[
+                            lead.countryCode || lead.country_code
+                          ] ||
+                          getCountryInfo(lead.countryCode || lead.country_code);
+
+                        const assignedTo =
+                          lead.assignedTo ||
+                          lead.assigned_to ||
+                          lead.assignedAgent;
+                        const teamMember = assignedTo
+                          ? teamMembers.find(
+                              (m) =>
+                                m.email === assignedTo || m.name === assignedTo
+                            )
+                          : null;
+                        const displayName = teamMember
+                          ? teamMember.name
+                          : assignedTo;
+
+                        return (
+                          <TableRow
+                            key={lead.id}
+                            hover
+                            sx={{
+                              "&:nth-of-type(even)": {
+                                bgcolor: "#f9fafb",
+                              },
+                              "&:hover": {
+                                bgcolor: "#f3f4f6",
+                              },
+                              cursor: "pointer",
+                            }}
+                          >
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                checked={selectedLeads.includes(lead.id)}
+                                onChange={() => handleLeadSelect(lead.id)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Box
                                 sx={{
-                                  background: `linear-gradient(135deg, ${
-                                    [
-                                      "#667eea",
-                                      "#f093fb",
-                                      "#4facfe",
-                                      "#a8edea",
-                                      "#ffecd2",
-                                    ][index % 5]
-                                  } 0%, ${
-                                    [
-                                      "#764ba2",
-                                      "#f5576c",
-                                      "#00f2fe",
-                                      "#fed6e3",
-                                      "#fcb69f",
-                                    ][index % 5]
-                                  } 100%)`,
-                                  color: "white",
-                                  width: 44,
-                                  height: 44,
-                                  fontWeight: "bold",
-                                  fontSize: "1.1rem",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1.5,
                                 }}
                               >
-                                {lead.name.charAt(0)}
-                              </Avatar>
+                                <Avatar
+                                  sx={{
+                                    bgcolor: "#2563eb",
+                                    width: 36,
+                                    height: 36,
+                                    fontSize: "0.875rem",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {lead.name.charAt(0)}
+                                </Avatar>
+                                <Box>
+                                  <Typography
+                                    variant="body2"
+                                    fontWeight="600"
+                                    sx={{ color: "#111827" }}
+                                  >
+                                    {lead.name}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: "#6b7280" }}
+                                  >
+                                    {countryInfo?.flag} {countryInfo?.name}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            </TableCell>
+                            <TableCell>
                               <Box>
                                 <Typography
-                                  variant="subtitle1"
-                                  fontWeight="700"
-                                  sx={{ color: "text.primary", mb: 0.5 }}
+                                  variant="body2"
+                                  sx={{ color: "#374151", mb: 0.5 }}
                                 >
-                                  {lead.name}
+                                  {lead.phone}
                                 </Typography>
+                                <Typography
+                                  variant="caption"
+                                  sx={{ color: "#6b7280" }}
+                                  noWrap
+                                >
+                                  {lead.email}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={lead.status}
+                                color={getStatusColor(lead.status)}
+                                size="small"
+                                sx={{
+                                  textTransform: "capitalize",
+                                  fontWeight: 500,
+                                  fontSize: "0.75rem",
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={lead.priority}
+                                color={getPriorityColor(lead.priority)}
+                                size="small"
+                                variant="outlined"
+                                sx={{
+                                  textTransform: "capitalize",
+                                  fontWeight: 500,
+                                  fontSize: "0.75rem",
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {assignedTo ? (
                                 <Box
                                   sx={{
                                     display: "flex",
@@ -2086,243 +1475,41 @@ const ConversionPlan = () => {
                                     gap: 1,
                                   }}
                                 >
-                                  <Chip
-                                    label={
-                                      <Box
-                                        sx={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: 0.5,
-                                        }}
-                                      >
-                                        <Typography
-                                          variant="caption"
-                                          sx={{ fontSize: "1.1em" }}
-                                        >
-                                          {
-                                            (
-                                              availableCountries[
-                                                lead.countryCode ||
-                                                  lead.country_code
-                                              ] ||
-                                              countryMapping[
-                                                lead.countryCode ||
-                                                  lead.country_code
-                                              ] ||
-                                              getCountryInfo(
-                                                lead.countryCode ||
-                                                  lead.country_code
-                                              )
-                                            )?.flag
-                                          }
-                                        </Typography>
-                                        <Typography
-                                          variant="caption"
-                                          fontWeight="500"
-                                        >
-                                          {
-                                            (
-                                              availableCountries[
-                                                lead.countryCode ||
-                                                  lead.country_code
-                                              ] ||
-                                              countryMapping[
-                                                lead.countryCode ||
-                                                  lead.country_code
-                                              ] ||
-                                              getCountryInfo(
-                                                lead.countryCode ||
-                                                  lead.country_code
-                                              )
-                                            )?.name
-                                          }
-                                        </Typography>
-                                      </Box>
-                                    }
-                                    size="small"
-                                    variant="outlined"
+                                  <Avatar
                                     sx={{
-                                      borderColor: "primary.light",
-                                      color: "primary.main",
+                                      width: 24,
+                                      height: 24,
                                       fontSize: "0.75rem",
                                     }}
-                                  />
-                                </Box>
-                              </Box>
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Stack spacing={1}>
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                }}
-                              >
-                                <Avatar
-                                  sx={{
-                                    bgcolor: "success.light",
-                                    width: 24,
-                                    height: 24,
-                                  }}
-                                >
-                                  <PhoneIcon
-                                    sx={{ fontSize: 14, color: "success.dark" }}
-                                  />
-                                </Avatar>
-                                <Typography
-                                  variant="body2"
-                                  fontWeight="500"
-                                  sx={{ color: "text.primary" }}
-                                >
-                                  {lead.phone}
-                                </Typography>
-                              </Box>
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                }}
-                              >
-                                <Avatar
-                                  sx={{
-                                    bgcolor: "info.light",
-                                    width: 24,
-                                    height: 24,
-                                  }}
-                                >
-                                  <EmailIcon
-                                    sx={{ fontSize: 14, color: "info.dark" }}
-                                  />
-                                </Avatar>
-                                <Typography
-                                  variant="body2"
-                                  noWrap
-                                  sx={{
-                                    maxWidth: 160,
-                                    color: "text.secondary",
-                                    fontWeight: 400,
-                                  }}
-                                >
-                                  {lead.email}
-                                </Typography>
-                              </Box>
-                            </Stack>
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={lead.status}
-                              color={getStatusColor(lead.status)}
-                              size="medium"
-                              sx={{
-                                textTransform: "capitalize",
-                                fontWeight: "bold",
-                                minWidth: "90px",
-                                boxShadow: 1,
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.5,
-                                  }}
-                                >
-                                  {lead.priority === "high" && (
-                                    <FlagIcon sx={{ fontSize: 14 }} />
-                                  )}
-                                  {lead.priority === "medium" && (
-                                    <ScheduleIcon sx={{ fontSize: 14 }} />
-                                  )}
-                                  {lead.priority === "low" && (
-                                    <CheckCircleIcon sx={{ fontSize: 14 }} />
-                                  )}
-                                  {lead.priority}
-                                </Box>
-                              }
-                              color={getPriorityColor(lead.priority)}
-                              size="medium"
-                              variant="outlined"
-                              sx={{
-                                textTransform: "capitalize",
-                                fontWeight: "bold",
-                                minWidth: "100px",
-                                borderWidth: 2,
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {(() => {
-                              const assignedTo =
-                                lead.assignedTo ||
-                                lead.assigned_to ||
-                                lead.assignedAgent;
-                              if (assignedTo) {
-                                // Try to find the team member by email first, then by name
-                                const teamMember = teamMembers.find(
-                                  (m) =>
-                                    m.email === assignedTo ||
-                                    m.name === assignedTo
-                                );
-                                const displayName = teamMember
-                                  ? teamMember.name
-                                  : assignedTo;
-
-                                return (
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
-                                    }}
                                   >
-                                    <Avatar sx={{ width: 24, height: 24 }}>
-                                      {displayName.charAt(0)}
-                                    </Avatar>
-                                    <Typography variant="body2">
-                                      {displayName}
-                                    </Typography>
-                                  </Box>
-                                );
-                              } else {
-                                return (
-                                  <Chip
-                                    label="Unassigned"
-                                    color="warning"
-                                    variant="outlined"
-                                    size="small"
-                                  />
-                                );
-                              }
-                            })()}
-                          </TableCell>
-                          {/* Assignment dropdown - Always show for admins */}
-                          <TableCell>
-                            <Box sx={{ display: "flex", gap: 1 }}>
+                                    {displayName.charAt(0)}
+                                  </Avatar>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ color: "#374151" }}
+                                  >
+                                    {displayName}
+                                  </Typography>
+                                </Box>
+                              ) : (
+                                <Chip
+                                  label="Unassigned"
+                                  color="warning"
+                                  variant="outlined"
+                                  size="small"
+                                />
+                              )}
+                            </TableCell>
+                            <TableCell>
                               <FormControl size="small" sx={{ minWidth: 120 }}>
                                 <Select
-                                  value={
-                                    lead.assignedTo ||
-                                    lead.assigned_to ||
-                                    lead.assignedAgent ||
-                                    ""
-                                  }
+                                  value={assignedTo || ""}
                                   displayEmpty
                                   onChange={(e) => {
                                     if (
                                       e.target.value &&
-                                      e.target.value !==
-                                        (lead.assignedTo ||
-                                          lead.assigned_to ||
-                                          lead.assignedAgent)
+                                      e.target.value !== assignedTo
                                     ) {
-                                      // Find the team member by email to get their name
                                       const selectedMember = teamMembers.find(
                                         (m) => m.email === e.target.value
                                       );
@@ -2332,7 +1519,7 @@ const ConversionPlan = () => {
                                       handleQuickAssign(lead.id, agentName);
                                     }
                                   }}
-                                  sx={{ fontSize: "0.875rem" }}
+                                  sx={{ fontSize: "0.813rem" }}
                                 >
                                   <MenuItem value="">
                                     <em>Select Agent</em>
@@ -2342,30 +1529,15 @@ const ConversionPlan = () => {
                                       key={member.id}
                                       value={member.email}
                                     >
-                                      {member.name.split(" ")[0]}
-                                      <Chip
-                                        label={`${member.assignedCount}/${member.maxCapacity}`}
-                                        size="small"
-                                        sx={{
-                                          ml: 1,
-                                          fontSize: "0.7rem",
-                                          height: 16,
-                                        }}
-                                        color={
-                                          member.assignedCount >=
-                                          member.maxCapacity
-                                            ? "error"
-                                            : "default"
-                                        }
-                                      />
+                                      {member.name}
                                     </MenuItem>
                                   ))}
                                 </Select>
                               </FormControl>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                   )}
                 </TableBody>
               </Table>
@@ -2387,32 +1559,44 @@ const ConversionPlan = () => {
           </Paper>
         </Grid>
 
-        {/* Team Members Sidebar - Always show for admins */}
+        {/* Simplified Team Members Sidebar */}
         <Grid item xs={12} lg={4}>
-          <Paper elevation={2} sx={{ p: 3 }}>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Marketing Team
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              border: "1px solid #e5e7eb",
+              borderRadius: 1.5,
+            }}
+          >
+            <Typography
+              variant="h6"
+              fontWeight="600"
+              sx={{ mb: 0.5, color: "#111827" }}
+            >
+              Team Members
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Available agents for lead assignment
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {teamMembers.length} active agents
             </Typography>
 
-            <List>
+            <List sx={{ p: 0 }}>
               {teamMembers.map((member, index) => (
                 <React.Fragment key={member.id}>
                   <ListItem
                     sx={{
-                      bgcolor: "background.paper",
-                      borderRadius: 2,
+                      px: 2,
+                      py: 1.5,
+                      bgcolor: "#f9fafb",
+                      borderRadius: 1,
                       mb: 1,
-                      border: "1px solid",
-                      borderColor: "divider",
+                      border: "1px solid #e5e7eb",
                     }}
                   >
                     <ListItemAvatar>
                       <Badge
                         color={
-                          member.status === "online" ? "success" : "warning"
+                          member.status === "online" ? "success" : "default"
                         }
                         variant="dot"
                         anchorOrigin={{
@@ -2420,61 +1604,40 @@ const ConversionPlan = () => {
                           horizontal: "right",
                         }}
                       >
-                        <Avatar src={member.avatar}>
+                        <Avatar
+                          sx={{ bgcolor: "#2563eb", width: 36, height: 36 }}
+                        >
                           {member.name.charAt(0)}
                         </Avatar>
                       </Badge>
                     </ListItemAvatar>
                     <ListItemText
                       primary={
-                        <Typography variant="subtitle2" fontWeight="bold">
+                        <Typography
+                          variant="body2"
+                          fontWeight="600"
+                          sx={{ color: "#111827" }}
+                        >
                           {member.name}
                         </Typography>
                       }
                       secondary={
-                        <Box>
-                          <Box sx={{ mt: 1 }}>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                mb: 0.5,
-                              }}
-                            >
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                Conversion rate
-                              </Typography>
-                            </Box>
-                            <LinearProgress
-                              variant="determinate"
-                              value={member.conversionRate}
-                              color="success"
-                              sx={{ mt: 0.5, height: 4, mb: 0.5 }}
-                            />
-                          </Box>
+                        <Box sx={{ mt: 0.5 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {member.conversionRate}% conversion rate
+                          </Typography>
                         </Box>
                       }
                     />
                     <ListItemSecondaryAction>
-                      <Box sx={{ textAlign: "center" }}>
-                        <Typography
-                          variant="h5"
-                          fontWeight="bold"
-                          color="primary"
-                        >
-                          {member.assignedCount}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          assigned leads
-                        </Typography>
-                      </Box>
+                      <Typography variant="h6" fontWeight="600" color="primary">
+                        {member.assignedCount}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        leads
+                      </Typography>
                     </ListItemSecondaryAction>
                   </ListItem>
-                  {index < teamMembers.length - 1 && <Divider sx={{ my: 1 }} />}
                 </React.Fragment>
               ))}
             </List>
@@ -2482,6 +1645,7 @@ const ConversionPlan = () => {
             <Button
               variant="outlined"
               fullWidth
+              size="small"
               startIcon={<PersonAddIcon />}
               sx={{ mt: 2 }}
             >

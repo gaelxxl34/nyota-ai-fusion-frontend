@@ -47,24 +47,8 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
     setLoading(true);
     setError(null);
     try {
-      console.log("Starting lead assignments data fetch...");
-
-      // Get marketing agents using the correct approach
-      console.log("Fetching marketing agents...");
+      // Get marketing agents
       const membersResponse = await teamService.getTeamMembers();
-
-      // Detailed logging to debug response
-      console.log("Team members response:", {
-        success: membersResponse.success,
-        membersCount: membersResponse.members?.length || 0,
-        firstMember: membersResponse.members?.[0]
-          ? {
-              email: membersResponse.members[0].email,
-              role: membersResponse.members[0].role,
-            }
-          : "none",
-      });
-
       const members = membersResponse.members || [];
 
       // Filter to get only marketing agents
@@ -72,75 +56,46 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
         (member) => member && member.role === "marketingAgent"
       );
 
-      console.log("Marketing agents found:", marketingAgents.length);
-
-      if (marketingAgents.length === 0) {
-        console.warn(
-          "No marketing agents found - check user roles in database"
-        );
-      }
-
-      // Get leads by status using the correct statuses from the backend
-      // Status values should be uppercase to match backend constants
-      const statusesToFetch = [
-        "NEW", // If this status exists in backend
-        "CONTACTED",
-        "INTERESTED",
-        "APPLIED",
-        "ENROLLED",
-        "NOT_INTERESTED", // If this status exists in backend
-        "ON_HOLD", // If this status exists in backend
-      ];
-
+      // Fetch ALL leads to ensure we get assigned leads with all statuses
       const allLeads = [];
-
-      // Get all leads if individual status fetch doesn't work
       try {
-        console.log("Fetching all leads first");
         const allLeadsResponse = await leadService.getAllLeads({
           limit: 10000,
           offset: 0,
         });
 
         if (allLeadsResponse?.data) {
-          console.log(
-            `Successfully fetched ${allLeadsResponse.data.length} leads from getAllLeads`
-          );
           allLeads.push(...allLeadsResponse.data);
         }
       } catch (allLeadsError) {
-        console.warn("Failed to fetch all leads:", allLeadsError);
-
-        // Fallback: Fetch leads by status
-        for (const status of statusesToFetch) {
-          try {
-            console.log(`Fetching leads for status: ${status}`);
-            const statusResponse = await leadService.getLeadsByStatus(status, {
-              limit: 10000,
-              offset: 0,
-            });
-
-            if (statusResponse?.data) {
-              console.log(
-                `Successfully fetched ${statusResponse.data.length} leads with status ${status}`
-              );
-              allLeads.push(...statusResponse.data);
-            }
-          } catch (statusError) {
-            console.warn(
-              `Failed to fetch leads for status ${status}:`,
-              statusError
-            );
-          }
-        }
+        console.error("Failed to fetch all leads:", allLeadsError);
       }
 
-      console.log("Total leads fetched:", allLeads.length);
+      // EXPIRED/DEFERRED TRACKING: Count total leads with these statuses
+      const expiredTotal = allLeads.filter(
+        (l) => String(l.status || "").toUpperCase() === "EXPIRED"
+      ).length;
+      const deferredTotal = allLeads.filter(
+        (l) => String(l.status || "").toUpperCase() === "DEFERRED"
+      ).length;
+      console.log(`🔍 EXPIRED leads in fetched data: ${expiredTotal}`);
+      console.log(`🔍 DEFERRED leads in fetched data: ${deferredTotal}`);
+
+      // Debug: Count leads with EXPIRED or DEFERRED that are assigned
+      const assignedExpired = allLeads.filter((l) => {
+        const hasAssignment = l.assignedTo || l.assigned_to;
+        const isExpired = String(l.status || "").toUpperCase() === "EXPIRED";
+        return hasAssignment && isExpired;
+      }).length;
+      const assignedDeferred = allLeads.filter((l) => {
+        const hasAssignment = l.assignedTo || l.assigned_to;
+        const isDeferred = String(l.status || "").toUpperCase() === "DEFERRED";
+        return hasAssignment && isDeferred;
+      }).length;
+      console.log(`🎯 Assigned EXPIRED leads: ${assignedExpired}`);
+      console.log(`🎯 Assigned DEFERRED leads: ${assignedDeferred}`);
 
       // Fetch all applications to map leadId to application existence
-      console.log(
-        "Fetching all applications to count applications per lead..."
-      );
       let allApplications = [];
       try {
         const applicationsResponse = await applicationService.getApplications({
@@ -152,20 +107,11 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
           applicationsResponse?.applications
         ) {
           allApplications = applicationsResponse.applications;
-          console.log(
-            `Successfully fetched ${allApplications.length} applications`
-          );
         } else if (applicationsResponse?.data?.data) {
           allApplications = applicationsResponse.data.data;
-          console.log(
-            `Successfully fetched ${allApplications.length} applications`
-          );
-        } else {
-          console.warn("No applications found or unexpected response format");
         }
       } catch (appError) {
         console.error("Failed to fetch applications:", appError);
-        // Continue without application data
       }
 
       // Create a map of leadId to application count for quick lookup
@@ -179,43 +125,14 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
         }
       });
 
-      console.log(
-        `Created application map with ${leadApplicationMap.size} unique lead IDs`
-      );
-
       // Store the map in state so it can be passed to AgentLeadsDetail
       setLeadApplicationMap(leadApplicationMap);
 
-      // Filter leads based on time filter
-      const now = new Date();
-      const filteredLeads = allLeads.filter((lead) => {
-        if (timeFilter === "all") return true;
-
-        const assignedDate = new Date(
-          lead.assignedAt || lead.updatedAt || lead.createdAt
-        );
-        const diffTime = now - assignedDate;
-        const diffDays = diffTime / (1000 * 60 * 60 * 24);
-
-        switch (timeFilter) {
-          case "daily":
-            return diffDays <= 1;
-          case "weekly":
-            return diffDays <= 7;
-          case "monthly":
-            return diffDays <= 30;
-          default:
-            return true;
-        }
-      });
-
-      console.log("Filtered leads for time period:", filteredLeads.length);
-
-      // Calculate performance for each marketing agent using the working pattern
+      // Calculate performance for each marketing agent
       const performanceData = marketingAgents.map((agent) => {
         try {
-          // Get leads assigned to this agent
-          const assignedLeads = filteredLeads.filter((lead) => {
+          // Get leads assigned to this agent - using ALL leads, not time-filtered
+          const assignedLeads = allLeads.filter((lead) => {
             const assignedTo =
               lead.assignedTo ||
               lead.assigned_to ||
@@ -231,23 +148,42 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
             return isAssigned;
           });
 
+          // EXPIRED/DEFERRED TRACKING: Count for this agent
+          const expiredCount = assignedLeads.filter((l) => {
+            // Handle both string and object status formats
+            let status;
+            if (typeof l.status === "object") {
+              status =
+                l.status?.code || l.status?.name || l.status?.value || "";
+            } else {
+              status = l.status || "";
+            }
+            const upperStatus = String(status).toUpperCase().trim();
+            return upperStatus === "EXPIRED";
+          }).length;
+          const deferredCount = assignedLeads.filter((l) => {
+            // Handle both string and object status formats
+            let status;
+            if (typeof l.status === "object") {
+              status =
+                l.status?.code || l.status?.name || l.status?.value || "";
+            } else {
+              status = l.status || "";
+            }
+            const upperStatus = String(status).toUpperCase().trim();
+            return upperStatus === "DEFERRED";
+          }).length;
           console.log(
-            `Agent ${agent.name || agent.email} has ${
-              assignedLeads.length
-            } assigned leads`
+            `🎯 Agent ${
+              agent.name || agent.email
+            } - EXPIRED: ${expiredCount}, DEFERRED: ${deferredCount}`
           );
 
-          // Count leads with applications (any lead that has an application in the applications collection)
+          // Count leads with applications
           const leadsWithApplications = assignedLeads.filter((lead) => {
             const leadId = lead._id || lead.id;
             return leadApplicationMap.has(leadId);
           }).length;
-
-          console.log(
-            `Agent ${
-              agent.name || agent.email
-            } has ${leadsWithApplications} leads with applications`
-          );
 
           // More robust status counting that handles multiple status formats
           const statusCounts = assignedLeads.reduce((acc, lead) => {
@@ -259,29 +195,37 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
                 lead.status?.code ||
                 lead.status?.name ||
                 lead.status?.value ||
-                "NEW";
+                "INTERESTED"; // Default to INTERESTED (a real status) instead of NEW
             } else {
-              status = lead.status || "NEW";
+              status = lead.status || "INTERESTED"; // Default to INTERESTED (a real status)
             }
 
-            // Normalize status names
-            // First convert to lowercase for consistency in our component
-            const normalizedStatus = status
+            // Normalize status names to UPPERCASE first for consistent comparison
+            const upperStatus = String(status).toUpperCase().trim();
+
+            // Then convert to lowercase for our object keys
+            const normalizedStatus = upperStatus
               .toLowerCase()
               .replace(/[^a-z0-9]/g, "_");
             acc[normalizedStatus] = (acc[normalizedStatus] || 0) + 1;
 
-            // Debug log to see what statuses we're finding
-            if (assignedLeads.length > 0 && !acc._logged) {
+            // EXPIRED/DEFERRED TRACKING: Log when we find these statuses
+            if (upperStatus === "EXPIRED" || upperStatus === "DEFERRED") {
               console.log(
-                `Sample lead status format: ${JSON.stringify(lead.status)}`
+                `🔍 Found ${upperStatus} lead for agent ${
+                  agent.name || agent.email
+                }: ${lead.name || lead.id}`
               );
-              console.log(`Normalized to: ${normalizedStatus}`);
-              acc._logged = true;
             }
 
             return acc;
           }, {});
+
+          // Debug: Log status counts to verify keys
+          console.log(
+            `📊 Status counts for ${agent.name || agent.email}:`,
+            statusCounts
+          );
 
           // Calculate interactions from timeline data, paying attention to who performed the interaction
           // Initialize counters
@@ -410,17 +354,6 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
             );
           });
 
-          // Debug log for the first agent
-          if (agent === marketingAgents[0]) {
-            console.log(`Interaction data for ${agent.name || agent.email}:`, {
-              totalByAgent: agentInteractions.totalByAgent,
-              dailyByAgent: agentInteractions.dailyByAgent,
-              weeklyByAgent: agentInteractions.weeklyByAgent,
-              interactionsByType,
-              assignedLeadsCount: assignedLeads.length,
-            });
-          }
-
           // Calculate last activity more comprehensively
           let lastActivityDate = null;
           if (assignedLeads.length > 0) {
@@ -446,6 +379,15 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
             }
           }
 
+          // Debug: Log the final values being returned
+          console.log(`✅ Returning for ${agent.name || agent.email}:`, {
+            expired: statusCounts.expired || 0,
+            deferred: statusCounts.deferred || 0,
+            expiredCount,
+            deferredCount,
+            statusCountsKeys: Object.keys(statusCounts),
+          });
+
           return {
             memberId: agent._id || agent.email,
             memberName: agent.name || agent.email.split("@")[0],
@@ -456,9 +398,8 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
             enrolledAssignments: statusCounts.enrolled || 0,
             interestedAssignments: statusCounts.interested || 0,
             contactedAssignments: statusCounts.contacted || 0,
-            newAssignments: statusCounts.new || 0,
-            onHoldAssignments: statusCounts.on_hold || 0,
-            notInterestedAssignments: statusCounts.not_interested || 0,
+            expiredAssignments: expiredCount, // Use directly calculated count
+            deferredAssignments: deferredCount, // Use directly calculated count
             // New detailed interaction metrics
             interactions: agentInteractions.totalByAgent || 0,
             dailyInteractions: agentInteractions.dailyByAgent || 0,
@@ -504,9 +445,8 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
             enrolledAssignments: 0,
             interestedAssignments: 0,
             contactedAssignments: 0,
-            newAssignments: 0,
-            onHoldAssignments: 0,
-            notInterestedAssignments: 0,
+            expiredAssignments: 0,
+            deferredAssignments: 0,
             interactions: 0,
             dailyInteractions: 0,
             weeklyInteractions: 0,
@@ -516,8 +456,6 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
           };
         }
       });
-
-      console.log("Performance data calculated:", performanceData);
 
       // Show all marketing agents, including those with no assignments
       setAssignmentData(performanceData);
@@ -715,7 +653,6 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
                       </TableCell>
                       <TableCell>Role</TableCell>
                       <TableCell align="right">Total Assigned</TableCell>
-                      <TableCell align="right">New</TableCell>
                       <TableCell align="right">Contacted</TableCell>
                       <TableCell align="right">Interested</TableCell>
                       <TableCell align="right">
@@ -738,6 +675,42 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
                         </Tooltip>
                       </TableCell>
                       <TableCell align="right">Enrolled</TableCell>
+                      <TableCell align="right">
+                        <Tooltip
+                          title="Leads deferred to next intake - students still interested but will apply later"
+                          arrow
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              justifyContent: "flex-end",
+                              cursor: "help",
+                            }}
+                          >
+                            Deferred
+                          </Box>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Tooltip
+                          title="Leads marked as expired - gone cold or too old to pursue"
+                          arrow
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              justifyContent: "flex-end",
+                              cursor: "help",
+                            }}
+                          >
+                            Expired
+                          </Box>
+                        </Tooltip>
+                      </TableCell>
                       <TableCell align="right">
                         <Box
                           sx={{
@@ -854,14 +827,6 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
                           </TableCell>
                           <TableCell align="right">
                             <Chip
-                              label={member.newAssignments}
-                              size="small"
-                              color="default"
-                              variant="outlined"
-                            />
-                          </TableCell>
-                          <TableCell align="right">
-                            <Chip
                               label={member.contactedAssignments}
                               size="small"
                               color="info"
@@ -889,6 +854,30 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
                               label={member.enrolledAssignments}
                               size="small"
                               color="success"
+                              variant="filled"
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Chip
+                              label={member.deferredAssignments}
+                              size="small"
+                              sx={{
+                                bgcolor: "#ff9800",
+                                color: "white",
+                                "& .MuiChip-label": { color: "white" },
+                              }}
+                              variant="filled"
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Chip
+                              label={member.expiredAssignments}
+                              size="small"
+                              sx={{
+                                bgcolor: "#9e9e9e",
+                                color: "white",
+                                "& .MuiChip-label": { color: "white" },
+                              }}
                               variant="filled"
                             />
                           </TableCell>
@@ -993,7 +982,7 @@ const LeadAssignmentsTab = ({ teamService, analytics, refreshAnalytics }) => {
                         <TableRow>
                           <TableCell
                             style={{ paddingBottom: 0, paddingTop: 0 }}
-                            colSpan={12}
+                            colSpan={13}
                           >
                             <Collapse
                               in={expandedAgent === member.memberId}
