@@ -619,6 +619,14 @@ const AssignedLeads = () => {
     [extractLastInteraction]
   );
 
+  // Helper function to safely extract string value from potentially object fields
+  const safeExtractString = (value, defaultValue = "") => {
+    if (!value) return defaultValue;
+    if (typeof value === "string") return value;
+    if (typeof value === "object" && value.name) return value.name;
+    return defaultValue;
+  };
+
   // Fetch assigned leads from the API
   const fetchAssignedLeads = useCallback(async () => {
     try {
@@ -680,7 +688,9 @@ const AssignedLeads = () => {
 
           // Format for our component
           return {
-            ...lead,
+            // Explicitly include only the properties we need (no spreading)
+            id: lead.id,
+            status: lead.status,
             avatar: initials,
             priority,
             interactionTags,
@@ -690,14 +700,24 @@ const AssignedLeads = () => {
             createdDate: createdDate,
             assignedDate: assignedDate,
             lastContact: lastContact,
-            course: lead.programOfInterest || lead.program || "Not specified",
-            source: lead.source || "Unknown",
+            updatedAt: lead.updatedAt,
+            applicationDate: lead.applicationDate,
+            lastInteractionAt: lead.lastInteractionAt,
+            // Safely extracted string fields
+            course:
+              safeExtractString(lead.programOfInterest) ||
+              safeExtractString(lead.program) ||
+              "Not specified",
+            source: safeExtractString(lead.source, "Unknown"),
             phone: lead.phone || lead.contactInfo?.phone || "Not provided",
             email: lead.email || lead.contactInfo?.email || "Not provided",
             name: lead.name || lead.contactInfo?.name || "Unknown Lead",
+            notes: lead.notes,
             // Preserve interaction data from backend
             interactionSummary: lead.interactionSummary,
             lastInteraction: lead.lastInteraction,
+            timeline: lead.timeline,
+            assignment: lead.assignment,
           };
         });
 
