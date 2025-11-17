@@ -30,6 +30,8 @@ import {
   Facebook as FacebookIcon,
   Assignment as AssignmentIcon,
   PersonPin as AssignedLeadsIcon,
+  Archive as ArchiveIcon,
+  TableView as TableViewIcon,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -84,6 +86,11 @@ const Layout = ({ children }) => {
           path: "/admission-admin/import-data",
         },
         {
+          text: "Suzy Sheets",
+          icon: <TableViewIcon />,
+          path: "/admission-admin/suzy-sheets",
+        },
+        {
           text: "Facebook Lead Forms",
           icon: <FacebookIcon />,
           path: "/super-admin/facebook-lead-forms",
@@ -97,6 +104,11 @@ const Layout = ({ children }) => {
           text: "Chat Management",
           icon: <ChatIcon />,
           path: "/super-admin/chat",
+        },
+        {
+          text: "Archive",
+          icon: <ArchiveIcon />,
+          path: "/super-admin/archive",
         },
         {
           text: "Admin Settings",
@@ -128,6 +140,11 @@ const Layout = ({ children }) => {
           text: "Import Data",
           icon: <ImportIcon />,
           path: "/admission-admin/import-data",
+        },
+        {
+          text: "Suzy Sheets",
+          icon: <TableViewIcon />,
+          path: "/admission-admin/suzy-sheets",
         },
       ];
 
@@ -250,6 +267,13 @@ const Layout = ({ children }) => {
         path: "/admin/import-data",
       });
 
+      // Suzy Sheets is available to admission agents
+      admissionAgentItems.push({
+        text: "Suzy Sheets",
+        icon: <TableViewIcon />,
+        path: "/admin/suzy-sheets",
+      });
+
       // Chat Configuration for admission agents
       if (checkPermission(role, PERMISSIONS.CHAT_CONFIG)) {
         admissionAgentItems.push({
@@ -327,6 +351,11 @@ const Layout = ({ children }) => {
         text: "Import Data",
         icon: <ImportIcon />,
         path: "/admin/import-data",
+      });
+      adminMenuItems.push({
+        text: "Suzy Sheets",
+        icon: <TableViewIcon />,
+        path: "/admin/suzy-sheets",
       });
     }
 
@@ -517,14 +546,29 @@ const Layout = ({ children }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          width: "100%",
+          minWidth: 0,
           minHeight: "100vh",
           bgcolor: "background.default",
+          px: { xs: 2, sm: 3 },
+          py: { xs: 2, sm: 3 },
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        <Toolbar />
-        {children}
+        <Toolbar sx={{ px: 0 }} />
+        <Box
+          sx={{
+            width: "100%",
+            maxWidth: 1200,
+            mx: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: { xs: 2, md: 3 },
+          }}
+        >
+          {children}
+        </Box>
       </Box>
     </Box>
   );

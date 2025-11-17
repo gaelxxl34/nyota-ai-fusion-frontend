@@ -32,6 +32,7 @@ import {
   Tabs,
   Tab,
   Divider,
+  Stack,
 } from "@mui/material";
 import {
   Send as SendIcon,
@@ -753,7 +754,15 @@ We're here to support you and are excited to have you on this journey! 🌟`;
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box
+      sx={{
+        p: { xs: 1, sm: 2, md: 3 },
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        width: "100%",
+      }}
+    >
       <Typography variant="h4" gutterBottom>
         Bulk Actions
       </Typography>
@@ -869,13 +878,12 @@ We're here to support you and are excited to have you on this journey! 🌟`;
 
       {/* Campaigns Tab */}
       <TabPanel value={tabValue} index={5}>
-        <Box
-          sx={{
-            mb: 3,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={{ xs: 2, md: 0 }}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", md: "center" }}
+          sx={{ mb: 3, width: "100%" }}
         >
           <Typography variant="h6">Campaign History</Typography>
           <Button
@@ -883,10 +891,11 @@ We're here to support you and are excited to have you on this journey! 🌟`;
             startIcon={<RefreshIcon />}
             onClick={fetchCampaigns}
             disabled={campaignLoading}
+            sx={{ width: { xs: "100%", md: "auto" } }}
           >
             Refresh
           </Button>
-        </Box>
+        </Stack>
 
         {campaignLoading ? (
           <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
@@ -903,13 +912,12 @@ We're here to support you and are excited to have you on this journey! 🌟`;
               <Grid item xs={12} key={campaign.id}>
                 <Card>
                   <CardContent>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        mb: 2,
-                      }}
+                    <Stack
+                      direction={{ xs: "column", lg: "row" }}
+                      spacing={2}
+                      justifyContent="space-between"
+                      alignItems={{ xs: "stretch", lg: "flex-start" }}
+                      sx={{ width: "100%" }}
                     >
                       <Box>
                         <Typography variant="h6">{campaign.name}</Typography>
@@ -917,8 +925,11 @@ We're here to support you and are excited to have you on this journey! 🌟`;
                           {campaign.description || "No description"}
                         </Typography>
                       </Box>
-                      <Box
-                        sx={{ display: "flex", gap: 1, alignItems: "center" }}
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        justifyContent={{ xs: "flex-start", lg: "flex-end" }}
                       >
                         <Chip
                           label={campaign.status}
@@ -942,18 +953,8 @@ We're here to support you and are excited to have you on this journey! 🌟`;
                         >
                           <DeleteIcon />
                         </IconButton>
-                      </Box>
-                    </Box>
-
-                    {/* Campaign Progress */}
-                    {campaign.status === "running" && (
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" gutterBottom>
-                          Processing...
-                        </Typography>
-                        <LinearProgress />
-                      </Box>
-                    )}
+                      </Stack>
+                    </Stack>
 
                     {/* Campaign Stats */}
                     {campaign.results && (

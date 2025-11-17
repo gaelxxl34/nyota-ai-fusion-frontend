@@ -652,258 +652,362 @@ const ConversionPlan = () => {
   return (
     <Box
       sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: { xs: 2, md: 3 },
         bgcolor: "#f9fafb",
         minHeight: "100vh",
-        p: 3,
+        p: { xs: 1.5, sm: 2, md: 3 },
+        width: "100%",
+        maxWidth: "100vw",
+        boxSizing: "border-box",
+        ml: 0,
+        mr: 0,
       }}
     >
-      {/* Simplified Header */}
-      <Box sx={{ mb: 3 }}>
+      {/* Responsive Header */}
+      <Box sx={{ mb: { xs: 2, md: 3 } }}>
         <Typography
           variant="h4"
           fontWeight="600"
-          sx={{ color: "#111827", mb: 0.5 }}
+          sx={{
+            color: "#111827",
+            mb: 0.5,
+            fontSize: { xs: "1.5rem", sm: "2rem", md: "2.125rem" },
+          }}
         >
           Lead Conversion Management
         </Typography>
-        <Typography variant="body2" sx={{ color: "#6b7280" }}>
+        <Typography
+          variant="body2"
+          sx={{
+            color: "#6b7280",
+            fontSize: { xs: "0.813rem", sm: "0.875rem" },
+          }}
+        >
           Manage and assign leads to your marketing team
         </Typography>
       </Box>
 
-      {/* Simplified Statistics Dashboard with Progressive Loading */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            elevation={0}
-            sx={{
-              bgcolor: "#ffffff",
-              border: "1px solid #e5e7eb",
-              borderRadius: 1.5,
-              transition: "border-color 0.2s",
-              "&:hover": {
-                borderColor: "#d1d5db",
-              },
-            }}
-          >
-            <CardContent sx={{ p: 2.5 }}>
-              <Box
+      {/* Responsive Statistics Dashboard */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "repeat(2, 1fr)",
+            sm: "repeat(3, 1fr)",
+            md: "repeat(5, 1fr)",
+          },
+          gap: { xs: 1.5, sm: 2 },
+        }}
+      >
+        <Card
+          elevation={0}
+          sx={{
+            bgcolor: "#ffffff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 1.5,
+            transition: "border-color 0.2s",
+            "&:hover": {
+              borderColor: "#d1d5db",
+            },
+          }}
+        >
+          <CardContent sx={{ p: { xs: 1.5, sm: 2, md: 2.5 } }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: { xs: 0.75, sm: 1.5 },
+                mb: { xs: 0.75, sm: 1.5 },
+                flexDirection: { xs: "column", sm: "row" },
+              }}
+            >
+              <GroupIcon
                 sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.5,
-                  mb: 1.5,
+                  fontSize: { xs: 18, sm: 20 },
+                  color: "#6b7280",
+                }}
+              />
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                fontWeight={500}
+                sx={{
+                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  textAlign: { xs: "center", sm: "left" },
                 }}
               >
-                <GroupIcon sx={{ fontSize: 20, color: "#6b7280" }} />
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  fontWeight={500}
-                >
-                  Total Leads
-                </Typography>
-              </Box>
-              {loading ? (
-                <Skeleton variant="text" width={80} height={40} />
-              ) : (
-                <Typography
-                  variant="h4"
-                  fontWeight="700"
-                  sx={{ color: "#111827" }}
-                >
-                  {stats.totalLeads}
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
+                Total Leads
+              </Typography>
+            </Box>
+            {loading ? (
+              <Skeleton variant="text" width={80} height={40} />
+            ) : (
+              <Typography
+                variant="h4"
+                fontWeight="700"
+                sx={{
+                  color: "#111827",
+                  fontSize: { xs: "1.75rem", sm: "2.125rem" },
+                  textAlign: { xs: "center", sm: "left" },
+                }}
+              >
+                {stats.totalLeads}
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
 
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            elevation={0}
-            sx={{
-              bgcolor: "#fffbeb",
-              border: "1px solid #fde68a",
-              borderRadius: 1.5,
-              transition: "border-color 0.2s",
-              "&:hover": {
-                borderColor: "#fcd34d",
-              },
-            }}
-          >
-            <CardContent sx={{ p: 2.5 }}>
-              <Box
+        <Card
+          elevation={0}
+          sx={{
+            bgcolor: "#fffbeb",
+            border: "1px solid #fde68a",
+            borderRadius: 1.5,
+            transition: "border-color 0.2s",
+            "&:hover": {
+              borderColor: "#fcd34d",
+            },
+          }}
+        >
+          <CardContent sx={{ p: { xs: 1.5, sm: 2, md: 2.5 } }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: { xs: 0.75, sm: 1.5 },
+                mb: { xs: 0.75, sm: 1.5 },
+                flexDirection: { xs: "column", sm: "row" },
+              }}
+            >
+              <PersonAddIcon
                 sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.5,
-                  mb: 1.5,
+                  fontSize: { xs: 18, sm: 20 },
+                  color: "#d97706",
+                }}
+              />
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "#92400e",
+                  fontWeight: 500,
+                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  textAlign: { xs: "center", sm: "left" },
                 }}
               >
-                <PersonAddIcon sx={{ fontSize: 20, color: "#d97706" }} />
-                <Typography
-                  variant="body2"
-                  sx={{ color: "#92400e", fontWeight: 500 }}
-                >
-                  Unassigned
-                </Typography>
-              </Box>
-              {loading ? (
-                <Skeleton variant="text" width={80} height={40} />
-              ) : (
-                <Typography
-                  variant="h4"
-                  fontWeight="700"
-                  sx={{ color: "#92400e" }}
-                >
-                  {stats.unassigned}
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
+                Unassigned
+              </Typography>
+            </Box>
+            {loading ? (
+              <Skeleton variant="text" width={80} height={40} />
+            ) : (
+              <Typography
+                variant="h4"
+                fontWeight="700"
+                sx={{
+                  color: "#92400e",
+                  fontSize: { xs: "1.75rem", sm: "2.125rem" },
+                  textAlign: { xs: "center", sm: "left" },
+                }}
+              >
+                {stats.unassigned}
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
 
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            elevation={0}
-            sx={{
-              bgcolor: "#eff6ff",
-              border: "1px solid #bfdbfe",
-              borderRadius: 1.5,
-              transition: "border-color 0.2s",
-              "&:hover": {
-                borderColor: "#93c5fd",
-              },
-            }}
-          >
-            <CardContent sx={{ p: 2.5 }}>
-              <Box
+        <Card
+          elevation={0}
+          sx={{
+            bgcolor: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            borderRadius: 1.5,
+            transition: "border-color 0.2s",
+            "&:hover": {
+              borderColor: "#93c5fd",
+            },
+          }}
+        >
+          <CardContent sx={{ p: { xs: 1.5, sm: 2, md: 2.5 } }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: { xs: 0.75, sm: 1.5 },
+                mb: { xs: 0.75, sm: 1.5 },
+                flexDirection: { xs: "column", sm: "row" },
+              }}
+            >
+              <PhoneIcon
                 sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.5,
-                  mb: 1.5,
+                  fontSize: { xs: 18, sm: 20 },
+                  color: "#2563eb",
+                }}
+              />
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "#1e40af",
+                  fontWeight: 500,
+                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  textAlign: { xs: "center", sm: "left" },
                 }}
               >
-                <PhoneIcon sx={{ fontSize: 20, color: "#2563eb" }} />
-                <Typography
-                  variant="body2"
-                  sx={{ color: "#1e40af", fontWeight: 500 }}
-                >
-                  Contacted
-                </Typography>
-              </Box>
-              {loading ? (
-                <Skeleton variant="text" width={80} height={40} />
-              ) : (
-                <Typography
-                  variant="h4"
-                  fontWeight="700"
-                  sx={{ color: "#1e40af" }}
-                >
-                  {stats.contacted}
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
+                Contacted
+              </Typography>
+            </Box>
+            {loading ? (
+              <Skeleton variant="text" width={80} height={40} />
+            ) : (
+              <Typography
+                variant="h4"
+                fontWeight="700"
+                sx={{
+                  color: "#1e40af",
+                  fontSize: { xs: "1.75rem", sm: "2.125rem" },
+                  textAlign: { xs: "center", sm: "left" },
+                }}
+              >
+                {stats.contacted}
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
 
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            elevation={0}
-            sx={{
-              bgcolor: "#f0fdf4",
-              border: "1px solid #bbf7d0",
-              borderRadius: 1.5,
-              transition: "border-color 0.2s",
-              "&:hover": {
-                borderColor: "#86efac",
-              },
-            }}
-          >
-            <CardContent sx={{ p: 2.5 }}>
-              <Box
+        <Card
+          elevation={0}
+          sx={{
+            bgcolor: "#f0fdf4",
+            border: "1px solid #bbf7d0",
+            borderRadius: 1.5,
+            transition: "border-color 0.2s",
+            "&:hover": {
+              borderColor: "#86efac",
+            },
+          }}
+        >
+          <CardContent sx={{ p: { xs: 1.5, sm: 2, md: 2.5 } }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: { xs: 0.75, sm: 1.5 },
+                mb: { xs: 0.75, sm: 1.5 },
+                flexDirection: { xs: "column", sm: "row" },
+              }}
+            >
+              <TrendingUpIcon
                 sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.5,
-                  mb: 1.5,
+                  fontSize: { xs: 18, sm: 20 },
+                  color: "#16a34a",
+                }}
+              />
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "#166534",
+                  fontWeight: 500,
+                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  textAlign: { xs: "center", sm: "left" },
                 }}
               >
-                <TrendingUpIcon sx={{ fontSize: 20, color: "#16a34a" }} />
-                <Typography
-                  variant="body2"
-                  sx={{ color: "#166534", fontWeight: 500 }}
-                >
-                  Interested
-                </Typography>
-              </Box>
-              {loading ? (
-                <Skeleton variant="text" width={80} height={40} />
-              ) : (
-                <Typography
-                  variant="h4"
-                  fontWeight="700"
-                  sx={{ color: "#166534" }}
-                >
-                  {stats.interested}
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
+                Interested
+              </Typography>
+            </Box>
+            {loading ? (
+              <Skeleton variant="text" width={80} height={40} />
+            ) : (
+              <Typography
+                variant="h4"
+                fontWeight="700"
+                sx={{
+                  color: "#166534",
+                  fontSize: { xs: "1.75rem", sm: "2.125rem" },
+                  textAlign: { xs: "center", sm: "left" },
+                }}
+              >
+                {stats.interested}
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
 
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            elevation={0}
-            sx={{
-              bgcolor: "#fef2f2",
-              border: "1px solid #fecaca",
-              borderRadius: 1.5,
-              transition: "border-color 0.2s",
-              "&:hover": {
-                borderColor: "#fca5a5",
-              },
-            }}
-          >
-            <CardContent sx={{ p: 2.5 }}>
-              <Box
+        <Card
+          elevation={0}
+          sx={{
+            bgcolor: "#fef2f2",
+            border: "1px solid #fecaca",
+            borderRadius: 1.5,
+            transition: "border-color 0.2s",
+            "&:hover": {
+              borderColor: "#fca5a5",
+            },
+          }}
+        >
+          <CardContent sx={{ p: { xs: 1.5, sm: 2, md: 2.5 } }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: { xs: 0.75, sm: 1.5 },
+                mb: { xs: 0.75, sm: 1.5 },
+                flexDirection: { xs: "column", sm: "row" },
+              }}
+            >
+              <FlagIcon
                 sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.5,
-                  mb: 1.5,
+                  fontSize: { xs: 18, sm: 20 },
+                  color: "#dc2626",
+                }}
+              />
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "#991b1b",
+                  fontWeight: 500,
+                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  textAlign: { xs: "center", sm: "left" },
                 }}
               >
-                <FlagIcon sx={{ fontSize: 20, color: "#dc2626" }} />
-                <Typography
-                  variant="body2"
-                  sx={{ color: "#991b1b", fontWeight: 500 }}
-                >
-                  High Priority
-                </Typography>
-              </Box>
-              {loading ? (
-                <Skeleton variant="text" width={80} height={40} />
-              ) : (
-                <Typography
-                  variant="h4"
-                  fontWeight="700"
-                  sx={{ color: "#991b1b" }}
-                >
-                  {stats.highPriority}
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+                High Priority
+              </Typography>
+            </Box>
+            {loading ? (
+              <Skeleton variant="text" width={80} height={40} />
+            ) : (
+              <Typography
+                variant="h4"
+                fontWeight="700"
+                sx={{
+                  color: "#991b1b",
+                  fontSize: { xs: "1.75rem", sm: "2.125rem" },
+                  textAlign: { xs: "center", sm: "left" },
+                }}
+              >
+                {stats.highPriority}
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
+      </Box>
 
       {/* Countries Info */}
       {Object.keys(availableCountries).length > 0 && (
-        <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }} icon={false}>
-          <Typography variant="body2" component="span">
+        <Alert
+          severity="info"
+          sx={{
+            mb: 2,
+            borderRadius: 2,
+            fontSize: { xs: "0.813rem", sm: "0.875rem" },
+          }}
+          icon={false}
+        >
+          <Typography
+            variant="body2"
+            component="span"
+            sx={{ fontSize: { xs: "0.813rem", sm: "0.875rem" } }}
+          >
             <strong>Available Countries:</strong>{" "}
             {Object.keys(availableCountries).length} countries detected from
             leads data:{" "}
@@ -927,25 +1031,38 @@ const ConversionPlan = () => {
         </Alert>
       )}
 
-      <Grid container spacing={3}>
-        {/* Simplified Leads Management Center */}
-        <Grid item xs={12} lg={8}>
+      <Stack
+        direction={{ xs: "column", lg: "row" }}
+        spacing={{ xs: 2, md: 3 }}
+        alignItems="stretch"
+        sx={{ width: "100%" }}
+      >
+        {/* Responsive Leads Management Center */}
+        <Box
+          sx={{
+            flex: { xs: "1 1 auto", lg: 2 },
+            width: { xs: "100%", lg: "auto" },
+            minWidth: 0,
+          }}
+        >
           <Paper
             elevation={0}
             sx={{
-              p: 3,
+              p: { xs: 1.5, sm: 2, md: 3 },
               bgcolor: "#ffffff",
               borderRadius: 1.5,
               border: "1px solid #e5e7eb",
             }}
           >
-            {/* Simplified Header with Actions */}
-            <Box sx={{ mb: 3 }}>
+            {/* Responsive Header with Actions */}
+            <Box sx={{ mb: { xs: 2, md: 3 } }}>
               <Box
                 sx={{
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "center",
+                  alignItems: { xs: "flex-start", sm: "center" },
+                  flexDirection: { xs: "column", sm: "row" },
+                  gap: { xs: 2, sm: 0 },
                   mb: 2,
                 }}
               >
@@ -953,36 +1070,81 @@ const ConversionPlan = () => {
                   <Typography
                     variant="h6"
                     fontWeight="600"
-                    sx={{ color: "#111827" }}
+                    sx={{
+                      color: "#111827",
+                      fontSize: { xs: "1.125rem", sm: "1.25rem" },
+                    }}
                   >
                     Lead Management
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ fontSize: { xs: "0.813rem", sm: "0.875rem" } }}
+                  >
                     {filteredLeads.length} leads
                   </Typography>
                 </Box>
 
-                <Stack direction="row" spacing={1}>
+                <Stack
+                  direction="row"
+                  spacing={{ xs: 0.75, sm: 1 }}
+                  sx={{ width: { xs: "100%", sm: "auto" } }}
+                >
                   <Button
                     size="small"
-                    startIcon={<RefreshIcon />}
+                    startIcon={<RefreshIcon sx={{ fontSize: 18 }} />}
                     onClick={handleRefresh}
                     disabled={refreshing}
                     variant="outlined"
+                    sx={{
+                      fontSize: "0.813rem",
+                      py: 0.75,
+                      px: { xs: 1.5, sm: 2 },
+                      minWidth: { xs: "auto", sm: 80 },
+                      borderColor: "#d1d5db",
+                      color: "#374151",
+                      "&:hover": {
+                        borderColor: "#9ca3af",
+                        bgcolor: "#f9fafb",
+                      },
+                    }}
                   >
-                    Refresh
+                    <Box
+                      component="span"
+                      sx={{ display: { xs: "none", sm: "inline" } }}
+                    >
+                      Refresh
+                    </Box>
                   </Button>
                   <Button
                     size="small"
-                    startIcon={<DownloadIcon />}
+                    startIcon={<DownloadIcon sx={{ fontSize: 18 }} />}
                     variant="outlined"
+                    sx={{
+                      fontSize: "0.813rem",
+                      py: 0.75,
+                      px: { xs: 1.5, sm: 2 },
+                      minWidth: { xs: "auto", sm: 80 },
+                      borderColor: "#d1d5db",
+                      color: "#374151",
+                      "&:hover": {
+                        borderColor: "#9ca3af",
+                        bgcolor: "#f9fafb",
+                      },
+                    }}
                   >
-                    Export
+                    <Box
+                      component="span"
+                      sx={{ display: { xs: "none", sm: "inline" } }}
+                    >
+                      Export
+                    </Box>
                   </Button>
                   <Button
                     size="small"
                     variant="contained"
-                    startIcon={<AssignmentIcon />}
+                    startIcon={<AssignmentIcon sx={{ fontSize: 18 }} />}
                     onClick={() =>
                       setAssignmentDialog((prev) => ({
                         ...prev,
@@ -992,197 +1154,98 @@ const ConversionPlan = () => {
                       }))
                     }
                     disabled={selectedLeads.length === 0}
+                    sx={{
+                      fontSize: "0.813rem",
+                      py: 0.75,
+                      px: { xs: 1.5, sm: 2 },
+                      minWidth: { xs: "auto", sm: 90 },
+                      bgcolor: "#3b82f6",
+                      "&:hover": {
+                        bgcolor: "#2563eb",
+                      },
+                      "&:disabled": {
+                        bgcolor: "#e5e7eb",
+                        color: "#9ca3af",
+                      },
+                    }}
                   >
-                    Assign ({selectedLeads.length})
+                    <Box component="span">
+                      Assign{" "}
+                      {selectedLeads.length > 0 && `(${selectedLeads.length})`}
+                    </Box>
                   </Button>
                 </Stack>
               </Box>
 
-              {/* Simplified Filter Controls */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  mb: 2,
-                  bgcolor: "#f9fafb",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 1.5,
-                }}
-              >
-                <Grid container spacing={2}>
-                  {/* Search Input - Full Width */}
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="Search by name, email, or phone..."
-                      value={filters.searchTerm}
-                      onChange={(e) =>
-                        handleFilterChange("searchTerm", e.target.value)
-                      }
-                      InputProps={{
-                        startAdornment: (
-                          <SearchIcon
-                            sx={{
-                              mr: 1,
-                              color: "text.secondary",
-                              fontSize: 20,
-                            }}
-                          />
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          bgcolor: "white",
-                        },
-                      }}
-                    />
-                  </Grid>
-
-                  {/* Filter Dropdowns */}
-                  <Grid item xs={12} sm={6} md={2.4}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Status</InputLabel>
-                      <Select
-                        value={filters.status}
-                        label="Status"
-                        onChange={(e) =>
-                          handleFilterChange("status", e.target.value)
-                        }
-                        sx={{ bgcolor: "white" }}
-                      >
-                        <MenuItem value="all">All Status</MenuItem>
-                        <MenuItem value="contacted">Contacted</MenuItem>
-                        <MenuItem value="interested">Interested</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  <Grid item xs={12} sm={6} md={2.4}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Country</InputLabel>
-                      <Select
-                        value={filters.country}
-                        label="Country"
-                        onChange={(e) =>
-                          handleFilterChange("country", e.target.value)
-                        }
-                        sx={{ bgcolor: "white" }}
-                      >
-                        <MenuItem value="all">All Countries</MenuItem>
-                        {Object.entries(availableCountries).length > 0
-                          ? Object.entries(availableCountries).map(
-                              ([code, country]) => (
-                                <MenuItem key={code} value={code}>
-                                  {country.flag} {country.name}
-                                </MenuItem>
-                              )
-                            )
-                          : Object.entries(countryMapping).map(
-                              ([code, country]) => (
-                                <MenuItem key={code} value={code}>
-                                  {country.flag} {country.name}
-                                </MenuItem>
-                              )
-                            )}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  <Grid item xs={12} sm={6} md={2.4}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Assignment</InputLabel>
-                      <Select
-                        value={filters.assignedTo}
-                        label="Assignment"
-                        onChange={(e) =>
-                          handleFilterChange("assignedTo", e.target.value)
-                        }
-                        sx={{ bgcolor: "white" }}
-                      >
-                        <MenuItem value="all">All</MenuItem>
-                        <MenuItem value="unassigned">Unassigned</MenuItem>
-                        {teamMembers.map((member) => (
-                          <MenuItem key={member.id} value={member.email}>
-                            {member.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  {/* Streamlined Date Picker matching other filters */}
-                  <Grid item xs={12} sm={6} md={2.4}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      type="date"
-                      label="Date Filter"
-                      value={filters.startDate}
-                      onChange={(e) =>
-                        handleFilterChange("startDate", e.target.value)
-                      }
-                      InputLabelProps={{
-                        shrink: true,
-                        sx: {
-                          fontSize: "0.875rem",
-                          fontWeight: 500,
-                          color: "#6b7280",
-                        },
-                      }}
-                      inputProps={{
-                        max: new Date().toISOString().split("T")[0],
-                      }}
-                      sx={{
-                        bgcolor: "white",
-                        "& .MuiOutlinedInput-root": {
-                          fontSize: "0.875rem",
-                          "& fieldset": {
-                            borderColor: "#e5e7eb",
-                          },
-                          "&:hover fieldset": {
-                            borderColor: "#d1d5db",
-                          },
-                          "&.Mui-focused fieldset": {
-                            borderColor: "#3b82f6",
-                            borderWidth: "1px",
-                          },
-                        },
-                        "& .MuiInputBase-input": {
-                          color: filters.startDate ? "#111827" : "#9ca3af",
-                        },
-                      }}
-                    />
-                    {filters.startDate && (
-                      <Typography
-                        variant="caption"
+              {/* Cleaner Filter Section */}
+              <Box sx={{ mb: 2 }}>
+                {/* Search Bar - Separate for emphasis */}
+                <TextField
+                  fullWidth
+                  size="medium"
+                  placeholder="Search by name, email, or phone..."
+                  value={filters.searchTerm}
+                  onChange={(e) =>
+                    handleFilterChange("searchTerm", e.target.value)
+                  }
+                  InputProps={{
+                    startAdornment: (
+                      <SearchIcon
                         sx={{
-                          color: "#059669",
-                          fontSize: "0.688rem",
-                          display: "block",
-                          mt: 0.5,
-                          fontWeight: 500,
+                          mr: 1,
+                          color: "#9ca3af",
+                          fontSize: 22,
                         }}
-                      >
-                        ✓{" "}
-                        {new Date(filters.startDate).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                          }
-                        )}{" "}
-                        → Today
-                      </Typography>
-                    )}
-                  </Grid>
+                      />
+                    ),
+                  }}
+                  sx={{
+                    mb: 2,
+                    "& .MuiOutlinedInput-root": {
+                      bgcolor: "white",
+                      borderRadius: 1.5,
+                      "& fieldset": {
+                        borderColor: "#e5e7eb",
+                      },
+                      "&:hover fieldset": {
+                        borderColor: "#d1d5db",
+                      },
+                      "&.Mui-focused fieldset": {
+                        borderColor: "#3b82f6",
+                        borderWidth: "2px",
+                      },
+                    },
+                  }}
+                />
 
-                  {/* Reset Button */}
-                  <Grid item xs={12}>
+                {/* Filter Bar */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    bgcolor: "white",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 1.5,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      mb: 2,
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      fontWeight="600"
+                      sx={{ color: "#374151" }}
+                    >
+                      Filters
+                    </Typography>
                     <Button
                       size="small"
                       variant="text"
-                      startIcon={<RefreshIcon />}
                       onClick={() => {
                         setFilters({
                           status: "all",
@@ -1194,42 +1257,296 @@ const ConversionPlan = () => {
                       }}
                       sx={{
                         color: "#6b7280",
-                        textTransform: "uppercase",
                         fontSize: "0.813rem",
-                        letterSpacing: 0.5,
                         fontWeight: 500,
                         "&:hover": {
-                          bgcolor: "#f3f4f6",
-                          color: "#111827",
+                          bgcolor: "#f9fafb",
                         },
                       }}
                     >
-                      Clear Filters
+                      Clear All
                     </Button>
-                  </Grid>
-                </Grid>
-              </Paper>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: {
+                        xs: "1fr",
+                        sm: "repeat(2, 1fr)",
+                        md: "repeat(4, 1fr)",
+                      },
+                      gap: { xs: 1.5, sm: 2 },
+                    }}
+                  >
+                    {/* Status Filter */}
+                    <FormControl fullWidth size="small">
+                      <InputLabel sx={{ fontSize: "0.875rem" }}>
+                        Status
+                      </InputLabel>
+                      <Select
+                        value={filters.status}
+                        label="Status"
+                        onChange={(e) =>
+                          handleFilterChange("status", e.target.value)
+                        }
+                        sx={{
+                          bgcolor:
+                            filters.status !== "all" ? "#eff6ff" : "#f9fafb",
+                          "& .MuiOutlinedInput-notchedOutline": {
+                            borderColor:
+                              filters.status !== "all" ? "#3b82f6" : "#e5e7eb",
+                          },
+                          "&:hover .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "#d1d5db",
+                          },
+                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "#3b82f6",
+                          },
+                        }}
+                      >
+                        <MenuItem value="all">
+                          <Typography variant="body2">All Status</Typography>
+                        </MenuItem>
+                        <MenuItem value="contacted">
+                          <Typography variant="body2">📞 Contacted</Typography>
+                        </MenuItem>
+                        <MenuItem value="interested">
+                          <Typography variant="body2">⭐ Interested</Typography>
+                        </MenuItem>
+                      </Select>
+                    </FormControl>
+
+                    {/* Country Filter */}
+
+                    <FormControl fullWidth size="small">
+                      <InputLabel sx={{ fontSize: "0.875rem" }}>
+                        Country
+                      </InputLabel>
+                      <Select
+                        value={filters.country}
+                        label="Country"
+                        onChange={(e) =>
+                          handleFilterChange("country", e.target.value)
+                        }
+                        sx={{
+                          bgcolor:
+                            filters.country !== "all" ? "#eff6ff" : "#f9fafb",
+                          "& .MuiOutlinedInput-notchedOutline": {
+                            borderColor:
+                              filters.country !== "all" ? "#3b82f6" : "#e5e7eb",
+                          },
+                          "&:hover .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "#d1d5db",
+                          },
+                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "#3b82f6",
+                          },
+                        }}
+                      >
+                        <MenuItem value="all">
+                          <Typography variant="body2">All Countries</Typography>
+                        </MenuItem>
+                        {Object.entries(availableCountries).length > 0
+                          ? Object.entries(availableCountries).map(
+                              ([code, country]) => (
+                                <MenuItem key={code} value={code}>
+                                  <Typography variant="body2">
+                                    {country.flag} {country.name}
+                                  </Typography>
+                                </MenuItem>
+                              )
+                            )
+                          : Object.entries(countryMapping).map(
+                              ([code, country]) => (
+                                <MenuItem key={code} value={code}>
+                                  <Typography variant="body2">
+                                    {country.flag} {country.name}
+                                  </Typography>
+                                </MenuItem>
+                              )
+                            )}
+                      </Select>
+                    </FormControl>
+
+                    {/* Assignment Filter */}
+
+                    <FormControl fullWidth size="small">
+                      <InputLabel sx={{ fontSize: "0.875rem" }}>
+                        Assigned To
+                      </InputLabel>
+                      <Select
+                        value={filters.assignedTo}
+                        label="Assigned To"
+                        onChange={(e) =>
+                          handleFilterChange("assignedTo", e.target.value)
+                        }
+                        sx={{
+                          bgcolor:
+                            filters.assignedTo !== "all"
+                              ? "#eff6ff"
+                              : "#f9fafb",
+                          "& .MuiOutlinedInput-notchedOutline": {
+                            borderColor:
+                              filters.assignedTo !== "all"
+                                ? "#3b82f6"
+                                : "#e5e7eb",
+                          },
+                          "&:hover .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "#d1d5db",
+                          },
+                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "#3b82f6",
+                          },
+                        }}
+                      >
+                        <MenuItem value="all">
+                          <Typography variant="body2">All Agents</Typography>
+                        </MenuItem>
+                        <MenuItem value="unassigned">
+                          <Typography variant="body2">🔓 Unassigned</Typography>
+                        </MenuItem>
+                        {teamMembers.map((member) => (
+                          <MenuItem key={member.id} value={member.email}>
+                            <Typography variant="body2">
+                              👤 {member.name}
+                            </Typography>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    {/* Date Filter */}
+
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="date"
+                      label="From Date"
+                      value={filters.startDate}
+                      onChange={(e) =>
+                        handleFilterChange("startDate", e.target.value)
+                      }
+                      InputLabelProps={{
+                        shrink: true,
+                        sx: {
+                          fontSize: "0.875rem",
+                        },
+                      }}
+                      inputProps={{
+                        max: new Date().toISOString().split("T")[0],
+                      }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          bgcolor: filters.startDate ? "#eff6ff" : "#f9fafb",
+                          "& fieldset": {
+                            borderColor: filters.startDate
+                              ? "#3b82f6"
+                              : "#e5e7eb",
+                          },
+                          "&:hover fieldset": {
+                            borderColor: "#d1d5db",
+                          },
+                          "&.Mui-focused fieldset": {
+                            borderColor: "#3b82f6",
+                          },
+                        },
+                      }}
+                    />
+                  </Box>
+
+                  {/* Active Filters Indicator */}
+                  {(filters.status !== "all" ||
+                    filters.country !== "all" ||
+                    filters.assignedTo !== "all" ||
+                    filters.startDate) && (
+                    <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #e5e7eb" }}>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "#6b7280", fontWeight: 500 }}
+                      >
+                        Active Filters:
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          gap: 1,
+                          mt: 1,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        {filters.status !== "all" && (
+                          <Chip
+                            label={`Status: ${filters.status}`}
+                            size="small"
+                            onDelete={() => handleFilterChange("status", "all")}
+                            sx={{ textTransform: "capitalize" }}
+                          />
+                        )}
+                        {filters.country !== "all" && (
+                          <Chip
+                            label={`Country: ${
+                              availableCountries[filters.country]?.name ||
+                              filters.country
+                            }`}
+                            size="small"
+                            onDelete={() =>
+                              handleFilterChange("country", "all")
+                            }
+                          />
+                        )}
+                        {filters.assignedTo !== "all" && (
+                          <Chip
+                            label={`Assigned: ${
+                              filters.assignedTo === "unassigned"
+                                ? "Unassigned"
+                                : teamMembers.find(
+                                    (m) => m.email === filters.assignedTo
+                                  )?.name || filters.assignedTo
+                            }`}
+                            size="small"
+                            onDelete={() =>
+                              handleFilterChange("assignedTo", "all")
+                            }
+                          />
+                        )}
+                        {filters.startDate && (
+                          <Chip
+                            label={`From: ${new Date(
+                              filters.startDate
+                            ).toLocaleDateString()}`}
+                            size="small"
+                            onDelete={() => handleFilterChange("startDate", "")}
+                          />
+                        )}
+                      </Box>
+                    </Box>
+                  )}
+                </Paper>
+              </Box>
             </Box>
 
-            {/* Simplified Data Table */}
+            {/* Responsive Data Table */}
             <TableContainer
               sx={{
                 bgcolor: "white",
                 borderRadius: 1.5,
                 border: "1px solid #e5e7eb",
+                overflowX: "auto",
               }}
             >
-              <Table sx={{ minWidth: 650 }}>
+              <Table sx={{ minWidth: { xs: 800, sm: 650 } }}>
                 <TableHead>
                   <TableRow
                     sx={{
                       bgcolor: "#f9fafb",
                       "& .MuiTableCell-head": {
                         fontWeight: 600,
-                        fontSize: "0.813rem",
+                        fontSize: { xs: "0.75rem", sm: "0.813rem" },
                         color: "#374151",
                         borderBottom: "1px solid #e5e7eb",
-                        py: 1.5,
+                        py: { xs: 1, sm: 1.5 },
+                        px: { xs: 1, sm: 2 },
                       },
                     }}
                   >
@@ -1556,14 +1873,20 @@ const ConversionPlan = () => {
               }}
             />
           </Paper>
-        </Grid>
+        </Box>
 
-        {/* Simplified Team Members Sidebar */}
-        <Grid item xs={12} lg={4}>
+        {/* Responsive Team Members Sidebar */}
+        <Box
+          sx={{
+            flex: { xs: "1 1 auto", lg: 1 },
+            width: { xs: "100%", lg: "auto" },
+            minWidth: 0,
+          }}
+        >
           <Paper
             elevation={0}
             sx={{
-              p: 2.5,
+              p: { xs: 2, sm: 2.5 },
               border: "1px solid #e5e7eb",
               borderRadius: 1.5,
             }}
@@ -1584,8 +1907,8 @@ const ConversionPlan = () => {
                 <React.Fragment key={member.id}>
                   <ListItem
                     sx={{
-                      px: 2,
-                      py: 1.5,
+                      px: { xs: 1.5, sm: 2 },
+                      py: { xs: 1, sm: 1.5 },
                       bgcolor: "#f9fafb",
                       borderRadius: 1,
                       mb: 1,
@@ -1604,7 +1927,12 @@ const ConversionPlan = () => {
                         }}
                       >
                         <Avatar
-                          sx={{ bgcolor: "#2563eb", width: 36, height: 36 }}
+                          sx={{
+                            bgcolor: "#2563eb",
+                            width: { xs: 32, sm: 36 },
+                            height: { xs: 32, sm: 36 },
+                            fontSize: { xs: "0.875rem", sm: "1rem" },
+                          }}
                         >
                           {member.name.charAt(0)}
                         </Avatar>
@@ -1615,24 +1943,40 @@ const ConversionPlan = () => {
                         <Typography
                           variant="body2"
                           fontWeight="600"
-                          sx={{ color: "#111827" }}
+                          sx={{
+                            color: "#111827",
+                            fontSize: { xs: "0.813rem", sm: "0.875rem" },
+                          }}
                         >
                           {member.name}
                         </Typography>
                       }
                       secondary={
                         <Box sx={{ mt: 0.5 }}>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ fontSize: { xs: "0.688rem", sm: "0.75rem" } }}
+                          >
                             {member.conversionRate}% conversion rate
                           </Typography>
                         </Box>
                       }
                     />
                     <ListItemSecondaryAction>
-                      <Typography variant="h6" fontWeight="600" color="primary">
+                      <Typography
+                        variant="h6"
+                        fontWeight="600"
+                        color="primary"
+                        sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }}
+                      >
                         {member.assignedCount}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ fontSize: { xs: "0.688rem", sm: "0.75rem" } }}
+                      >
                         leads
                       </Typography>
                     </ListItemSecondaryAction>
@@ -1651,8 +1995,8 @@ const ConversionPlan = () => {
               Add Team Member
             </Button>
           </Paper>
-        </Grid>
-      </Grid>
+        </Box>
+      </Stack>
 
       {/* Assignment Dialog */}
       <Dialog

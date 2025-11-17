@@ -14,6 +14,7 @@ import SuperAdminSettings from "./pages/super-admin/AdminSettings";
 import FacebookLeadForms from "./pages/super-admin/FacebookLeadForms";
 import BulkActions from "./pages/super-admin/BulkActions";
 import ConversionPlan from "./pages/super-admin/ConversionPlan";
+import Archive from "./pages/super-admin/Archive";
 // Admin Pages (formerly organization)
 import TeamManagement from "./pages/admin/TeamManagement";
 import LeadsOverview from "./pages/admin/LeadsOverview";
@@ -22,7 +23,11 @@ import Analytics from "./pages/admin/Analytics";
 import DataCenter from "./pages/admin/DataCenter";
 import KnowledgeBase from "./pages/admin/KnowledgeBase";
 // Admission Admin Pages
-import { AdmissionAdminDashboard, ImportData } from "./pages/admission-admin";
+import {
+  AdmissionAdminDashboard,
+  ImportData,
+  SuzySheets,
+} from "./pages/admission-admin";
 // Marketing Pages
 import AssignedLeads from "./pages/Marketing/AssignedLeads";
 // Auth Pages
@@ -139,6 +144,7 @@ function App() {
                         />
                         <Route path="bulk-actions" element={<BulkActions />} />
                         <Route path="chat" element={<ChatManagement />} />
+                        <Route path="archive" element={<Archive />} />
                         <Route
                           path="settings"
                           element={
@@ -183,6 +189,7 @@ function App() {
                           element={<AdmissionAdminDashboard />}
                         />
                         <Route path="import-data" element={<ImportData />} />
+                        <Route path="suzy-sheets" element={<SuzySheets />} />
                         {/* Root path redirects to dashboard */}
                         <Route
                           path=""
@@ -322,6 +329,23 @@ function App() {
                         >
                           <Layout>
                             <ImportData />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="suzy-sheets"
+                      element={
+                        <ProtectedRoute
+                          allowedRoles={[
+                            "superAdmin",
+                            "admin",
+                            "admissionAdmin",
+                            "admissionAgent",
+                          ]}
+                        >
+                          <Layout>
+                            <SuzySheets />
                           </Layout>
                         </ProtectedRoute>
                       }

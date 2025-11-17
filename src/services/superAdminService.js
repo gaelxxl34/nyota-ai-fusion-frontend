@@ -50,6 +50,21 @@ export const superAdminService = {
     }
   },
 
+  async bulkDeleteUsers(userIds) {
+    try {
+      const response = await axiosInstance.post(
+        "/api/super-admin/users/bulk-delete",
+        { userIds }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error bulk deleting users:", error);
+      throw new Error(
+        error.response?.data?.message || "Failed to bulk delete users"
+      );
+    }
+  },
+
   async resetUserPassword(userId) {
     try {
       const response = await axiosInstance.post(

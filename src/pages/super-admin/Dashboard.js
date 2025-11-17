@@ -12,6 +12,7 @@ import {
   Alert,
   IconButton,
   Tooltip,
+  Stack,
 } from "@mui/material";
 import {
   GroupAdd as GroupAddIcon,
@@ -382,22 +383,34 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <Box>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        width: "100%",
+      }}
+    >
       {/* Header with title and actions */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={{ xs: 2, md: 0 }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", md: "center" }}
+        sx={{ mb: 3, width: "100%" }}
       >
         <Box>
           <Typography variant="body2" color="text.secondary">
             Platform-wide overview and management
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          justifyContent={{ xs: "flex-start", md: "flex-end" }}
+          alignItems="center"
+          sx={{ width: { xs: "100%", md: "auto" } }}
+        >
           <Tooltip title="Refresh data">
             <IconButton onClick={handleRefresh} disabled={refreshing}>
               <RefreshIcon />
@@ -406,8 +419,8 @@ const AdminDashboard = () => {
           <Button variant="outlined" startIcon={<DownloadIcon />}>
             Export Report
           </Button>
-        </Box>
-      </Box>
+        </Stack>
+      </Stack>
 
       {/* Error Alert */}
       {error && (

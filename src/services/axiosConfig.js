@@ -1,8 +1,26 @@
 import axios from "axios";
 
+const resolveBaseUrl = () => {
+  if (process.env.REACT_APP_API_BASE_URL) {
+    return process.env.REACT_APP_API_BASE_URL;
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    return "http://localhost:3000";
+  }
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  return "http://localhost:3000";
+};
+
+const normalizedBaseUrl = resolveBaseUrl().replace(/\/$/, "");
+
 // Create axios instance with the correct base URL (services will include /api in their paths)
 export const axiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE_URL || "http://localhost:3000",
+  baseURL: normalizedBaseUrl,
   headers: {
     "Content-Type": "application/json",
   },

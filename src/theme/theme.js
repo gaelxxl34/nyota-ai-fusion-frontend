@@ -43,6 +43,14 @@ export const createAppTheme = (colors = {}) =>
           },
         },
       },
+      MuiTableContainer: {
+        styleOverrides: {
+          root: {
+            width: "100%",
+            overflowX: "auto",
+          },
+        },
+      },
     },
   });
 

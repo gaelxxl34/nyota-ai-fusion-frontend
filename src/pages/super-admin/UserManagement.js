@@ -31,6 +31,8 @@ import {
   InputLabel,
   Select,
   CircularProgress,
+  Checkbox,
+  Stack,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -44,6 +46,7 @@ import {
   Key as KeyIcon,
   Shield as ShieldIcon,
   Visibility as ViewIcon,
+  DeleteSweep as DeleteSweepIcon,
 } from "@mui/icons-material";
 import { superAdminService } from "../../services/superAdminService";
 import { useAuth } from "../../contexts/AuthContext";
@@ -67,6 +70,8 @@ const UserManagement = () => {
   const [viewApplicationDialogOpen, setViewApplicationDialogOpen] =
     useState(false);
   const [selectedApplicant, setSelectedApplicant] = useState(null);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Available roles for IUEA system
   const ROLES = [
@@ -258,6 +263,93 @@ const UserManagement = () => {
     }
   };
 
+  // Handle checkbox selection
+  const handleSelectUser = (userId) => {
+    setSelectedUsers((prev) => {
+      if (prev.includes(userId)) {
+        return prev.filter((id) => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+
+  // Handle select all
+  const handleSelectAll = (event) => {
+    if (event.target.checked) {
+      // Select all users except the current user
+      const allSelectableUsers = filteredUsers
+        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+        .filter(
+          (tableUser) =>
+            tableUser.id !== user?.uid && tableUser.email !== user?.email
+        )
+        .map((tableUser) => tableUser.id);
+      setSelectedUsers(allSelectableUsers);
+    } else {
+      setSelectedUsers([]);
+    }
+  };
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedUsers.length === 0) {
+      setError("No users selected for deletion");
+      return;
+    }
+
+    const usersToDelete = filteredUsers.filter((u) =>
+      selectedUsers.includes(u.id)
+    );
+    const userNames = usersToDelete.map((u) => u.name || u.email).join(", ");
+
+    const confirmMessage = `⚠️ BULK DELETE WARNING ⚠️
+
+You are about to permanently delete ${selectedUsers.length} user(s):
+${userNames}
+
+This will delete for EACH user:
+• Their user account and authentication data
+• All leads they have submitted or are assigned to
+• All applications they have submitted or are assigned to
+• All WhatsApp conversations and messages
+• All uploaded files in Firebase Storage
+• All assignments (leads/applications will be unassigned)
+
+This action CANNOT be undone!
+
+Type 'DELETE' to confirm:`;
+
+    const userInput = window.prompt(confirmMessage);
+
+    if (userInput !== "DELETE") {
+      if (userInput !== null) {
+        setError("Bulk deletion cancelled. You must type 'DELETE' to confirm.");
+      }
+      return;
+    }
+
+    try {
+      setBulkDeleting(true);
+      setError("");
+      await superAdminService.bulkDeleteUsers(selectedUsers);
+      setSuccess(
+        `Successfully deleted ${selectedUsers.length} user(s) and all their associated data`
+      );
+      setSelectedUsers([]);
+      fetchUsers();
+    } catch (error) {
+      console.error("Error bulk deleting users:", error);
+      setError(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to delete some users. Please check the results."
+      );
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   // Handle delete
   const handleDelete = async (userToDelete) => {
     // Prevent self-deletion
@@ -381,25 +473,34 @@ This comprehensive deletion cannot be undone!`;
   // Pagination
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
+    setSelectedUsers([]); // Clear selections when changing pages
   };
 
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
+    setSelectedUsers([]); // Clear selections when changing rows per page
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box
+      sx={{
+        p: { xs: 1, sm: 2, md: 3 },
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        width: "100%",
+      }}
+    >
       {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={{ xs: 2, md: 0 }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", md: "center" }}
+        sx={{ mb: 3, width: "100%" }}
       >
-        <Box>
+        <Box sx={{ flex: 1 }}>
           <Typography variant="h4" fontWeight="bold">
             User Management
           </Typography>
@@ -411,11 +512,14 @@ This comprehensive deletion cannot be undone!`;
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
-          sx={{ textTransform: "none" }}
+          sx={{
+            textTransform: "none",
+            width: { xs: "100%", md: "auto" },
+          }}
         >
           Add New User
         </Button>
-      </Box>
+      </Stack>
 
       {/* Alerts */}
       {error && (
@@ -430,8 +534,17 @@ This comprehensive deletion cannot be undone!`;
       )}
 
       {/* Search and Actions Bar */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+      <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, mb: 3, width: "100%" }}>
+        <Stack
+          direction={{ xs: "column", lg: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", lg: "center" }}
+          sx={{
+            flexWrap: { xs: "wrap", lg: "nowrap" },
+            width: "100%",
+            mb: selectedUsers.length > 0 ? 2 : 0,
+          }}
+        >
           <TextField
             placeholder="Search by name, email, or role..."
             variant="outlined"
@@ -439,6 +552,7 @@ This comprehensive deletion cannot be undone!`;
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             sx={{ flex: 1 }}
+            fullWidth
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -447,11 +561,17 @@ This comprehensive deletion cannot be undone!`;
               ),
             }}
           />
-          <FormControl size="small" sx={{ minWidth: 150 }}>
+          <FormControl
+            size="small"
+            sx={{ minWidth: { xs: "100%", sm: 180 }, flexShrink: 0 }}
+          >
             <InputLabel>Filter by Role</InputLabel>
             <Select
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
+              onChange={(e) => {
+                setRoleFilter(e.target.value);
+                setSelectedUsers([]); // Clear selection when filter changes
+              }}
               label="Filter by Role"
             >
               <MenuItem value="all">All Roles</MenuItem>
@@ -465,18 +585,93 @@ This comprehensive deletion cannot be undone!`;
               ))}
             </Select>
           </FormControl>
-          <IconButton onClick={fetchUsers} color="primary">
+          <IconButton
+            onClick={fetchUsers}
+            color="primary"
+            sx={{ alignSelf: { xs: "flex-start", lg: "center" } }}
+          >
             <RefreshIcon />
           </IconButton>
-        </Box>
+        </Stack>
+        {selectedUsers.length > 0 && (
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            justifyContent="space-between"
+            sx={{
+              p: 2,
+              bgcolor: "error.light",
+              borderRadius: 1,
+            }}
+          >
+            <Typography variant="body2" fontWeight="medium" color="error.dark">
+              {selectedUsers.length} user(s) selected
+            </Typography>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={
+                bulkDeleting ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <DeleteSweepIcon />
+                )
+              }
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              size="small"
+              sx={{ width: { xs: "100%", sm: "auto" } }}
+            >
+              {bulkDeleting ? "Deleting..." : "Bulk Delete"}
+            </Button>
+          </Stack>
+        )}
       </Paper>
 
       {/* Users Table */}
-      <Paper elevation={2}>
+      <Paper elevation={2} sx={{ width: "100%", overflow: "hidden" }}>
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    indeterminate={
+                      selectedUsers.length > 0 &&
+                      selectedUsers.length <
+                        filteredUsers
+                          .slice(
+                            page * rowsPerPage,
+                            page * rowsPerPage + rowsPerPage
+                          )
+                          .filter(
+                            (u) => u.id !== user?.uid && u.email !== user?.email
+                          ).length
+                    }
+                    checked={
+                      filteredUsers
+                        .slice(
+                          page * rowsPerPage,
+                          page * rowsPerPage + rowsPerPage
+                        )
+                        .filter(
+                          (u) => u.id !== user?.uid && u.email !== user?.email
+                        ).length > 0 &&
+                      selectedUsers.length ===
+                        filteredUsers
+                          .slice(
+                            page * rowsPerPage,
+                            page * rowsPerPage + rowsPerPage
+                          )
+                          .filter(
+                            (u) => u.id !== user?.uid && u.email !== user?.email
+                          ).length
+                    }
+                    onChange={handleSelectAll}
+                    disabled={loading}
+                  />
+                </TableCell>
                 <TableCell>User Details</TableCell>
                 <TableCell>Role</TableCell>
                 <TableCell>Contact</TableCell>
@@ -511,7 +706,7 @@ This comprehensive deletion cannot be undone!`;
                 ))
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     <Typography
                       variant="body2"
                       color="text.secondary"
@@ -525,7 +720,22 @@ This comprehensive deletion cannot be undone!`;
                 filteredUsers
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((tableUser) => (
-                    <TableRow key={tableUser.id} hover>
+                    <TableRow
+                      key={tableUser.id}
+                      hover
+                      selected={selectedUsers.includes(tableUser.id)}
+                    >
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selectedUsers.includes(tableUser.id)}
+                          onChange={() => handleSelectUser(tableUser.id)}
+                          disabled={
+                            tableUser.id === user?.uid ||
+                            tableUser.email === user?.email ||
+                            loading
+                          }
+                        />
+                      </TableCell>
                       <TableCell>
                         <Box
                           sx={{ display: "flex", alignItems: "center", gap: 2 }}
@@ -665,7 +875,7 @@ This comprehensive deletion cannot be undone!`;
           </Table>
         </TableContainer>
         <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
+          rowsPerPageOptions={[5, 10, 25, 50, 100, 250, 500, 1000]}
           component="div"
           count={filteredUsers.length}
           rowsPerPage={rowsPerPage}
