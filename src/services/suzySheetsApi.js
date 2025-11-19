@@ -3,11 +3,7 @@
  * Handles all API calls for the Suzy Sheets feature
  */
 
-const API_BASE_URL =
-  (process.env.REACT_APP_API_BASE_URL || "http://localhost:3000").replace(
-    /\/$/,
-    ""
-  ) + "/api";
+import { axiosInstance } from "./axiosConfig";
 
 /**
  * Get all admitted leads
@@ -15,22 +11,8 @@ const API_BASE_URL =
  */
 export const getAdmittedLeads = async () => {
   try {
-    const token = localStorage.getItem("authToken");
-
-    const response = await fetch(`${API_BASE_URL}/suzy-sheets/admitted-leads`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to fetch admitted leads");
-    }
-
-    return await response.json();
+    const response = await axiosInstance.get("/api/suzy-sheets/admitted-leads");
+    return response.data;
   } catch (error) {
     console.error("Error fetching admitted leads:", error);
     throw error;
@@ -44,22 +26,8 @@ export const getAdmittedLeads = async () => {
  */
 export const getLeadDetail = async (leadId) => {
   try {
-    const token = localStorage.getItem("authToken");
-
-    const response = await fetch(`${API_BASE_URL}/suzy-sheets/lead/${leadId}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to fetch lead detail");
-    }
-
-    return await response.json();
+    const response = await axiosInstance.get(`/api/suzy-sheets/lead/${leadId}`);
+    return response.data;
   } catch (error) {
     console.error(`Error fetching lead detail for ${leadId}:`, error);
     throw error;
@@ -74,26 +42,11 @@ export const getLeadDetail = async (leadId) => {
  */
 export const updateLeadStatus = async (leadId, status) => {
   try {
-    const token = localStorage.getItem("authToken");
-
-    const response = await fetch(
-      `${API_BASE_URL}/suzy-sheets/lead/${leadId}/status`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status }),
-      }
+    const response = await axiosInstance.patch(
+      `/api/suzy-sheets/lead/${leadId}/status`,
+      { status }
     );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to update lead status");
-    }
-
-    return await response.json();
+    return response.data;
   } catch (error) {
     console.error(`Error updating status for lead ${leadId}:`, error);
     throw error;
@@ -108,26 +61,11 @@ export const updateLeadStatus = async (leadId, status) => {
  */
 export const updateLeadNotes = async (leadId, notes) => {
   try {
-    const token = localStorage.getItem("authToken");
-
-    const response = await fetch(
-      `${API_BASE_URL}/suzy-sheets/lead/${leadId}/notes`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ notes }),
-      }
+    const response = await axiosInstance.patch(
+      `/api/suzy-sheets/lead/${leadId}/notes`,
+      { notes }
     );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to update lead notes");
-    }
-
-    return await response.json();
+    return response.data;
   } catch (error) {
     console.error(`Error updating notes for lead ${leadId}:`, error);
     throw error;
@@ -140,22 +78,8 @@ export const updateLeadNotes = async (leadId, notes) => {
  */
 export const refreshCache = async () => {
   try {
-    const token = localStorage.getItem("authToken");
-
-    const response = await fetch(`${API_BASE_URL}/suzy-sheets/refresh-cache`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to refresh cache");
-    }
-
-    return await response.json();
+    const response = await axiosInstance.post("/api/suzy-sheets/refresh-cache");
+    return response.data;
   } catch (error) {
     console.error("Error refreshing cache:", error);
     throw error;
@@ -168,22 +92,8 @@ export const refreshCache = async () => {
  */
 export const getCacheStats = async () => {
   try {
-    const token = localStorage.getItem("authToken");
-
-    const response = await fetch(`${API_BASE_URL}/suzy-sheets/cache-stats`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to get cache stats");
-    }
-
-    return await response.json();
+    const response = await axiosInstance.get("/api/suzy-sheets/cache-stats");
+    return response.data;
   } catch (error) {
     console.error("Error getting cache stats:", error);
     throw error;

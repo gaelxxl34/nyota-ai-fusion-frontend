@@ -1,24 +1,27 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
+  CircularProgress,
   Card,
   CardContent,
   Chip,
-  CircularProgress,
   Container,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
+  Fade,
   Grid,
   IconButton,
   InputAdornment,
   Menu,
   MenuItem,
   Paper,
+  Skeleton,
   Snackbar,
   Stack,
   Table,
@@ -32,7 +35,6 @@ import {
   Typography,
 } from "@mui/material";
 import {
-  ArrowForward as ArrowForwardIcon,
   Download as DownloadIcon,
   Edit as EditIcon,
   FilterList as FilterListIcon,
@@ -81,6 +83,288 @@ const paymentStatusPalette = {
 
 const statusFilters = ["ALL", "ADMITTED", "ENROLLED", "DEFERRED", "EXPIRED"];
 
+const normalizeProgram = (program) => {
+  if (!program) return "N/A";
+
+  if (typeof program === "string") {
+    return program;
+  }
+
+  if (Array.isArray(program)) {
+    return program
+      .map((item) => normalizeProgram(item))
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  if (typeof program === "object") {
+    const name = program.name || program.displayName;
+    const code = program.code || program.id;
+
+    if (name && code) {
+      return `${name} (${code})`;
+    }
+
+    return name || code || "N/A";
+  }
+
+  return String(program);
+};
+
+const formatLabel = (value) => {
+  if (!value) return "";
+  return value
+    .toString()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
+
+const toCsvValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const normalized = String(value)
+    .replace(/\r?\n|\r/g, " ")
+    .trim();
+  const escaped = normalized.replace(/"/g, '""');
+  return /[",]/.test(escaped) ? `"${escaped}"` : escaped;
+};
+
+const normalizeSource = (admission) => {
+  const sourceCandidate =
+    admission?.source ||
+    admission?.leadSource ||
+    admission?.sourceName ||
+    admission?.source_type ||
+    admission?.sourceType ||
+    admission?.metadata?.source ||
+    admission?.application?.source ||
+    admission?.application?.raw?.source ||
+    null;
+
+  if (!sourceCandidate || !String(sourceCandidate).trim()) {
+    return { key: "UNKNOWN", label: "Unknown" };
+  }
+
+  const key = String(sourceCandidate).trim().toUpperCase();
+  const label = formatLabel(sourceCandidate) || "Unknown";
+
+  return { key, label };
+};
+
+const normalizeModeOfStudy = (admission) => {
+  const modeCandidate =
+    admission?.modeOfStudy ||
+    admission?.studyMode ||
+    admission?.mode ||
+    admission?.programMode ||
+    admission?.application?.modeOfStudy ||
+    admission?.application?.raw?.modeOfStudy ||
+    admission?.application?.raw?.studyMode ||
+    null;
+
+  if (!modeCandidate || !String(modeCandidate).trim()) {
+    return { key: "UNKNOWN", label: "Unknown" };
+  }
+
+  const value = String(modeCandidate).trim().toLowerCase();
+  if (value.includes("campus")) {
+    return { key: "ON_CAMPUS", label: "On Campus" };
+  }
+  if (value.includes("online")) {
+    return { key: "ONLINE", label: "Online" };
+  }
+
+  const label = formatLabel(modeCandidate) || "Unknown";
+  return { key: label.toUpperCase(), label };
+};
+
+const normalizeName = (admission) => {
+  if (!admission) return "Unknown Student";
+
+  const fromObjectName = () => {
+    if (typeof admission.name === "object" && admission.name) {
+      const potentialFirst =
+        admission.name.first ||
+        admission.name.givenName ||
+        admission.name.given;
+      const potentialLast =
+        admission.name.last ||
+        admission.name.familyName ||
+        admission.name.family;
+      if (potentialFirst || potentialLast) {
+        return `${potentialFirst || ""} ${potentialLast || ""}`.trim();
+      }
+      if (admission.name.full || admission.name.display) {
+        return admission.name.full || admission.name.display;
+      }
+    }
+    return null;
+  };
+
+  const firstName =
+    admission.firstName ||
+    admission.givenName ||
+    admission.first_name ||
+    (typeof admission.name === "object" ? admission.name.firstName : null);
+  const lastName =
+    admission.lastName ||
+    admission.familyName ||
+    admission.last_name ||
+    (typeof admission.name === "object" ? admission.name.lastName : null);
+
+  if (firstName || lastName) {
+    return `${firstName || ""} ${lastName || ""}`.trim();
+  }
+
+  if (typeof admission.name === "string" && admission.name.trim()) {
+    return admission.name.trim();
+  }
+
+  const objectValue = fromObjectName();
+  if (objectValue) return objectValue;
+
+  if (admission.profile && typeof admission.profile === "object") {
+    const profileFirst =
+      admission.profile.firstName || admission.profile.givenName;
+    const profileLast =
+      admission.profile.lastName || admission.profile.familyName;
+    if (profileFirst || profileLast) {
+      return `${profileFirst || ""} ${profileLast || ""}`.trim();
+    }
+  }
+
+  const application =
+    admission.application ||
+    admission.applicationData ||
+    admission.applicationDetails ||
+    admission.latestApplication ||
+    (admission.applications && admission.applications[0]);
+
+  if (application && typeof application === "object") {
+    const appFirst =
+      application.firstName ||
+      application.first_name ||
+      application.givenName ||
+      (application.applicant && application.applicant.firstName) ||
+      (application.raw && application.raw.firstName);
+    const appLast =
+      application.lastName ||
+      application.last_name ||
+      application.familyName ||
+      (application.applicant && application.applicant.lastName) ||
+      (application.raw && application.raw.lastName);
+
+    if (appFirst || appLast) {
+      return `${appFirst || ""} ${appLast || ""}`.trim();
+    }
+
+    if (typeof application.name === "string" && application.name.trim()) {
+      return application.name.trim();
+    }
+
+    if (application.name && typeof application.name === "object") {
+      const fromAppName = `${
+        application.name.first ||
+        application.name.firstName ||
+        application.name.givenName ||
+        ""
+      } ${
+        application.name.last ||
+        application.name.lastName ||
+        application.name.familyName ||
+        ""
+      }`.trim();
+      if (fromAppName) {
+        return fromAppName;
+      }
+
+      const displayName = application.name.full || application.name.display;
+      if (typeof displayName === "string" && displayName.trim()) {
+        return displayName.trim();
+      }
+    }
+  }
+
+  return "Unknown Student";
+};
+
+const normalizeRegNo = (admission) => {
+  if (!admission) return "N/A";
+
+  const candidateValues = [];
+
+  const addCandidate = (value) => {
+    if (typeof value === "string" && value.trim()) {
+      candidateValues.push(value.trim());
+    }
+  };
+
+  addCandidate(admission.registrationNumber);
+  addCandidate(admission.regNumber);
+  addCandidate(admission.regNo);
+
+  const application =
+    admission.application ||
+    admission.applicationData ||
+    admission.applicationDetails ||
+    admission.latestApplication ||
+    (admission.applications && admission.applications[0]);
+
+  if (application && typeof application === "object") {
+    addCandidate(
+      application.registrationNumber || application.registration_number
+    );
+    addCandidate(application.regNo || application.reg_no);
+    addCandidate(application.studentRegNo);
+    if (application.student && typeof application.student === "object") {
+      addCandidate(application.student.registrationNumber);
+      addCandidate(application.student.regNo);
+    }
+
+    if (application.raw && typeof application.raw === "object") {
+      addCandidate(
+        application.raw.registrationNumber ||
+          application.raw.registration_number
+      );
+      addCandidate(application.raw.regNo || application.raw.reg_no);
+    }
+  }
+
+  if (candidateValues.length > 0) {
+    return candidateValues[0];
+  }
+
+  return admission.regNo && typeof admission.regNo === "string"
+    ? admission.regNo.trim()
+    : "N/A";
+};
+
+const normalizeStatus = (status, fallback = "ADMITTED") => {
+  if (!status) return fallback;
+
+  let value = status;
+  if (typeof status === "object") {
+    value = status.code || status.name || status.value || fallback;
+  }
+
+  return String(value).toUpperCase();
+};
+
+const normalizePaymentStatus = (status) => {
+  if (!status) return "PENDING";
+
+  let value = status;
+  if (typeof status === "object") {
+    value = status.code || status.name || status.value || "PENDING";
+  }
+
+  return String(value).toUpperCase();
+};
+
 const SuzySheets = () => {
   const { user } = useAuth();
 
@@ -94,6 +378,8 @@ const SuzySheets = () => {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [lastTouchFilter, setLastTouchFilter] = useState("ALL");
   const [searchTerm, setSearchTerm] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("ALL");
+  const [modeFilter, setModeFilter] = useState("ALL");
 
   // UI state
   const [anchorEl, setAnchorEl] = useState(null);
@@ -105,6 +391,7 @@ const SuzySheets = () => {
     message: "",
     severity: "success",
   });
+  const [exporting, setExporting] = useState(false);
 
   // Fetch admitted leads on component mount
   useEffect(() => {
@@ -118,7 +405,25 @@ const SuzySheets = () => {
       const response = await suzySheetsApi.getAdmittedLeads();
 
       if (response.success) {
-        setAdmissions(response.data);
+        const sanitizedAdmissions = (response.data || []).map((admission) => {
+          const sourceInfo = normalizeSource(admission);
+          const modeInfo = normalizeModeOfStudy(admission);
+
+          return {
+            ...admission,
+            name: normalizeName(admission),
+            regNo: normalizeRegNo(admission),
+            program: normalizeProgram(admission.program),
+            status: normalizeStatus(admission.status),
+            paymentStatus: normalizePaymentStatus(admission.paymentStatus),
+            source: sourceInfo.label,
+            sourceKey: sourceInfo.key,
+            modeOfStudy: modeInfo.label,
+            modeKey: modeInfo.key,
+          };
+        });
+
+        setAdmissions(sanitizedAdmissions);
         setCached(response.cached);
       } else {
         throw new Error(response.message || "Failed to fetch admitted leads");
@@ -177,15 +482,12 @@ const SuzySheets = () => {
       );
 
       if (response.success) {
-        // Refresh the data
         await fetchAdmittedLeads();
-
         setSnackbar({
           open: true,
           message: "Note saved successfully",
           severity: "success",
         });
-
         handleCloseNoteDialog();
       } else {
         throw new Error(response.message || "Failed to save note");
@@ -255,12 +557,31 @@ const SuzySheets = () => {
         matchesLastTouch = item.lastTouchDays > 7;
       }
 
-      return matchesStatus && matchesSearch && matchesLastTouch;
+      const matchesSource =
+        sourceFilter === "ALL" ||
+        (item.sourceKey || "UNKNOWN") === sourceFilter;
+      const matchesMode =
+        modeFilter === "ALL" || (item.modeKey || "UNKNOWN") === modeFilter;
+
+      return (
+        matchesStatus &&
+        matchesSearch &&
+        matchesLastTouch &&
+        matchesSource &&
+        matchesMode
+      );
     });
 
     // Sort by most recent first
     return filtered.sort((a, b) => a.lastTouchDays - b.lastTouchDays);
-  }, [admissions, statusFilter, searchTerm, lastTouchFilter]);
+  }, [
+    admissions,
+    statusFilter,
+    searchTerm,
+    lastTouchFilter,
+    sourceFilter,
+    modeFilter,
+  ]);
 
   const statusSummaries = useMemo(() => {
     return admissions.reduce(
@@ -274,6 +595,151 @@ const SuzySheets = () => {
       { total: 0 }
     );
   }, [admissions]);
+
+  const sourceOptions = useMemo(() => {
+    const entries = new Map();
+    admissions.forEach((item) => {
+      const key = item.sourceKey || "UNKNOWN";
+      const label = item.source || "Unknown";
+      if (!entries.has(key)) {
+        entries.set(key, label);
+      }
+    });
+    return Array.from(entries, ([key, label]) => ({ key, label })).sort(
+      (a, b) => a.label.localeCompare(b.label)
+    );
+  }, [admissions]);
+
+  const modeOptions = useMemo(() => {
+    const entries = new Map();
+    admissions.forEach((item) => {
+      const key = item.modeKey || "UNKNOWN";
+      const label = item.modeOfStudy || "Unknown";
+      if (!entries.has(key)) {
+        entries.set(key, label);
+      }
+    });
+    return Array.from(entries, ([key, label]) => ({ key, label })).sort(
+      (a, b) => a.label.localeCompare(b.label)
+    );
+  }, [admissions]);
+
+  const selectedSourceOption = useMemo(() => {
+    if (sourceFilter === "ALL") return null;
+    return sourceOptions.find((option) => option.key === sourceFilter) || null;
+  }, [sourceFilter, sourceOptions]);
+
+  const selectedModeOption = useMemo(() => {
+    if (modeFilter === "ALL") return null;
+    return modeOptions.find((option) => option.key === modeFilter) || null;
+  }, [modeFilter, modeOptions]);
+
+  const handleExport = useCallback(() => {
+    if (!filteredAdmissions.length) {
+      setSnackbar({
+        open: true,
+        message: "No records to export for the current filters",
+        severity: "warning",
+      });
+      return;
+    }
+
+    setExporting(true);
+    let objectUrl;
+
+    try {
+      const headers = [
+        "Student Name",
+        "Registration Number",
+        "Email",
+        "Phone",
+        "Programme",
+        "Lead Source",
+        "Mode of Study",
+        "Status",
+        "Payment Status",
+        "Last Touch",
+      ];
+
+      const rows = filteredAdmissions.map((item) => {
+        const statusLabel =
+          statusPalette[item.status]?.label ||
+          (item.status ? formatLabel(item.status) : "Unknown");
+        const paymentLabel =
+          paymentStatusPalette[item.paymentStatus]?.label ||
+          (item.paymentStatus ? formatLabel(item.paymentStatus) : "Unknown");
+
+        return [
+          item.name || "Unknown Student",
+          item.regNo || "",
+          item.email || "",
+          item.phone || "",
+          item.program || "",
+          item.source || "Unknown",
+          item.modeOfStudy || "Unknown",
+          statusLabel,
+          paymentLabel,
+          item.lastTouch || "",
+        ]
+          .map(toCsvValue)
+          .join(",");
+      });
+
+      const csvContent = [headers.map(toCsvValue).join(","), ...rows].join(
+        "\r\n"
+      );
+
+      const blob = new Blob([csvContent], {
+        type: "text/csv;charset=utf-8;",
+      });
+      objectUrl = URL.createObjectURL(blob);
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.setAttribute("download", `suzy-sheets-${timestamp}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setSnackbar({
+        open: true,
+        message: `Exported ${filteredAdmissions.length} record${
+          filteredAdmissions.length === 1 ? "" : "s"
+        }`,
+        severity: "success",
+      });
+    } catch (error) {
+      console.error("Error exporting Suzy Sheets:", error);
+      setSnackbar({
+        open: true,
+        message: "Failed to export data. Please try again.",
+        severity: "error",
+      });
+    } finally {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+      setExporting(false);
+    }
+  }, [filteredAdmissions, setSnackbar]);
+
+  useEffect(() => {
+    if (
+      sourceFilter !== "ALL" &&
+      !sourceOptions.some((option) => option.key === sourceFilter)
+    ) {
+      setSourceFilter("ALL");
+    }
+  }, [sourceFilter, sourceOptions]);
+
+  useEffect(() => {
+    if (
+      modeFilter !== "ALL" &&
+      !modeOptions.some((option) => option.key === modeFilter)
+    ) {
+      setModeFilter("ALL");
+    }
+  }, [modeFilter, modeOptions]);
 
   const renderStatusChip = (status) => {
     const palette = statusPalette[status] || statusPalette.ADMITTED;
@@ -324,12 +790,125 @@ const SuzySheets = () => {
 
   if (loading) {
     return (
-      <Container
-        maxWidth="lg"
-        sx={{ mt: 8, display: "flex", justifyContent: "center" }}
-      >
-        <CircularProgress size={60} />
-      </Container>
+      <Fade in={loading}>
+        <Container maxWidth="xl" sx={{ mt: 4, mb: 6 }}>
+          {/* Header Skeleton */}
+          <Box mb={4}>
+            <Skeleton variant="text" width="30%" height={48} sx={{ mb: 1 }} />
+            <Skeleton variant="text" width="60%" height={24} sx={{ mb: 2 }} />
+            <Skeleton variant="rounded" width={200} height={32} />
+          </Box>
+
+          {/* Status Cards Skeleton */}
+          <Grid container spacing={3} sx={{ mb: 2 }}>
+            {[1, 2, 3, 4].map((item) => (
+              <Grid item xs={12} sm={6} md={3} key={item}>
+                <Card>
+                  <CardContent>
+                    <Box
+                      sx={{ display: "flex", justifyContent: "space-between" }}
+                    >
+                      <Box>
+                        <Skeleton variant="text" width={80} height={20} />
+                        <Skeleton
+                          variant="text"
+                          width={60}
+                          height={48}
+                          sx={{ mt: 1 }}
+                        />
+                      </Box>
+                      <Skeleton variant="circular" width={12} height={12} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* Search and Filter Skeleton */}
+          <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+            <Stack spacing={2}>
+              <Skeleton variant="rounded" height={40} width="100%" />
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Skeleton key={i} variant="rounded" width={80} height={32} />
+                ))}
+              </Box>
+            </Stack>
+          </Paper>
+
+          {/* Table Skeleton */}
+          <Paper variant="outlined">
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    {[
+                      "Student",
+                      "Reg No.",
+                      "Email",
+                      "Phone",
+                      "Programme",
+                      "Source",
+                      "Mode",
+                      "Status",
+                      "Payment",
+                      "Last Touch",
+                      "Actions",
+                    ].map((header) => (
+                      <TableCell key={header}>
+                        <Skeleton variant="text" width="80%" height={20} />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {[1, 2, 3, 4, 5].map((row) => (
+                    <TableRow key={row}>
+                      <TableCell>
+                        <Skeleton variant="text" width="90%" height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width="80%" height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width="95%" height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width="80%" height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width="95%" height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width="80%" height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width="80%" height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="rounded" width={90} height={24} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="rounded" width={110} height={24} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width="70%" height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: "flex", gap: 0.5 }}>
+                          <Skeleton variant="circular" width={32} height={32} />
+                          <Skeleton variant="circular" width={32} height={32} />
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Container>
+      </Fade>
     );
   }
 
@@ -464,143 +1043,214 @@ const SuzySheets = () => {
         </Grid>
 
         <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={2}
-            justifyContent="space-between"
-            alignItems={{ xs: "stretch", md: "center" }}
-          >
-            <TextField
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              size="small"
-              placeholder="Search by name, reg no. or programme"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon
-                      fontSize="small"
-                      sx={{ color: "text.secondary" }}
-                    />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ width: { xs: "100%", md: 320 } }}
-            />
-
-            <Stack direction="column" spacing={1.5} flex={1}>
-              {/* Status Filters */}
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Typography
-                  variant="caption"
-                  color="textSecondary"
-                  sx={{ alignSelf: "center", mr: 1 }}
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={6} lg={5}>
+              <TextField
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                size="small"
+                placeholder="Search by name, reg no. or programme"
+                fullWidth
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon
+                        fontSize="small"
+                        sx={{ color: "text.secondary" }}
+                      />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6} lg={7}>
+              <Stack
+                direction="row"
+                spacing={1.5}
+                justifyContent={{ xs: "flex-start", md: "flex-end" }}
+              >
+                <Button
+                  startIcon={
+                    exporting ? (
+                      <CircularProgress
+                        color="inherit"
+                        size={18}
+                        thickness={4}
+                      />
+                    ) : (
+                      <DownloadIcon />
+                    )
+                  }
+                  variant="contained"
+                  color="primary"
+                  sx={{ fontWeight: 600, minWidth: 160 }}
+                  onClick={handleExport}
+                  disabled={exporting || filteredAdmissions.length === 0}
                 >
-                  Status:
+                  {exporting ? "Exporting..." : "Export Excel"}
+                </Button>
+              </Stack>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Stack spacing={1}>
+                <Typography variant="caption" color="textSecondary">
+                  Status
                 </Typography>
-                {statusFilters.map((status) => {
-                  if (status === "ALL") {
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                  {statusFilters.map((status) => {
+                    if (status === "ALL") {
+                      return (
+                        <Chip
+                          key={status}
+                          label="All"
+                          clickable
+                          size="small"
+                          variant={
+                            statusFilter === "ALL" ? "filled" : "outlined"
+                          }
+                          color={statusFilter === "ALL" ? "primary" : "default"}
+                          onClick={() => setStatusFilter("ALL")}
+                          sx={{ fontWeight: 500 }}
+                        />
+                      );
+                    }
+                    const palette = statusPalette[status];
                     return (
                       <Chip
                         key={status}
-                        label="All"
+                        label={palette.label}
+                        onClick={() => setStatusFilter(status)}
                         clickable
                         size="small"
-                        variant={statusFilter === "ALL" ? "filled" : "outlined"}
-                        color={statusFilter === "ALL" ? "primary" : "default"}
-                        onClick={() => setStatusFilter("ALL")}
-                        sx={{ fontWeight: 500 }}
+                        variant={
+                          statusFilter === status ? "filled" : "outlined"
+                        }
+                        sx={{
+                          fontWeight: 500,
+                          bgcolor:
+                            statusFilter === status
+                              ? alpha(palette.dot, 0.15)
+                              : "inherit",
+                          color:
+                            statusFilter === status
+                              ? palette.chip
+                              : "text.primary",
+                          borderColor: palette.dot,
+                          "&:hover": { bgcolor: alpha(palette.dot, 0.12) },
+                        }}
                       />
                     );
-                  }
-                  const palette = statusPalette[status];
-                  return (
-                    <Chip
-                      key={status}
-                      label={palette.label}
-                      onClick={() => setStatusFilter(status)}
-                      clickable
-                      size="small"
-                      variant={statusFilter === status ? "filled" : "outlined"}
-                      sx={{
-                        fontWeight: 500,
-                        bgcolor:
-                          statusFilter === status
-                            ? alpha(palette.dot, 0.15)
-                            : "inherit",
-                        color:
-                          statusFilter === status
-                            ? palette.chip
-                            : "text.primary",
-                        borderColor: palette.dot,
-                        "&:hover": { bgcolor: alpha(palette.dot, 0.12) },
-                      }}
-                    />
-                  );
-                })}
+                  })}
+                </Box>
               </Stack>
+            </Grid>
 
-              {/* Last Touch Filters */}
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Typography
-                  variant="caption"
-                  color="textSecondary"
-                  sx={{ alignSelf: "center", mr: 1 }}
-                >
-                  Last Contact:
+            <Grid item xs={12}>
+              <Stack spacing={1}>
+                <Typography variant="caption" color="textSecondary">
+                  Last Contact
                 </Typography>
-                <Chip
-                  label="All Time"
-                  clickable
-                  size="small"
-                  variant={lastTouchFilter === "ALL" ? "filled" : "outlined"}
-                  color={lastTouchFilter === "ALL" ? "primary" : "default"}
-                  onClick={() => setLastTouchFilter("ALL")}
-                  sx={{ fontWeight: 500 }}
-                />
-                <Chip
-                  label="Today"
-                  clickable
-                  size="small"
-                  variant={lastTouchFilter === "TODAY" ? "filled" : "outlined"}
-                  color={lastTouchFilter === "TODAY" ? "success" : "default"}
-                  onClick={() => setLastTouchFilter("TODAY")}
-                  sx={{ fontWeight: 500 }}
-                />
-                <Chip
-                  label="This Week"
-                  clickable
-                  size="small"
-                  variant={lastTouchFilter === "WEEK" ? "filled" : "outlined"}
-                  color={lastTouchFilter === "WEEK" ? "info" : "default"}
-                  onClick={() => setLastTouchFilter("WEEK")}
-                  sx={{ fontWeight: 500 }}
-                />
-                <Chip
-                  label="Over 1 Week Ago"
-                  clickable
-                  size="small"
-                  variant={lastTouchFilter === "OLD" ? "filled" : "outlined"}
-                  color={lastTouchFilter === "OLD" ? "warning" : "default"}
-                  onClick={() => setLastTouchFilter("OLD")}
-                  sx={{ fontWeight: 500 }}
-                />
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                  <Chip
+                    label="All Time"
+                    clickable
+                    size="small"
+                    variant={lastTouchFilter === "ALL" ? "filled" : "outlined"}
+                    color={lastTouchFilter === "ALL" ? "primary" : "default"}
+                    onClick={() => setLastTouchFilter("ALL")}
+                    sx={{ fontWeight: 500 }}
+                  />
+                  <Chip
+                    label="Today"
+                    clickable
+                    size="small"
+                    variant={
+                      lastTouchFilter === "TODAY" ? "filled" : "outlined"
+                    }
+                    color={lastTouchFilter === "TODAY" ? "success" : "default"}
+                    onClick={() => setLastTouchFilter("TODAY")}
+                    sx={{ fontWeight: 500 }}
+                  />
+                  <Chip
+                    label="This Week"
+                    clickable
+                    size="small"
+                    variant={lastTouchFilter === "WEEK" ? "filled" : "outlined"}
+                    color={lastTouchFilter === "WEEK" ? "info" : "default"}
+                    onClick={() => setLastTouchFilter("WEEK")}
+                    sx={{ fontWeight: 500 }}
+                  />
+                  <Chip
+                    label="Over 1 Week Ago"
+                    clickable
+                    size="small"
+                    variant={lastTouchFilter === "OLD" ? "filled" : "outlined"}
+                    color={lastTouchFilter === "OLD" ? "warning" : "default"}
+                    onClick={() => setLastTouchFilter("OLD")}
+                    sx={{ fontWeight: 500 }}
+                  />
+                </Box>
               </Stack>
-            </Stack>
+            </Grid>
 
-            <Button
-              startIcon={<DownloadIcon />}
-              variant="contained"
-              color="primary"
-              sx={{
-                alignSelf: { xs: "stretch", md: "center" },
-                minWidth: 180,
-                fontWeight: 600,
-              }}
-            >
-              Export Excel
-            </Button>
-          </Stack>
+            <Grid item xs={12} md={6}>
+              <Autocomplete
+                options={sourceOptions}
+                getOptionLabel={(option) => option.label}
+                value={selectedSourceOption}
+                onChange={(_, newValue) =>
+                  setSourceFilter(newValue ? newValue.key : "ALL")
+                }
+                isOptionEqualToValue={(option, value) =>
+                  option.key === value.key
+                }
+                clearOnEscape
+                disablePortal
+                fullWidth
+                disabled={sourceOptions.length === 0}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Lead Source"
+                    size="small"
+                    placeholder={
+                      sourceOptions.length ? "Filter by source" : "No sources"
+                    }
+                  />
+                )}
+                noOptionsText="No sources"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Autocomplete
+                options={modeOptions}
+                getOptionLabel={(option) => option.label}
+                value={selectedModeOption}
+                onChange={(_, newValue) =>
+                  setModeFilter(newValue ? newValue.key : "ALL")
+                }
+                isOptionEqualToValue={(option, value) =>
+                  option.key === value.key
+                }
+                clearOnEscape
+                disablePortal
+                fullWidth
+                disabled={modeOptions.length === 0}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Mode of Study"
+                    size="small"
+                    placeholder={
+                      modeOptions.length ? "Filter by mode" : "No modes"
+                    }
+                  />
+                )}
+                noOptionsText="No modes"
+              />
+            </Grid>
+          </Grid>
         </Paper>
 
         <Paper variant="outlined">
@@ -614,13 +1264,25 @@ const SuzySheets = () => {
                   <TableCell sx={{ fontWeight: 700, width: "12%" }}>
                     Reg No.
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 700, width: "25%" }}>
+                  <TableCell sx={{ fontWeight: 700, width: "18%" }}>
+                    Email
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700, width: "14%" }}>
+                    Phone
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700, width: "18%" }}>
                     Programme
                   </TableCell>
                   <TableCell sx={{ fontWeight: 700, width: "12%" }}>
-                    Status
+                    Source
                   </TableCell>
                   <TableCell sx={{ fontWeight: 700, width: "12%" }}>
+                    Mode
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700, width: "10%" }}>
+                    Status
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700, width: "10%" }}>
                     Payment
                   </TableCell>
                   <TableCell sx={{ fontWeight: 700, width: "10%" }}>
@@ -650,7 +1312,27 @@ const SuzySheets = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" noWrap>
+                        {admission.email || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" noWrap>
+                        {admission.phone || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" noWrap>
                         {admission.program}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" noWrap>
+                        {admission.source || "Unknown"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" noWrap>
+                        {admission.modeOfStudy || "Unknown"}
                       </Typography>
                     </TableCell>
                     <TableCell>{renderStatusChip(admission.status)}</TableCell>
@@ -693,7 +1375,7 @@ const SuzySheets = () => {
                 ))}
                 {filteredAdmissions.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} sx={{ py: 6 }}>
+                    <TableCell colSpan={11} sx={{ py: 6 }}>
                       <Typography align="center" color="textSecondary">
                         Nothing matches your current filters – try clearing the
                         search or switching the tag.

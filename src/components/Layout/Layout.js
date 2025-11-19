@@ -144,7 +144,7 @@ const Layout = ({ children }) => {
         {
           text: "Suzy Sheets",
           icon: <TableViewIcon />,
-          path: "/admission-admin/suzy-sheets",
+          path: "/admin/suzy-sheets",
         },
       ];
 

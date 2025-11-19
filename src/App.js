@@ -189,7 +189,6 @@ function App() {
                           element={<AdmissionAdminDashboard />}
                         />
                         <Route path="import-data" element={<ImportData />} />
-                        <Route path="suzy-sheets" element={<SuzySheets />} />
                         {/* Root path redirects to dashboard */}
                         <Route
                           path=""
