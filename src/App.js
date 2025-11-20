@@ -1,407 +1,205 @@
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
-import Layout from "./components/Layout/Layout";
-// Super Admin Pages
-import SuperAdminDashboard from "./pages/super-admin/Dashboard";
-import ChatManagement from "./pages/super-admin/ChatManagement";
-import Settings from "./pages/super-admin/Settings";
-import UserManagement from "./pages/super-admin/UserManagement";
-import SuperAdminSettings from "./pages/super-admin/AdminSettings";
-import FacebookLeadForms from "./pages/super-admin/FacebookLeadForms";
-import BulkActions from "./pages/super-admin/BulkActions";
-import ConversionPlan from "./pages/super-admin/ConversionPlan";
-import Archive from "./pages/super-admin/Archive";
-// Admin Pages (formerly organization)
-import TeamManagement from "./pages/admin/TeamManagement";
-import LeadsOverview from "./pages/admin/LeadsOverview";
-import ChatConfig from "./pages/admin/ChatConfig";
-import Analytics from "./pages/admin/Analytics";
-import DataCenter from "./pages/admin/DataCenter";
-import KnowledgeBase from "./pages/admin/KnowledgeBase";
-// Admission Admin Pages
-import {
-  AdmissionAdminDashboard,
-  ImportData,
-  SuzySheets,
-} from "./pages/admission-admin";
-// Marketing Pages
-import AssignedLeads from "./pages/Marketing/AssignedLeads";
-// Auth Pages
-import Login from "./pages/auth/Login";
-import ForgotPassword from "./pages/auth/ForgotPassword";
-// Public Pages
-import LandingPage from "./pages/LandingPage";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsOfService from "./pages/TermsOfService";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { useState } from "react";
-import { ThemeProvider } from "@mui/material/styles";
-import { createAppTheme } from "./theme/theme";
-import { Box, CircularProgress } from "@mui/material";
-import { HelmetProvider } from "react-helmet-async";
-
-const ProtectedRoute = ({
-  allowedRoles = [],
-  requiredPermission = null,
-  children,
-}) => {
-  const { user, loading, hasPermission } = useAuth();
-
-  // Show loading state
-  if (loading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  // Redirect to login if not authenticated
-  if (!user) {
-    if (process.env.NODE_ENV === "development") {
-      console.log("No user found, redirecting to login");
-    }
-    return <Navigate to="/login" replace />;
-  }
-
-  // Get user role
-  const userRole = user.role || user.jobRole || null;
-
-  // Check role-based access
-  if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-    console.log(`Access denied: ${userRole} not in ${allowedRoles.join(", ")}`);
-
-    // Redirect to appropriate dashboard based on role
-    let redirectPath = "/login";
-    if (userRole === "superAdmin") redirectPath = "/super-admin/dashboard";
-    else if (userRole === "admin") redirectPath = "/admin/leads";
-    else if (userRole === "admissionAdmin")
-      redirectPath = "/admission-admin/dashboard";
-    else if (userRole === "marketingAgent")
-      redirectPath = "/marketing/assigned-leads";
-    else if (userRole === "admissionAgent") redirectPath = "/admin/chat-config";
-
-    return <Navigate to={redirectPath} replace />;
-  }
-
-  // Check permission-based access
-  if (requiredPermission && !hasPermission(requiredPermission)) {
-    console.log(`Permission denied: ${requiredPermission}`);
-    return <Navigate to={user.defaultRoute || "/login"} replace />;
-  }
-
-  return children;
-};
+import React from "react";
+import { Box, Container, Typography, Paper } from "@mui/material";
+import { Lock, Email } from "@mui/icons-material";
 
 function App() {
-  const [currentTheme, setCurrentTheme] = useState(() => {
-    const savedColors = localStorage.getItem("themeColors");
-    return createAppTheme(savedColors ? JSON.parse(savedColors) : {});
-  });
-
-  const handleThemeChange = (colors) => {
-    const newTheme = createAppTheme(colors);
-    setCurrentTheme(newTheme);
-  };
-
   return (
-    <HelmetProvider>
-      <ThemeProvider theme={currentTheme}>
-        <Router
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true,
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#ffffff",
+        padding: { xs: 2, sm: 3 },
+      }}
+    >
+      <Container maxWidth="sm">
+        <Paper
+          elevation={3}
+          sx={{
+            padding: { xs: 3, sm: 4, md: 5 },
+            textAlign: "center",
+            borderRadius: 3,
+            border: "1px solid #e0e0e0",
           }}
         >
-          <AuthProvider>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-              <Route path="/terms-of-service" element={<TermsOfService />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
+          {/* University Logo */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              marginBottom: { xs: 2, sm: 3 },
+            }}
+          >
+            <img
+              src="https://iuea.ac.ug/sitepad-data/uploads/2020/11/Website-Logo.png"
+              alt="IUEA Logo"
+              style={{
+                maxWidth: "100%",
+                width: "250px",
+                height: "auto",
+              }}
+            />
+          </Box>
 
-              {/* Super Admin Routes */}
-              <Route
-                path="/super-admin/*"
-                element={
-                  <ProtectedRoute allowedRoles={["superAdmin"]}>
-                    <Layout>
-                      <Routes>
-                        <Route
-                          path="dashboard"
-                          element={<SuperAdminDashboard />}
-                        />
-                        <Route path="users" element={<UserManagement />} />
-                        <Route
-                          path="facebook-lead-forms"
-                          element={<FacebookLeadForms />}
-                        />
-                        <Route path="bulk-actions" element={<BulkActions />} />
-                        <Route path="chat" element={<ChatManagement />} />
-                        <Route path="archive" element={<Archive />} />
-                        <Route
-                          path="settings"
-                          element={
-                            <Settings onThemeChange={handleThemeChange} />
-                          }
-                        />
-                        <Route
-                          path="admin-settings"
-                          element={<SuperAdminSettings />}
-                        />
-                      </Routes>
-                    </Layout>
-                  </ProtectedRoute>
-                }
+          {/* Lock Icon */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              marginBottom: { xs: 1.5, sm: 2 },
+            }}
+          >
+            <Lock
+              sx={{
+                fontSize: { xs: 50, sm: 60 },
+                color: "#667eea",
+              }}
+            />
+          </Box>
+
+          {/* Main Heading */}
+          <Typography
+            variant="h4"
+            component="h1"
+            gutterBottom
+            sx={{
+              fontWeight: 700,
+              color: "#2c3e50",
+              marginBottom: { xs: 1.5, sm: 2 },
+              fontSize: { xs: "1.75rem", sm: "2.125rem" },
+            }}
+          >
+            System Under Review
+          </Typography>
+
+          {/* Access Restricted Message */}
+          <Typography
+            variant="h6"
+            sx={{
+              color: "#e74c3c",
+              fontWeight: 600,
+              marginBottom: { xs: 2, sm: 3 },
+              fontSize: { xs: "1.1rem", sm: "1.25rem" },
+            }}
+          >
+            Access Restricted
+          </Typography>
+
+          {/* Description */}
+          <Typography
+            variant="body1"
+            sx={{
+              color: "#555",
+              marginBottom: { xs: 2, sm: 3 },
+              lineHeight: 1.8,
+              fontSize: { xs: "0.95rem", sm: "1rem" },
+              px: { xs: 0, sm: 2 },
+            }}
+          >
+            This system is currently undergoing maintenance and review. Access
+            has been temporarily restricted to ensure system integrity and
+            security.
+          </Typography>
+
+          {/* Contact Information */}
+          <Paper
+            sx={{
+              padding: { xs: 2, sm: 3 },
+              backgroundColor: "#f8f9fa",
+              borderRadius: 2,
+              marginTop: { xs: 2, sm: 3 },
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 1.5,
+                flexWrap: "wrap",
+              }}
+            >
+              <Email
+                sx={{
+                  color: "#667eea",
+                  marginRight: 1,
+                  fontSize: { xs: 20, sm: 24 },
+                }}
               />
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  fontWeight: 600,
+                  color: "#2c3e50",
+                  fontSize: { xs: "0.95rem", sm: "1rem" },
+                }}
+              >
+                For More Information
+              </Typography>
+            </Box>
+            <Typography
+              variant="body1"
+              sx={{
+                color: "#555",
+                marginBottom: 1,
+                fontSize: { xs: "0.9rem", sm: "1rem" },
+              }}
+            >
+              Please contact the Head of ICT:
+            </Typography>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 700,
+                color: "#667eea",
+                marginBottom: 0.5,
+                fontSize: { xs: "1.1rem", sm: "1.25rem" },
+              }}
+            >
+              Mohammed Yahya
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#777",
+                fontStyle: "italic",
+                marginBottom: 1,
+                fontSize: { xs: "0.85rem", sm: "0.875rem" },
+              }}
+            >
+              Head of ICT Department
+            </Typography>
+            <Typography
+              variant="body1"
+              sx={{
+                color: "#667eea",
+                fontWeight: 500,
+                marginTop: 1,
+                fontSize: { xs: "0.9rem", sm: "1rem" },
+                wordBreak: "break-all",
+              }}
+            >
+              mohammed.yahya@iuea.ac.ug
+            </Typography>
+          </Paper>
 
-              {/* Shared Conversion Plan Route - Accessible by admin roles only */}
-              <Route
-                path="/super-admin/conversion-plan"
-                element={
-                  <ProtectedRoute
-                    allowedRoles={["superAdmin", "admin", "admissionAdmin"]}
-                  >
-                    <Layout>
-                      <ConversionPlan />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Admission Admin Routes */}
-              <Route
-                path="/admission-admin/*"
-                element={
-                  <ProtectedRoute
-                    allowedRoles={["superAdmin", "admissionAdmin"]}
-                  >
-                    <Layout>
-                      <Routes>
-                        <Route
-                          path="dashboard"
-                          element={<AdmissionAdminDashboard />}
-                        />
-                        <Route path="import-data" element={<ImportData />} />
-                        {/* Root path redirects to dashboard */}
-                        <Route
-                          path=""
-                          element={<Navigate to="dashboard" replace />}
-                        />
-                      </Routes>
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Admin Routes (IUEA Admins) */}
-              <Route
-                path="/admin/*"
-                element={
-                  <Routes>
-                    <Route
-                      path="leads"
-                      element={
-                        <ProtectedRoute
-                          allowedRoles={["admin", "admissionAdmin"]}
-                        >
-                          <Layout>
-                            <LeadsOverview />
-                          </Layout>
-                        </ProtectedRoute>
-                      }
-                    />
-
-                    {/* Ensure root admin path redirects appropriately */}
-                    <Route
-                      path=""
-                      element={
-                        <ProtectedRoute
-                          allowedRoles={[
-                            "admin",
-                            "marketingAgent",
-                            "admissionAgent",
-                          ]}
-                        >
-                          <Navigate to="leads" replace />
-                        </ProtectedRoute>
-                      }
-                    />
-
-                    <Route
-                      path="team"
-                      element={
-                        <ProtectedRoute
-                          allowedRoles={["admin", "admissionAdmin"]}
-                        >
-                          <Layout>
-                            <TeamManagement />
-                          </Layout>
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="chat-config"
-                      element={
-                        <ProtectedRoute
-                          allowedRoles={[
-                            "admin",
-                            "admissionAdmin",
-                            "marketingAgent",
-                            "admissionAgent",
-                          ]}
-                        >
-                          <Layout>
-                            <ChatConfig />
-                          </Layout>
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="knowledge-base"
-                      element={
-                        <ProtectedRoute
-                          allowedRoles={[
-                            "admin",
-                            "admissionAdmin",
-                            "superAdmin",
-                            "marketingAgent",
-                            "admissionAgent",
-                          ]}
-                        >
-                          <Layout>
-                            <KnowledgeBase />
-                          </Layout>
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="analytics"
-                      element={
-                        <ProtectedRoute
-                          allowedRoles={[
-                            "admin",
-                            "admissionAdmin",
-                            "marketingAgent",
-                            "admissionAgent",
-                          ]}
-                        >
-                          <Layout>
-                            <Analytics />
-                          </Layout>
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="data-center"
-                      element={
-                        <ProtectedRoute
-                          allowedRoles={[
-                            "admin",
-                            "admissionAdmin",
-                            "marketingAgent",
-                            "admissionAgent",
-                          ]}
-                        >
-                          <Layout>
-                            <DataCenter />
-                          </Layout>
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="import-data"
-                      element={
-                        <ProtectedRoute
-                          allowedRoles={[
-                            "superAdmin",
-                            "admin",
-                            "admissionAdmin",
-                            "admissionAgent",
-                          ]}
-                        >
-                          <Layout>
-                            <ImportData />
-                          </Layout>
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="suzy-sheets"
-                      element={
-                        <ProtectedRoute
-                          allowedRoles={[
-                            "superAdmin",
-                            "admin",
-                            "admissionAdmin",
-                            "admissionAgent",
-                          ]}
-                        >
-                          <Layout>
-                            <SuzySheets />
-                          </Layout>
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="settings"
-                      element={
-                        <ProtectedRoute
-                          allowedRoles={[
-                            "admin",
-                            "admissionAdmin",
-                            "marketingAgent",
-                            "admissionAgent",
-                          ]}
-                        >
-                          <Layout>
-                            <Settings onThemeChange={handleThemeChange} />
-                          </Layout>
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route path="*" element={<Navigate to="leads" replace />} />
-                  </Routes>
-                }
-              />
-
-              {/* Marketing Routes */}
-              <Route
-                path="/marketing/*"
-                element={
-                  <ProtectedRoute allowedRoles={["marketingAgent"]}>
-                    <Layout>
-                      <Routes>
-                        <Route
-                          path="assigned-leads"
-                          element={<AssignedLeads />}
-                        />
-                        {/* Root path redirects to assigned leads */}
-                        <Route
-                          path=""
-                          element={<Navigate to="assigned-leads" replace />}
-                        />
-                      </Routes>
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Redirect dashboard to appropriate role-based dashboard */}
-              <Route path="/dashboard" element={<Navigate to="/" replace />} />
-
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </AuthProvider>
-        </Router>
-      </ThemeProvider>
-    </HelmetProvider>
+          {/* Footer Message */}
+          <Typography
+            variant="caption"
+            sx={{
+              display: "block",
+              marginTop: { xs: 2, sm: 3 },
+              color: "#999",
+              fontSize: { xs: "0.75rem", sm: "0.875rem" },
+            }}
+          >
+            Thank you for your patience and understanding
+          </Typography>
+        </Paper>
+      </Container>
+    </Box>
   );
 }
 
